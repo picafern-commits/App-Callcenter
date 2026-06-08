@@ -1,4 +1,4 @@
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 
 const pages = [
@@ -39,8 +39,8 @@ function seedData() {
       { id: uid('CLI'), nome:'Auto Oficina Braga', telefone:'253000000', email:'geral@oficina.pt', tipo:'Recorrente', notas:'Cliente profissional.' }
     ],
     suppliers: [
-      { id: uid('FOR'), nome:'Fornecedor Norte', telefone:'253111222', email:'pecas@norte.pt', whatsapp:'253111222', tipo:'Usadas / Recondicionadas', marcas:'Mercedes, BMW, Audi', tempo:'2h', avaliacao:'5', notas:'Boa resposta.' },
-      { id: uid('FOR'), nome:'Stock Sul', telefone:'219000111', email:'comercial@stocksul.pt', whatsapp:'219000111', tipo:'Novas', marcas:'Todas', tempo:'24h', avaliacao:'4', notas:'Bom preço em óticas.' }
+      { id: uid('FOR'), nomeFornecedor:'Fornecedor Norte', numeroReferencia:'FOR-001', telefone:'253111222', email:'pecas@norte.pt', whatsapp:'253111222', notas:'Usadas / Recondicionadas · Mercedes, BMW, Audi · resposta média 2h.' },
+      { id: uid('FOR'), nomeFornecedor:'Stock Sul', numeroReferencia:'FOR-002', telefone:'219000111', email:'comercial@stocksul.pt', whatsapp:'219000111', notas:'Peças novas · todas as marcas · bom preço em óticas.' }
     ],
     quotes: [],
     followups: [
@@ -128,30 +128,42 @@ function renderPage(id){
 }
 
 function dashboard(){
+  const appCards = pages.filter(p => p.id !== 'dashboard').map(p => `
+    <button class="launcher-card" data-page-card="${p.id}">
+      <div class="launcher-icon">${p.icon}</div>
+      <strong>${esc(p.title)}</strong>
+      <span>${esc(p.subtitle)}</span>
+    </button>`).join('');
   const total = state.calls.length;
   const pend = state.calls.filter(c=>!['Concluído','Perdido'].includes(c.estado)).length;
-  const quotes = state.quotes.length;
-  const revenue = state.calls.filter(c=>c.estado==='Concluído').reduce((a,c)=>a+Number(c.precoVenda||0),0);
+  const suppliers = state.suppliers.length;
+  const followToday = state.followups.filter(f=>f.date===today()).length;
   return `
-    <div class="grid metrics">
-      ${metric('Chamadas / Pedidos', total, 'Registos totais')}
-      ${metric('Pendentes', pend, 'Ainda precisam de ação')}
-      ${metric('Orçamentos', quotes, 'Propostas criadas')}
-      ${metric('Vendas concluídas', money(revenue), 'Total registado')}
-    </div>
-    <div class="grid two" style="margin-top:18px">
-      <div class="card">
-        <div class="card-head"><h3>Pedidos recentes</h3><button class="btn primary small" data-go="nova-chamada">+ Nova chamada</button></div>
-        ${callsTable(state.calls.slice().reverse().slice(0,6), false)}
+    <div class="launcher-page">
+      <div class="launcher-top">
+        <div class="launcher-logo">
+          <div class="launcher-logo-mark">AZ</div>
+          <div>
+            <h1>AUTOZITÂNIA</h1>
+            <small>Sistema callcenter de peças automóveis</small>
+          </div>
+        </div>
+        <div class="launcher-title">
+          <h2>📊 PAINEL DE APLICAÇÕES</h2>
+          <p>Acede rapidamente às ferramentas da empresa</p>
+        </div>
       </div>
-      <div class="card">
-        <div class="card-head"><h3>Follow-ups de hoje</h3><button class="btn small" data-go="agenda">Ver agenda</button></div>
-        ${state.followups.filter(f=>f.date===today()).map(f=>`<div class="mini-card"><strong>${esc(f.time)} · ${esc(f.title)}</strong><span>${esc(f.related)} — ${esc(f.status)}</span></div>`).join('') || '<div class="empty">Sem follow-ups para hoje.</div>'}
+
+      <div class="launcher-stats">
+        <div><strong>${total}</strong><span>Pedidos</span></div>
+        <div><strong>${pend}</strong><span>Pendentes</span></div>
+        <div><strong>${suppliers}</strong><span>Fornecedores</span></div>
+        <div><strong>${followToday}</strong><span>Follow-ups hoje</span></div>
       </div>
-    </div>
-    <div class="card" style="margin-top:18px">
-      <div class="card-head"><h3>Pipeline de pedidos</h3><span class="muted">Estado atual por fase</span></div>
-      ${kanban()}
+
+      <div class="launcher-grid">
+        ${appCards}
+      </div>
     </div>`;
 }
 function metric(label,value,note){ return `<div class="card metric"><div class="label">${label}</div><div class="value">${value}</div><div class="note">${note}</div></div>`; }
@@ -207,9 +219,35 @@ function clientes(){
   ], state.clients, ['nome','telefone','email','tipo'], 'client');
 }
 function fornecedores(){
-  return entityPage('Fornecedores','supplierForm',[
-    ['nome','Nome'],['telefone','Telefone'],['email','Email'],['whatsapp','WhatsApp'],['tipo','Tipo de peças'],['marcas','Marcas'],['tempo','Tempo resposta'],['avaliacao','Avaliação 1-5'],['notas','Notas']
-  ], state.suppliers, ['nome','telefone','email','tipo','marcas','tempo','avaliacao'], 'supplier');
+  return `<div class="grid two suppliers-page">
+    <div class="card">
+      <div class="card-head"><h3>Adicionar fornecedor</h3><span class="muted">Lista simples por fornecedor e referência.</span></div>
+      <form id="supplierForm" class="form-grid">
+        <input class="field span2" name="nomeFornecedor" placeholder="Nome Fornecedor" required>
+        <input class="field" name="numeroReferencia" placeholder="Número referência" required>
+        <input class="field" name="telefone" placeholder="Telefone">
+        <input class="field" name="email" placeholder="Email">
+        <input class="field" name="whatsapp" placeholder="WhatsApp">
+        <textarea class="span3" name="notas" placeholder="Notas internas"></textarea>
+        <div class="span3"><button class="btn primary" type="submit">Guardar fornecedor</button></div>
+      </form>
+    </div>
+    <div class="card supplier-list-card">
+      <div class="card-head"><h3>Lista de fornecedores</h3><span class="muted">${state.suppliers.length} registos</span></div>
+      <div class="toolbar"><input id="supplierSearch" class="field" placeholder="Pesquisar por nome fornecedor ou número referência"></div>
+      <div id="suppliersTable">${suppliersTable(state.suppliers)}</div>
+    </div>
+  </div>`;
+}
+function supplierName(s){ return s.nomeFornecedor || s.nome || ''; }
+function supplierRef(s){ return s.numeroReferencia || s.referenciaFornecedor || s.referencia || ''; }
+function filterSuppliers(){
+  const q = (qs('#supplierSearch')?.value || '').toLowerCase();
+  return state.suppliers.filter(s => `${supplierName(s)} ${supplierRef(s)}`.toLowerCase().includes(q));
+}
+function suppliersTable(rows){
+  if(!rows.length) return '<div class="empty">Sem fornecedores registados.</div>';
+  return `<div class="table-wrap"><table class="suppliers-table"><thead><tr><th>Nome Fornecedor</th><th>Número Referência</th><th>Ações</th></tr></thead><tbody>${rows.map(s=>`<tr><td><strong>${esc(supplierName(s))}</strong></td><td><span class="supplier-ref">${esc(supplierRef(s) || '-')}</span></td><td><div class="actions"><button class="btn small" data-edit-entity="supplier:${s.id}">Editar</button><button class="btn danger small" data-delete-entity="supplier:${s.id}">Apagar</button></div></td></tr>`).join('')}</tbody></table></div>`;
 }
 function stock(){
   return entityPage('Stock / Catálogo','stockForm',[
@@ -258,6 +296,9 @@ function config(){
 
 function bindPage(id){
   qsa('[data-go]').forEach(b=>b.addEventListener('click',()=>renderPage(b.dataset.go)));
+  qsa('[data-page-card]').forEach(b=>b.addEventListener('click',()=>renderPage(b.dataset.pageCard)));
+  const supplierSearch = qs('#supplierSearch');
+  if(supplierSearch) supplierSearch.addEventListener('input',()=>{ qs('#suppliersTable').innerHTML = suppliersTable(filterSuppliers()); bindEntities(); });
   if(id==='nova-chamada') bindCallForm();
   if(id==='pedidos') bindPedidos();
   bindEntities();
