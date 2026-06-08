@@ -38,3 +38,9 @@ npm run setup
 ```
 
 O instalador fica na pasta `dist`.
+
+Em Windows também podes abrir:
+
+`criar-setup-windows.bat`
+
+Esse ficheiro instala as dependências e cria o setup automaticamente, desde que o Node.js LTS esteja instalado no computador.

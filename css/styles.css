@@ -318,3 +318,44 @@ tr:hover td{
   background:rgba(255,255,255,.55);
   border-color:#c8d8e5;
 }
+
+/* Correção final: fundo AZ sempre visível por baixo da app. */
+html{
+  background:#eef5fa!important;
+}
+body{
+  position:relative;
+  isolation:isolate;
+  background:transparent!important;
+}
+body:before{
+  content:""!important;
+  position:fixed!important;
+  inset:-28px!important;
+  z-index:0!important;
+  background:url("../assets/az-40-anos-bg.png") center / cover no-repeat!important;
+  filter:blur(7px)!important;
+  transform:scale(1.04)!important;
+  opacity:.72!important;
+  pointer-events:none!important;
+}
+body:after{
+  content:""!important;
+  position:fixed!important;
+  inset:0!important;
+  z-index:0!important;
+  background:
+    linear-gradient(90deg,rgba(246,250,253,.88),rgba(246,250,253,.72) 52%,rgba(246,250,253,.54)),
+    rgba(255,255,255,.16)!important;
+  pointer-events:none!important;
+}
+body > *{
+  position:relative;
+  z-index:1;
+}
+.login-screen,.app-shell{
+  background:transparent!important;
+}
+.main,.content{
+  background:transparent!important;
+}
