@@ -1,4 +1,4 @@
-const APP_VERSION = '1.7.3';
+const APP_VERSION = '1.7.4';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session_user';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
