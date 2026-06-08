@@ -949,3 +949,174 @@ html, body{
     min-width:720px;
   }
 }
+
+/* v1.7.2 - Diretório com Local/Empresa > Secções */
+.directory-local-block{display:grid;gap:10px;border:1px solid rgba(0,58,112,.16);border-radius:14px;background:rgba(255,255,255,.55);padding:12px}
+.directory-local-title{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#e8f2fb;border:1px solid rgba(0,58,112,.12);border-radius:12px;padding:12px 14px;color:#073b70;font-weight:950}
+.directory-local-title span{font-size:13px;color:#46637c;font-weight:850}
+.directory-section-actions{justify-content:flex-end;margin-bottom:2px}
+
+/* v1.7.3 - Fundo AZ 40 anos + scrollbars invisíveis */
+:root{
+  --page:#1f2a63;
+  --page2:#009fe3;
+  --brand:#29265f;
+  --brand2:#005d9f;
+  --brand3:#1d2458;
+  --accent:#ed1748;
+  --accent2:#00b5ea;
+  --text:#07345f;
+  --muted:#4a6680;
+  --card:rgba(247,251,255,.90);
+  --card2:rgba(234,243,251,.86);
+  --line:rgba(9,60,105,.18);
+  --shadow:0 18px 34px rgba(15,39,88,.20);
+}
+html,body{
+  scrollbar-width:none !important;
+  -ms-overflow-style:none !important;
+}
+*{
+  scrollbar-width:none !important;
+  -ms-overflow-style:none !important;
+}
+*::-webkit-scrollbar{
+  width:0 !important;
+  height:0 !important;
+  display:none !important;
+}
+body{
+  position:relative;
+  background:#1f2a63 url('../assets/az-40anos-bg.png') center center / cover no-repeat fixed !important;
+}
+body::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:-2;
+  background:url('../assets/az-40anos-bg.png') center center / cover no-repeat;
+}
+body::after{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:-1;
+  pointer-events:none;
+  background:
+    linear-gradient(90deg, rgba(31,42,99,.18), rgba(0,181,234,.08)),
+    rgba(255,255,255,.08);
+}
+.login-screen,
+.app-shell{
+  background:transparent !important;
+}
+.login-screen{
+  backdrop-filter:blur(1px);
+}
+.login-card{
+  background:rgba(247,251,255,.88) !important;
+  backdrop-filter:blur(18px);
+}
+.shell-header{
+  background:rgba(247,251,255,.16);
+  border:1px solid rgba(255,255,255,.28);
+  border-radius:18px;
+  padding:12px 16px;
+  backdrop-filter:blur(14px);
+  box-shadow:0 12px 26px rgba(16,42,91,.12);
+}
+.header-brand strong,
+.header-copy h2{
+  color:#ffffff !important;
+  text-shadow:0 2px 10px rgba(0,0,0,.22);
+}
+.header-brand span,
+.header-copy span{
+  color:rgba(255,255,255,.86) !important;
+  text-shadow:0 2px 8px rgba(0,0,0,.18);
+}
+.brand-mark{
+  background:linear-gradient(135deg,#29265f,#00b5ea) !important;
+  border-color:rgba(255,255,255,.78) !important;
+}
+.nav-btn{
+  background:linear-gradient(180deg,#064b86,#29265f) !important;
+  border-color:rgba(255,255,255,.30) !important;
+  box-shadow:0 9px 18px rgba(15,39,88,.18) !important;
+}
+.nav-btn.active,
+.btn.primary{
+  background:linear-gradient(180deg,#00b5ea,#005d9f) !important;
+  border-color:rgba(255,255,255,.35) !important;
+  color:white !important;
+}
+.btn.danger,
+.btn.danger-soft{
+  border-color:rgba(237,23,72,.22) !important;
+  background:rgba(255,255,255,.88) !important;
+  color:#ed1748 !important;
+}
+.btn.ghost,
+.btn{
+  background:rgba(255,255,255,.86);
+  backdrop-filter:blur(10px);
+}
+.content{
+  scrollbar-gutter:auto !important;
+}
+.card,
+.az-section-card,
+.az-insert-card,
+.toolbar,
+.az-filter-panel,
+.portal-kpis div,
+.quick-card,
+.mini-metric{
+  background:rgba(247,251,255,.88) !important;
+  border-color:rgba(255,255,255,.58) !important;
+  backdrop-filter:blur(13px);
+  box-shadow:0 14px 28px rgba(15,39,88,.15) !important;
+}
+.table-wrap{
+  background:rgba(255,255,255,.88) !important;
+  backdrop-filter:blur(10px);
+}
+th{
+  background:linear-gradient(180deg,#005d9f,#29265f) !important;
+}
+.portal-card,
+.az-app-card{
+  background:linear-gradient(135deg,rgba(41,38,95,.96),rgba(0,93,159,.94)) !important;
+  border:1px solid rgba(255,255,255,.20) !important;
+}
+.portal-card:after,
+.az-app-card:after{
+  background:linear-gradient(#00b5ea,#ed1748) !important;
+}
+.supplier-ref{
+  color:#005d9f !important;
+}
+.modal{
+  background:rgba(247,251,255,.94) !important;
+  backdrop-filter:blur(18px);
+}
+.toast{
+  background:rgba(255,255,255,.92) !important;
+  backdrop-filter:blur(14px);
+}
+.main{
+  height:auto !important;
+  flex:1 1 auto !important;
+}
+.content{
+  height:100% !important;
+}
+@media(max-width:1180px){
+  html,body,.app-shell,.main{
+    overflow:hidden !important;
+  }
+  .content{
+    overflow-y:auto !important;
+    min-height:0 !important;
+  }
+}

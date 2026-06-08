@@ -1,4 +1,4 @@
-const APP_VERSION = '1.7.1';
+const APP_VERSION = '1.7.3';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session_user';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
@@ -107,7 +107,8 @@ function seedData() {
     contactGroups: [
       {
         id: uid('DIR'),
-        nome:'Callcenter Lisboa',
+        localEmpresa:'Armazém Lisboa',
+        nome:'Callcenter',
         aberto:true,
         contactos:[
           { id: uid('CNT'), nome:'Ricardo', telemovel:'912345678', telefone:'213000000', email:'pica.fern@gmail.com' },
@@ -116,7 +117,8 @@ function seedData() {
       },
       {
         id: uid('DIR'),
-        nome:'Callcenter Porto',
+        localEmpresa:'Armazém Porto',
+        nome:'Callcenter',
         aberto:false,
         contactos:[
           { id: uid('CNT'), nome:'Apoio Porto', telemovel:'914000000', telefone:'223000000', email:'porto@empresa.pt' }
@@ -585,7 +587,7 @@ function dashboard(){
 }
 function metric(label,value,note){ return `<div class="card metric"><div class="label">${label}</div><div class="value">${value}</div><div class="note">${note}</div></div>`; }
 function globalSearchRows(){
-  const contacts = (state.contactGroups || []).flatMap(g => (g.contactos || []).map(c => ({ type:'Contacto', title:c.nome, detail:`${g.nome} · ${c.telemovel || c.telefone || ''} · ${c.email || ''}`, page:'contactos' })));
+  const contacts = (state.contactGroups || []).flatMap(g => (g.contactos || []).map(c => ({ type:'Contacto', title:c.nome, detail:`${contactGroupLocal(g)} · ${g.nome} · ${c.telemovel || c.telefone || ''} · ${c.email || ''}`, page:'contactos' })));
   return [
     ...state.clients.map(c=>({ type:'Cliente', title:c.nome, detail:`${clientCode(c)} · ${c.telefone || ''} · ${c.email || ''}`, page:'clientes', id:c.id })),
     ...state.calls.map(c=>({ type:'Pedido', title:c.cliente, detail:`${c.matricula || ''} · ${c.peca || ''} · ${c.estado || ''}`, page:'pedidos' })),
@@ -699,20 +701,24 @@ function fornecedores(){
   </div>`;
 }
 function contactos(){
+  const locais = contactLocals();
+  const secoes = [...new Set((state.contactGroups || []).map(g=>g.nome).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt'));
   return `<div class="az-module-page">
-    ${azPageHeader('DIRETÓRIO DE CONTACTOS','Pesquisa rápida por nome, telefone, telemóvel, email ou grupo','☎️')}
+    ${azPageHeader('DIRETÓRIO DE CONTACTOS','Organizado por local/empresa e secções internas','☎️')}
     ${azActionBar('contactSearch','contactGroupForm')}
     <div class="az-filter-panel">
       <label>🔍 Pesquisa geral<input id="contactSearch" class="field" placeholder="Nome, email, telefone, secção ou local..."></label>
-      <label>🏢 Secção<select id="contactGroupSelect" class="select"><option value="">Todas</option>${(state.contactGroups || []).map(g=>`<option>${esc(g.nome)}</option>`).join('')}</select></label>
-      <label>📍 Local / Empresa<select class="select"><option>Todos</option><option>Autozitânia</option><option>Braga</option><option>Callcenter</option></select></label>
+      <label>🏢 Secção<select id="contactGroupSelect" class="select"><option value="">Todas</option>${secoes.map(nome=>`<option>${esc(nome)}</option>`).join('')}</select></label>
+      <label>📍 Local / Empresa<select id="contactLocalSelect" class="select"><option value="">Todos</option>${locais.map(local=>`<option>${esc(local)}</option>`).join('')}</select></label>
       <button class="btn ghost" data-clear-search="contactSearch">× Limpar Filtros</button>
     </div>
     <div class="grid two az-main-grid contacts-page">
       <div class="card az-insert-card">
-        <div class="card-head"><h3>＋ Inserir secção</h3><span class="muted">Ex: Administração, Fornecedores, Vendas</span></div>
+        <div class="card-head"><h3>＋ Inserir secção</h3><span class="muted">Ex: Armazém Lisboa → Compras</span></div>
         <form id="contactGroupForm" class="form-grid">
-          <input class="field span3" name="nome" placeholder="Nome da secção / grupo" required>
+          <input class="field span3" name="localEmpresa" placeholder="Local / Empresa (ex: Armazém Lisboa)" required list="contactLocalOptions">
+          <datalist id="contactLocalOptions">${locais.map(local=>`<option value="${esc(local)}"></option>`).join('')}</datalist>
+          <input class="field span3" name="nome" placeholder="Nome da secção dentro do local (ex: Administração, Vendas, Peças)" required>
           <div class="span3"><button class="btn primary" type="submit">Criar secção</button></div>
         </form>
       </div>
@@ -726,34 +732,61 @@ function contactos(){
 function contactCount(){
   return (state.contactGroups || []).reduce((sum, group)=>sum + (group.contactos || []).length, 0);
 }
+function contactGroupLocal(group){
+  return group.localEmpresa || group.local || group.empresa || 'Geral';
+}
+function contactLocals(){
+  return [...new Set((state.contactGroups || []).map(contactGroupLocal).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt'));
+}
 function filterContactGroups(){
   const q = (qs('#contactSearch')?.value || '').toLowerCase();
+  const selectedSection = qs('#contactGroupSelect')?.value || '';
+  const selectedLocal = qs('#contactLocalSelect')?.value || '';
   const groups = state.contactGroups || [];
-  if(!q) return groups;
   return groups.map(group => {
-    const groupMatch = (group.nome || '').toLowerCase().includes(q);
-    const contactos = (group.contactos || []).filter(c => `${group.nome || ''} ${c.nome || ''} ${c.telemovel || ''} ${c.telefone || ''} ${c.email || ''}`.toLowerCase().includes(q));
+    const local = contactGroupLocal(group);
+    const localOk = !selectedLocal || local === selectedLocal;
+    const sectionOk = !selectedSection || group.nome === selectedSection;
+    if(!localOk || !sectionOk) return null;
+    if(!q) return group;
+    const groupText = `${local} ${group.nome || ''}`.toLowerCase();
+    const groupMatch = groupText.includes(q);
+    const contactos = (group.contactos || []).filter(c => `${local} ${group.nome || ''} ${c.nome || ''} ${c.telemovel || ''} ${c.telefone || ''} ${c.email || ''}`.toLowerCase().includes(q));
     return groupMatch ? { ...group, aberto:true } : { ...group, aberto:true, contactos };
-  }).filter(group => (group.contactos || []).length || (group.nome || '').toLowerCase().includes(q));
+  }).filter(group => group && ((group.contactos || []).length || `${contactGroupLocal(group)} ${group.nome || ''}`.toLowerCase().includes(q)));
 }
 function contactGroupsView(groups){
   if(!groups.length) return '<div class="empty">Sem grupos ou contactos encontrados.</div>';
-  return `<div class="directory-list">${groups.map(group => `
-    <div class="directory-group">
-      <button class="directory-toggle" data-toggle-contact-group="${group.id}">
-        <strong>${esc(group.nome)}</strong>
-        <span>${(group.contactos || []).length} contactos</span>
-      </button>
-      <div class="directory-body ${group.aberto ? '' : 'hidden'}">
-        ${contactsTable(group)}
-        <form class="form-grid contact-inline-form" data-contact-form="${group.id}">
-          <input class="field" name="nome" placeholder="Nome" required>
-          <input class="field" name="telemovel" placeholder="Telemóvel">
-          <input class="field" name="telefone" placeholder="Telefone">
-          <input class="field span2" name="email" type="email" placeholder="Email">
-          <div class="actions"><button class="btn primary small" type="submit">Adicionar</button><button class="btn danger small" type="button" data-delete-contact-group="${group.id}">Apagar grupo</button></div>
-        </form>
-      </div>
+  const grouped = groups.reduce((acc, group)=>{
+    const local = contactGroupLocal(group);
+    acc[local] = acc[local] || [];
+    acc[local].push(group);
+    return acc;
+  }, {});
+  return `<div class="directory-list">${Object.entries(grouped).map(([local, localGroups]) => `
+    <div class="directory-local-block">
+      <div class="directory-local-title"><strong>📍 ${esc(local)}</strong><span>${localGroups.length} secções</span></div>
+      ${localGroups.map(group => `
+        <div class="directory-group">
+          <button class="directory-toggle" data-toggle-contact-group="${group.id}">
+            <strong>${esc(group.nome)}</strong>
+            <span>${(group.contactos || []).length} contactos</span>
+          </button>
+          <div class="directory-body ${group.aberto ? '' : 'hidden'}">
+            <div class="actions directory-section-actions">
+              <button class="btn small" data-edit-contact-group="${group.id}">Editar secção</button>
+              ${canDelete()?`<button class="btn danger small" type="button" data-delete-contact-group="${group.id}">Apagar secção</button>`:''}
+            </div>
+            ${contactsTable(group)}
+            <form class="form-grid contact-inline-form" data-contact-form="${group.id}">
+              <input class="field" name="nome" placeholder="Nome" required>
+              <input class="field" name="telemovel" placeholder="Telemóvel">
+              <input class="field" name="telefone" placeholder="Telefone">
+              <input class="field span2" name="email" type="email" placeholder="Email">
+              <div class="actions"><button class="btn primary small" type="submit">Adicionar contacto</button></div>
+            </form>
+          </div>
+        </div>`).join('')}
     </div>`).join('')}</div>`;
 }
 function contactsTable(group){
@@ -980,7 +1013,11 @@ function bindPage(id){
   const clientSearch = qs('#clientSearch');
   if(clientSearch) clientSearch.addEventListener('input',()=>{ qs('#clientsTable').innerHTML = clientsTable(filterClients()); bindEntities(); });
   const contactSearch = qs('#contactSearch');
-  if(contactSearch) contactSearch.addEventListener('input',()=>{ qs('#contactsTable').innerHTML = contactGroupsView(filterContactGroups()); bindContactDirectory(); });
+  if(contactSearch) contactSearch.addEventListener('input',()=>refreshContactDirectory());
+  const contactGroupSelect = qs('#contactGroupSelect');
+  if(contactGroupSelect) contactGroupSelect.addEventListener('change',()=>refreshContactDirectory());
+  const contactLocalSelect = qs('#contactLocalSelect');
+  if(contactLocalSelect) contactLocalSelect.addEventListener('change',()=>refreshContactDirectory());
   const supplierSearch = qs('#supplierSearch');
   if(supplierSearch) supplierSearch.addEventListener('input',()=>{ qs('#suppliersTable').innerHTML = suppliersTable(filterSuppliers()); bindEntities(); });
   if(id==='nova-chamada') bindCallForm();
@@ -1092,6 +1129,12 @@ function upsertClient(nome, telefone, email){
   const exists = state.clients.find(c=>c.nome.toLowerCase()===nome.toLowerCase() || (telefone && c.telefone===telefone));
   if(!exists) state.clients.push({id:uid('CLI'), codigoCliente:`CLI-${String(state.clients.length + 1).padStart(3,'0')}`, nome, telefone, email, notas:''});
 }
+function refreshContactDirectory(){
+  const table = qs('#contactsTable');
+  if(!table) return;
+  table.innerHTML = contactGroupsView(filterContactGroups());
+  bindContactDirectory();
+}
 function bindContactDirectory(){
   const groupForm = qs('#contactGroupForm');
   if(groupForm) groupForm.addEventListener('submit',e=>{
@@ -1099,15 +1142,17 @@ function bindContactDirectory(){
     if(!canEditOperational()) return toast('Sem permissão para alterar contactos.');
     const data = Object.fromEntries(new FormData(e.target).entries());
     state.contactGroups = state.contactGroups || [];
-    state.contactGroups.push({ id:uid('DIR'), nome:data.nome, aberto:true, contactos:[] });
-    saveState(); renderPage('contactos'); toast('Grupo criado.');
+    state.contactGroups.push({ id:uid('DIR'), localEmpresa:data.localEmpresa, nome:data.nome, aberto:true, contactos:[] });
+    saveState(); renderPage('contactos'); toast('Secção criada.');
   });
   qsa('[data-toggle-contact-group]').forEach(btn=>btn.addEventListener('click',()=>{
     const group = (state.contactGroups || []).find(g=>g.id===btn.dataset.toggleContactGroup);
     if(!group) return;
     group.aberto = !group.aberto;
-    saveState(); renderPage('contactos');
+    saveState(); refreshContactDirectory();
   }));
+  qsa('[data-edit-contact-group]').forEach(btn=>btn.addEventListener('click',()=>openContactGroupModal(btn.dataset.editContactGroup)));
+  
   qsa('[data-contact-form]').forEach(form=>form.addEventListener('submit',e=>{
     e.preventDefault();
     if(!canEditOperational()) return toast('Sem permissão para alterar contactos.');
@@ -1130,8 +1175,28 @@ function bindContactDirectory(){
   qsa('[data-delete-contact-group]').forEach(btn=>btn.addEventListener('click',()=>{
     if(!canDelete()) return toast('Sem permissão para apagar.');
     state.contactGroups = (state.contactGroups || []).filter(g=>g.id!==btn.dataset.deleteContactGroup);
-    saveState(); renderPage('contactos'); toast('Grupo apagado.');
+    saveState(); renderPage('contactos'); toast('Secção apagada.');
   }));
+}
+function openContactGroupModal(id){
+  const group = (state.contactGroups || []).find(g=>g.id===id);
+  if(!group) return;
+  openModal('Editar secção do diretório', `<form id="editContactGroupForm" class="form-grid">
+    <input class="field span3" name="localEmpresa" placeholder="Local / Empresa" value="${esc(contactGroupLocal(group))}" required>
+    <input class="field span3" name="nome" placeholder="Nome da secção" value="${esc(group.nome || '')}" required>
+    <div class="span3"><button class="btn primary">Guardar alterações</button></div>
+  </form>`);
+  qs('#editContactGroupForm').addEventListener('submit', e=>{
+    e.preventDefault();
+    if(!canEditOperational()) return toast('Sem permissão para alterar contactos.');
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    group.localEmpresa = data.localEmpresa;
+    group.nome = data.nome;
+    saveState();
+    closeModal();
+    renderPage('contactos');
+    toast('Secção atualizada.');
+  });
 }
 function bindUsersPage(){
   qsa('[data-approve-user]').forEach(btn=>btn.addEventListener('click',()=>{
