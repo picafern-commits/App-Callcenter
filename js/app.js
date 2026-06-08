@@ -1,4 +1,4 @@
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 
 const pages = [
@@ -131,100 +131,39 @@ function dashboard(){
   const total = state.calls.length;
   const pend = state.calls.filter(c=>!['Concluído','Perdido'].includes(c.estado)).length;
   const quotes = state.quotes.length;
-  const suppliers = state.suppliers.length;
   const todayFollowups = state.followups.filter(f=>f.date===today()).length;
-  const totalVenda = state.calls.reduce((a,c)=>a+Number(c.precoVenda||0),0);
-  const totalCompra = state.calls.reduce((a,c)=>a+Number(c.precoCompra||0),0);
-  const margem = totalVenda - totalCompra;
-  const percent = total ? Math.round((state.calls.filter(c=>c.estado==='Concluído').length / total) * 100) : 0;
-
   const appCards = pages.filter(p => p.id !== 'dashboard').map(p => `
-    <button class="launcher-card" data-page-card="${p.id}">
-      <div class="launcher-topline">
-        <div class="launcher-icon">${p.icon}</div>
-        <span class="card-tag">Abrir</span>
-      </div>
+    <button class="portal-card" data-page-card="${p.id}">
+      <div class="portal-icon">${p.icon}</div>
       <strong>${esc(p.title)}</strong>
       <span>${esc(p.subtitle)}</span>
     </button>`).join('');
 
-  const pendingList = state.calls.filter(c=>!['Concluído','Perdido'].includes(c.estado)).slice(0,4);
-  const followList = state.followups.slice(0,4);
-  const supplierList = state.suppliers.slice(0,4);
-
   return `
-    <div class="dashboard-wrap">
-      <div class="hero-panel">
-        <div>
-          <span class="hero-eyebrow">⚡ CENTRAL OPERACIONAL</span>
-          <h1>${esc(companyName())}</h1>
-          <p>Plataforma interna para atendimento, pesquisa de peças, gestão de fornecedores, orçamentos e acompanhamento comercial. Mantive o login e removi a sidebar para dar um aspeto mais limpo e mais próprio.</p>
-          <div class="hero-actions">
-            <button class="btn primary" data-go="nova-chamada">+ Registar chamada</button>
-            <button class="btn ghost" data-go="pedidos">Ver pedidos</button>
-            <button class="btn ghost" data-go="fornecedores">Abrir fornecedores</button>
-          </div>
-          <div class="hero-highlights">
-            <div class="highlight-box"><strong>${total}</strong><span>Pedidos totais</span></div>
-            <div class="highlight-box"><strong>${pend}</strong><span>Pedidos pendentes</span></div>
-            <div class="highlight-box"><strong>${quotes}</strong><span>Orçamentos criados</span></div>
+    <div class="portal-page">
+      <div class="portal-top">
+        <div class="portal-logo">
+          <div class="portal-logo-mark">AP</div>
+          <div>
+            <h1>${esc(companyName())}</h1>
+            <small>Callcenter de peças automóveis</small>
           </div>
         </div>
-        <div class="hero-side">
-          <div class="status-panel">
-            <div class="panel-label">Resumo comercial</div>
-            <div class="big-number">${money(margem)}</div>
-            <div class="panel-sub">Margem prevista atual</div>
-            <div class="progress-list">
-              <div class="progress-item">
-                <span><b>Taxa concluída</b><b>${percent}%</b></span>
-                <div class="progress-bar"><i style="width:${percent}%"></i></div>
-              </div>
-              <div class="progress-item">
-                <span><b>Venda prevista</b><b>${money(totalVenda)}</b></span>
-                <div class="progress-bar"><i style="width:${Math.min(100, totalVenda ? 72 : 0)}%"></i></div>
-              </div>
-              <div class="progress-item">
-                <span><b>Compra prevista</b><b>${money(totalCompra)}</b></span>
-                <div class="progress-bar"><i style="width:${Math.min(100, totalCompra ? 54 : 0)}%"></i></div>
-              </div>
-            </div>
-          </div>
-          <div class="today-panel">
-            <div class="panel-label">Hoje</div>
-            <div class="big-number">${todayFollowups}</div>
-            <div class="panel-sub">Follow-ups agendados para hoje</div>
-          </div>
+        <div class="portal-title">
+          <h2>📊 Painel Central</h2>
+          <p>Acede rapidamente às ferramentas da empresa</p>
         </div>
       </div>
 
-      <div class="section-head">
-        <h3>Ferramentas da aplicação</h3>
-        <span class="muted">Acesso rápido sem sidebar</span>
+      <div class="portal-kpis">
+        <div><b>${total}</b><span>Pedidos totais</span></div>
+        <div><b>${pend}</b><span>Em aberto</span></div>
+        <div><b>${quotes}</b><span>Orçamentos</span></div>
+        <div><b>${todayFollowups}</b><span>Follow-ups hoje</span></div>
       </div>
-      <div class="launcher-grid">
+
+      <div class="portal-grid">
         ${appCards}
-      </div>
-
-      <div class="quick-grid">
-        <div class="quick-card">
-          <h4>Pedidos em aberto</h4>
-          <div class="quick-list">
-            ${pendingList.length ? pendingList.map(c => `<div class="quick-line"><div><strong>${esc(c.cliente)}</strong><small>${esc(c.peca)} · ${esc(c.marca)} ${esc(c.modelo)}</small></div>${badge(c.estado)}</div>`).join('') : '<div class="empty">Sem pedidos em aberto.</div>'}
-          </div>
-        </div>
-        <div class="quick-card">
-          <h4>Agenda rápida</h4>
-          <div class="quick-list">
-            ${followList.length ? followList.map(f => `<div class="quick-line"><div><strong>${esc(f.title)}</strong><small>${esc(f.date)} ${esc(f.time || '')} · ${esc(f.related || '')}</small></div>${badge(f.status)}</div>`).join('') : '<div class="empty">Sem follow-ups.</div>'}
-          </div>
-        </div>
-        <div class="quick-card">
-          <h4>Fornecedores recentes</h4>
-          <div class="quick-list">
-            ${supplierList.length ? supplierList.map(s => `<div class="quick-line"><div><strong>${esc(supplierName(s))}</strong><small>Ref.: ${esc(supplierRef(s) || '-')}</small></div><span class="badge blue">Fornecedor</span></div>`).join('') : '<div class="empty">Sem fornecedores.</div>'}
-          </div>
-        </div>
       </div>
     </div>`;
 }
