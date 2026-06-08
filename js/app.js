@@ -1,4 +1,4 @@
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 
 const pages = [
@@ -15,9 +15,23 @@ const pages = [
   { id: 'config', icon: '⚙️', title: 'Configurações', subtitle: 'GitHub, Electron, Firebase e backups' }
 ];
 
+const pageFiles = {
+  dashboard: 'index.html',
+  'nova-chamada': 'nova-chamada.html',
+  pedidos: 'pedidos.html',
+  clientes: 'clientes.html',
+  fornecedores: 'fornecedores.html',
+  orcamentos: 'orcamentos.html',
+  agenda: 'agenda.html',
+  stock: 'stock.html',
+  relatorios: 'relatorios.html',
+  users: 'users.html',
+  config: 'configuracoes.html'
+};
+
 const states = ['Novo', 'Em pesquisa', 'Orçamento enviado', 'Confirmado', 'Perdido', 'Concluído'];
 const urgencies = ['Normal', 'Urgente', 'Muito urgente'];
-let currentPage = 'dashboard';
+let currentPage = getDefaultPage();
 let state = loadState();
 
 function seedData() {
@@ -74,11 +88,26 @@ function toast(msg){ const el = qs('#toast'); el.textContent = msg; el.classList
 function qs(s){ return document.querySelector(s); }
 function qsa(s){ return [...document.querySelectorAll(s)]; }
 function companyName(){ return state.settings?.companyName || 'AutoParts CallCenter'; }
+function pageUrl(id){ return pageFiles[id] || 'index.html'; }
+function goPage(id){ window.location.href = pageUrl(id); }
+function getDefaultPage(){
+  if (window.DEFAULT_PAGE) return window.DEFAULT_PAGE;
+  const file = (window.location.pathname.split('/').pop() || 'index.html').toLowerCase();
+  const found = Object.entries(pageFiles).find(([, f]) => f.toLowerCase() === file);
+  return found ? found[0] : 'dashboard';
+}
+function showApp(){
+  qs('#loginScreen').classList.add('hidden');
+  qs('#appShell').classList.remove('hidden');
+  qs('#userBadge').textContent = state.currentUser?.name || 'Admin';
+  renderPage(currentPage);
+}
 
 function init(){
   buildNav();
   bindShell();
   restoreLogin();
+  if(state.currentUser) showApp();
 }
 
 function restoreLogin(){
@@ -95,20 +124,16 @@ function login(){
   if(qs('#rememberLogin').checked) localStorage.setItem('autoparts_login_email', email);
   state.currentUser = { email, name: email.split('@')[0] };
   saveState();
-  qs('#loginScreen').classList.add('hidden');
-  qs('#appShell').classList.remove('hidden');
-  qs('#userBadge').textContent = state.currentUser.name;
-  renderPage('dashboard');
+  showApp();
 }
 
 function buildNav(){
-  qs('#navMenu').innerHTML = pages.map(p => `<button class="nav-btn" data-page="${p.id}"><span class="nav-icon">${p.icon}</span><span>${p.title}</span></button>`).join('');
-  qsa('.nav-btn').forEach(btn => btn.addEventListener('click', () => renderPage(btn.dataset.page)));
+  qs('#navMenu').innerHTML = pages.map(p => `<a class="nav-btn" href="${pageUrl(p.id)}" data-page="${p.id}"><span class="nav-icon">${p.icon}</span><span>${p.title}</span></a>`).join('');
 }
 
 function bindShell(){
-  qs('#homeBtn').addEventListener('click',()=>renderPage('dashboard'));
-  qs('#quickCallBtn').addEventListener('click',()=>renderPage('nova-chamada'));
+  qs('#homeBtn').addEventListener('click',()=>goPage('dashboard'));
+  qs('#quickCallBtn').addEventListener('click',()=>goPage('nova-chamada'));
   qs('#logoutBtn').addEventListener('click',()=>{
     state.currentUser = null; saveState();
     qs('#appShell').classList.add('hidden');
@@ -293,8 +318,8 @@ function config(){
 }
 
 function bindPage(id){
-  qsa('[data-go]').forEach(b=>b.addEventListener('click',()=>renderPage(b.dataset.go)));
-  qsa('[data-page-card]').forEach(b=>b.addEventListener('click',()=>renderPage(b.dataset.pageCard)));
+  qsa('[data-go]').forEach(b=>b.addEventListener('click',()=>goPage(b.dataset.go)));
+  qsa('[data-page-card]').forEach(b=>b.addEventListener('click',()=>goPage(b.dataset.pageCard)));
   const supplierSearch = qs('#supplierSearch');
   if(supplierSearch) supplierSearch.addEventListener('input',()=>{ qs('#suppliersTable').innerHTML = suppliersTable(filterSuppliers()); bindEntities(); });
   if(id==='nova-chamada') bindCallForm();
@@ -310,7 +335,7 @@ function bindCallForm(){
     const call = { id: uid('PED'), createdAt: today(), ...data, precoCompra:Number(data.precoCompra||0), precoVenda:Number(data.precoVenda||0) };
     state.calls.push(call);
     upsertClient(data.cliente, data.telefone, data.email);
-    saveState(); toast('Chamada guardada com sucesso.'); renderPage('pedidos');
+    saveState(); toast('Chamada guardada com sucesso.'); setTimeout(()=>goPage('pedidos'), 250);
   });
 }
 function bindPedidos(){
@@ -330,7 +355,7 @@ function openCallModal(id){
 function createQuoteFromCall(id){
   const c = state.calls.find(x=>x.id===id); if(!c) return;
   const q = { id: uid('ORC'), callId:id, cliente:c.cliente, peca:c.peca, total:Number(c.precoVenda||0), estado:'Rascunho', createdAt:today() };
-  state.quotes.push(q); c.estado='Orçamento enviado'; saveState(); renderPage('orcamentos'); toast('Orçamento criado.');
+  state.quotes.push(q); c.estado='Orçamento enviado'; saveState(); toast('Orçamento criado.'); setTimeout(()=>goPage('orcamentos'), 250);
 }
 function upsertClient(nome, telefone, email){
   if(!nome) return;
@@ -357,7 +382,7 @@ function bindFollowForm(){
 function bindConfig(){
   qs('#settingsForm').addEventListener('submit',e=>{ e.preventDefault(); const fd=new FormData(e.target); state.settings={ companyName:fd.get('companyName'), dailyBackupHour:fd.get('dailyBackupHour'), githubUrl:fd.get('githubUrl'), firebaseEnabled:fd.get('firebaseEnabled')==='on'}; saveState(); toast('Configurações guardadas.'); renderPage('config'); });
   qs('#exportJsonBtn').addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='autoparts-callcenter-export.json'; a.click(); URL.revokeObjectURL(a.href); });
-  qs('#resetDemoBtn').addEventListener('click',()=>{ localStorage.removeItem(STORAGE_KEY); state=seedData(); renderPage('dashboard'); toast('Demo reposta.'); });
+  qs('#resetDemoBtn').addEventListener('click',()=>{ localStorage.removeItem(STORAGE_KEY); state=seedData(); toast('Demo reposta.'); setTimeout(()=>goPage('dashboard'), 250); });
 }
 function openModal(title, html){ qs('#modalRoot').innerHTML = `<div class="modal"><div class="modal-head"><h3>${title}</h3><button class="btn danger-soft small" id="closeModalBtn">Fechar</button></div>${html}</div>`; qs('#modalRoot').classList.remove('hidden'); qs('#closeModalBtn').addEventListener('click',closeModal); }
 function closeModal(){ qs('#modalRoot').classList.add('hidden'); qs('#modalRoot').innerHTML=''; }
