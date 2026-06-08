@@ -1,0 +1,95 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function masterEmail() {
+      return signedIn() && request.auth.token.email == 'pica.fern@gmail.com';
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/utilizadores/$(request.auth.uid));
+    }
+
+    function hasUserDoc() {
+      return signedIn() && exists(/databases/$(database)/documents/utilizadores/$(request.auth.uid));
+    }
+
+    function isActive() {
+      return masterEmail() || (hasUserDoc() && userDoc().data.status == 'Ativo');
+    }
+
+    function role() {
+      return masterEmail() ? 'Admin Master' : (hasUserDoc() ? userDoc().data.role : 'Pendente');
+    }
+
+    function canManage() {
+      return isActive() && (role() in ['Admin Master', 'Admin']);
+    }
+
+    function canOperate() {
+      return isActive() && (role() in ['Admin Master', 'Admin', 'Supervisor', 'Operador']);
+    }
+
+    match /meta/{document} {
+      allow read: if signedIn();
+      allow write: if canManage();
+    }
+
+    match /utilizadores/{document} {
+      allow read: if signedIn();
+      allow create: if (signedIn() && document == request.auth.uid) || masterEmail() || (isActive() && role() == 'Admin Master');
+      allow update, delete: if masterEmail() || (isActive() && role() == 'Admin Master');
+    }
+
+    match /clientes/{document} {
+      allow read: if signedIn();
+      allow create, update: if canOperate();
+      allow delete: if canManage();
+    }
+
+    match /fornecedores/{document} {
+      allow read: if signedIn();
+      allow create, update: if canOperate();
+      allow delete: if canManage();
+    }
+
+    match /orcamentos/{document} {
+      allow read: if signedIn();
+      allow create, update: if canOperate();
+      allow delete: if canManage();
+    }
+
+    match /pedidos/{document} {
+      allow read: if signedIn();
+      allow create, update: if canOperate();
+      allow delete: if canManage();
+    }
+
+    match /agenda/{document} {
+      allow read: if signedIn();
+      allow create, update: if canOperate();
+      allow delete: if canManage();
+    }
+
+    match /stock/{document} {
+      allow read: if signedIn();
+      allow create, update: if canOperate();
+      allow delete: if canManage();
+    }
+
+    match /diretorioContactos/{document} {
+      allow read: if signedIn();
+      allow create, update: if canOperate();
+      allow delete: if canManage();
+    }
+
+    match /appState/{document} {
+      allow read: if signedIn();
+      allow write: if canManage();
+    }
+  }
+}
