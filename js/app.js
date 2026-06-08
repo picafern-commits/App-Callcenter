@@ -1,4 +1,4 @@
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
 const FIREBASE_LEGACY_STATE_DOC = 'main';
