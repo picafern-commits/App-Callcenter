@@ -1,4 +1,4 @@
-const APP_VERSION = '1.7.4';
+const APP_VERSION = '1.7.5';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session_user';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
@@ -702,27 +702,46 @@ function fornecedores(){
 }
 function contactos(){
   const locais = contactLocals();
-  const secoes = [...new Set((state.contactGroups || []).map(g=>g.nome).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt'));
-  return `<div class="az-module-page">
-    ${azPageHeader('DIRETÓRIO DE CONTACTOS','Organizado por local/empresa e secções internas','☎️')}
-    ${azActionBar('contactSearch','contactGroupForm')}
-    <div class="az-filter-panel">
-      <label>🔍 Pesquisa geral<input id="contactSearch" class="field" placeholder="Nome, email, telefone, secção ou local..."></label>
-      <label>🏢 Secção<select id="contactGroupSelect" class="select"><option value="">Todas</option>${secoes.map(nome=>`<option>${esc(nome)}</option>`).join('')}</select></label>
-      <label>📍 Local / Empresa<select id="contactLocalSelect" class="select"><option value="">Todos</option>${locais.map(local=>`<option>${esc(local)}</option>`).join('')}</select></label>
-      <button class="btn ghost" data-clear-search="contactSearch">× Limpar Filtros</button>
+  const groups = state.contactGroups || [];
+  const groupOptions = groups.map(g=>`<option value="${esc(g.id)}">${esc(contactGroupLocal(g))} · ${esc(g.nome || 'Sem secção')}</option>`).join('');
+  return `<div class="az-module-page directory-simple-page">
+    ${azPageHeader('DIRETÓRIO DE CONTACTOS','Locais, secções e contactos num ecrã mais simples','☎️')}
+
+    <div class="directory-simple-search">
+      <input id="contactSearch" class="field" placeholder="Pesquisar por nome, telefone, email, local ou secção...">
+      <button class="btn ghost" data-clear-search="contactSearch">Limpar</button>
     </div>
-    <div class="grid two az-main-grid contacts-page">
-      <div class="card az-insert-card">
-        <div class="card-head"><h3>＋ Inserir secção</h3><span class="muted">Ex: Armazém Lisboa → Compras</span></div>
-        <form id="contactGroupForm" class="form-grid">
-          <input class="field span3" name="localEmpresa" placeholder="Local / Empresa (ex: Armazém Lisboa)" required list="contactLocalOptions">
+
+    <div class="grid two az-main-grid contacts-page directory-simple-grid">
+      <div class="card az-insert-card directory-tools-card">
+        <div class="simple-card-title">
+          <h3>Adicionar</h3>
+          <span>Cria uma secção ou adiciona contactos a uma secção existente.</span>
+        </div>
+
+        <form id="contactGroupForm" class="simple-stack">
+          <strong>Nova secção</strong>
+          <input class="field" name="localEmpresa" placeholder="Local / Empresa, ex: Armazém Lisboa" required list="contactLocalOptions">
           <datalist id="contactLocalOptions">${locais.map(local=>`<option value="${esc(local)}"></option>`).join('')}</datalist>
-          <input class="field span3" name="nome" placeholder="Nome da secção dentro do local (ex: Administração, Vendas, Peças)" required>
-          <div class="span3"><button class="btn primary" type="submit">Criar secção</button></div>
+          <input class="field" name="nome" placeholder="Secção, ex: Administração / Peças / Vendas" required>
+          <button class="btn primary" type="submit">Criar secção</button>
+        </form>
+
+        <form id="contactQuickForm" class="simple-stack">
+          <strong>Novo contacto</strong>
+          <select class="select" name="groupId" required>
+            <option value="">Escolher local / secção</option>
+            ${groupOptions}
+          </select>
+          <input class="field" name="nome" placeholder="Nome" required>
+          <input class="field" name="telemovel" placeholder="Telemóvel">
+          <input class="field" name="telefone" placeholder="Telefone fixo">
+          <input class="field" name="email" type="email" placeholder="Email">
+          <button class="btn primary" type="submit">Adicionar contacto</button>
         </form>
       </div>
-      <div class="az-section-card">
+
+      <div class="az-section-card directory-results-card">
         <div class="az-section-title"><span>☎️ Diretório</span><b>${contactCount()}</b></div>
         <div id="contactsTable">${contactGroupsView(filterContactGroups())}</div>
       </div>
@@ -756,43 +775,56 @@ function filterContactGroups(){
   }).filter(group => group && ((group.contactos || []).length || `${contactGroupLocal(group)} ${group.nome || ''}`.toLowerCase().includes(q)));
 }
 function contactGroupsView(groups){
-  if(!groups.length) return '<div class="empty">Sem grupos ou contactos encontrados.</div>';
+  if(!groups.length) return '<div class="empty">Sem contactos encontrados.</div>';
   const grouped = groups.reduce((acc, group)=>{
     const local = contactGroupLocal(group);
     acc[local] = acc[local] || [];
     acc[local].push(group);
     return acc;
   }, {});
-  return `<div class="directory-list">${Object.entries(grouped).map(([local, localGroups]) => `
-    <div class="directory-local-block">
-      <div class="directory-local-title"><strong>📍 ${esc(local)}</strong><span>${localGroups.length} secções</span></div>
-      ${localGroups.map(group => `
-        <div class="directory-group">
-          <button class="directory-toggle" data-toggle-contact-group="${group.id}">
-            <strong>${esc(group.nome)}</strong>
-            <span>${(group.contactos || []).length} contactos</span>
-          </button>
-          <div class="directory-body ${group.aberto ? '' : 'hidden'}">
-            <div class="actions directory-section-actions">
-              <button class="btn small" data-edit-contact-group="${group.id}">Editar secção</button>
-              ${canDelete()?`<button class="btn danger small" type="button" data-delete-contact-group="${group.id}">Apagar secção</button>`:''}
+  return `<div class="directory-clean-list">${Object.entries(grouped).map(([local, localGroups]) => `
+    <section class="directory-clean-local">
+      <div class="directory-clean-local-head">
+        <strong>📍 ${esc(local)}</strong>
+        <span>${localGroups.reduce((sum,g)=>sum + (g.contactos || []).length,0)} contactos</span>
+      </div>
+      <div class="directory-clean-sections">
+        ${localGroups.map(group => `
+          <article class="directory-clean-section">
+            <div class="directory-clean-section-head">
+              <button class="directory-clean-toggle" data-toggle-contact-group="${group.id}">
+                <strong>${esc(group.nome || 'Sem secção')}</strong>
+                <span>${group.aberto ? 'Recolher' : 'Abrir'} · ${(group.contactos || []).length}</span>
+              </button>
+              <div class="actions">
+                <button class="btn small" data-edit-contact-group="${group.id}">Editar</button>
+                ${canDelete()?`<button class="btn danger small" type="button" data-delete-contact-group="${group.id}">Apagar</button>`:''}
+              </div>
             </div>
-            ${contactsTable(group)}
-            <form class="form-grid contact-inline-form" data-contact-form="${group.id}">
-              <input class="field" name="nome" placeholder="Nome" required>
-              <input class="field" name="telemovel" placeholder="Telemóvel">
-              <input class="field" name="telefone" placeholder="Telefone">
-              <input class="field span2" name="email" type="email" placeholder="Email">
-              <div class="actions"><button class="btn primary small" type="submit">Adicionar contacto</button></div>
-            </form>
-          </div>
-        </div>`).join('')}
-    </div>`).join('')}</div>`;
+            <div class="directory-clean-body ${group.aberto ? '' : 'hidden'}">
+              ${contactsTable(group)}
+            </div>
+          </article>`).join('')}
+      </div>
+    </section>`).join('')}</div>`;
 }
 function contactsTable(group){
   const rows = group.contactos || [];
-  if(!rows.length) return '<div class="empty">Sem contactos neste grupo.</div>';
-  return `<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Telemóvel</th><th>Telefone</th><th>Email</th><th>Ações</th></tr></thead><tbody>${rows.map(c=>`<tr><td><strong>${esc(c.nome || '-')}</strong></td><td>${esc(c.telemovel || '-')}</td><td>${esc(c.telefone || '-')}</td><td>${esc(c.email || '-')}</td><td><div class="actions">${c.telemovel ? `<a class="btn small" href="tel:${esc(c.telemovel)}">Telemóvel</a>` : ''}${c.telefone ? `<a class="btn small" href="tel:${esc(c.telefone)}">Telefone</a>` : ''}${c.email ? `<a class="btn small" href="mailto:${esc(c.email)}">Email</a>` : ''}<button class="btn danger small" data-delete-contact="${group.id}:${c.id}">Apagar</button></div></td></tr>`).join('')}</tbody></table></div>`;
+  if(!rows.length) return '<div class="empty compact-empty">Sem contactos nesta secção.</div>';
+  return `<div class="contact-card-list">${rows.map(c=>`
+    <div class="contact-mini-card">
+      <div class="contact-mini-main">
+        <strong>${esc(c.nome || '-')}</strong>
+        <span>${esc(c.telemovel || c.telefone || '-')}</span>
+        ${c.email ? `<small>${esc(c.email)}</small>` : ''}
+      </div>
+      <div class="actions contact-mini-actions">
+        ${c.telemovel ? `<a class="btn small" href="tel:${esc(c.telemovel)}">Ligar móvel</a>` : ''}
+        ${c.telefone ? `<a class="btn small" href="tel:${esc(c.telefone)}">Ligar fixo</a>` : ''}
+        ${c.email ? `<a class="btn small" href="mailto:${esc(c.email)}">Email</a>` : ''}
+        ${canDelete()?`<button class="btn danger small" data-delete-contact="${group.id}:${c.id}">Apagar</button>`:''}
+      </div>
+    </div>`).join('')}</div>`;
 }
 function clientCode(c){ return c.codigoCliente || c.codigo || c.tipo || ''; }
 function filterClients(){
@@ -1144,6 +1176,18 @@ function bindContactDirectory(){
     state.contactGroups = state.contactGroups || [];
     state.contactGroups.push({ id:uid('DIR'), localEmpresa:data.localEmpresa, nome:data.nome, aberto:true, contactos:[] });
     saveState(); renderPage('contactos'); toast('Secção criada.');
+  });
+  const quickForm = qs('#contactQuickForm');
+  if(quickForm) quickForm.addEventListener('submit',e=>{
+    e.preventDefault();
+    if(!canEditOperational()) return toast('Sem permissão para alterar contactos.');
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    const group = (state.contactGroups || []).find(g=>g.id===data.groupId);
+    if(!group) return toast('Escolhe uma secção para adicionar o contacto.');
+    group.contactos = group.contactos || [];
+    group.contactos.push({ id:uid('CNT'), nome:data.nome, telemovel:data.telemovel, telefone:data.telefone, email:data.email });
+    group.aberto = true;
+    saveState(); renderPage('contactos'); toast('Contacto adicionado.');
   });
   qsa('[data-toggle-contact-group]').forEach(btn=>btn.addEventListener('click',()=>{
     const group = (state.contactGroups || []).find(g=>g.id===btn.dataset.toggleContactGroup);
