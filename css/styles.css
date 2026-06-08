@@ -359,3 +359,260 @@ body > *{
 .main,.content{
   background:transparent!important;
 }
+
+/* Layout do painel e diretorio conforme o painel interno de aplicacoes. */
+.app-panel-page{
+  max-width:1180px;
+  margin:0 auto;
+  padding:26px 0 58px;
+}
+.app-panel-page .portal-kpis,
+.app-panel-page .dashboard-work{
+  display:none;
+}
+.app-panel-page .portal-top,
+.directory-head{
+  display:grid;
+  grid-template-columns:1fr 1fr auto;
+  align-items:center;
+  gap:24px;
+  margin:8px 0 34px;
+}
+.app-panel-page .portal-title,
+.directory-head .portal-title{
+  justify-self:center;
+}
+.app-panel-grid{
+  max-width:1120px;
+  margin:0 auto;
+  grid-template-columns:repeat(3,minmax(260px,1fr));
+  gap:30px;
+}
+.app-panel-grid .portal-card{
+  min-height:245px;
+  border-radius:16px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:34px 26px;
+  background:linear-gradient(145deg,#123d66,#0d4c7c);
+  box-shadow:0 14px 28px rgba(8,44,76,.22);
+}
+.app-panel-grid .portal-card:after{
+  display:none;
+}
+.app-panel-grid .portal-icon{
+  font-size:44px;
+  margin:0 0 22px;
+}
+.app-panel-grid .portal-card strong{
+  font-size:23px;
+  line-height:1.15;
+}
+.app-panel-grid .portal-card span{
+  max-width:260px;
+  color:#d9e8f4;
+}
+.directory-page{
+  max-width:1180px;
+  margin:0 auto;
+  padding:22px 0 60px;
+}
+.directory-actions{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:16px;
+  margin-bottom:16px;
+}
+.directory-actions .btn{
+  min-height:49px;
+  border-radius:7px;
+  font-size:16px;
+  font-weight:950;
+}
+.directory-filters{
+  display:grid;
+  grid-template-columns:1.2fr 1.2fr 1.2fr .72fr;
+  gap:16px;
+  align-items:end;
+  padding:16px;
+  margin-bottom:18px;
+  border:1px solid #c7d8e7;
+  border-radius:8px;
+  background:rgba(244,249,253,.9);
+}
+.directory-filters label{
+  display:grid;
+  gap:8px;
+  color:#082e55;
+  font-weight:950;
+  font-size:13px;
+}
+.directory-insert{
+  margin-bottom:18px;
+}
+.directory-list{
+  gap:18px;
+}
+.directory-group{
+  border-radius:8px;
+  background:rgba(255,255,255,.94);
+  overflow:hidden;
+}
+.directory-toggle{
+  min-height:60px;
+  padding:15px 20px;
+  border-bottom:0;
+  background:linear-gradient(180deg,#f8fbff,#edf5fb);
+  font-size:19px;
+}
+.directory-toggle strong{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.directory-toggle strong:before{
+  display:none;
+}
+.directory-toggle em{
+  min-width:26px;
+  height:23px;
+  padding:0 8px;
+  border-radius:7px;
+  display:inline-grid;
+  place-items:center;
+  background:#1d67c8;
+  color:white;
+  font-style:normal;
+  font-size:13px;
+}
+.directory-toggle span{
+  color:#052f57;
+  font-size:17px;
+  font-weight:1000;
+}
+.directory-body{
+  padding:0;
+  gap:0;
+}
+.directory-table{
+  border-radius:0;
+  border-left:0;
+  border-right:0;
+}
+.directory-table th{
+  background:#064b88;
+}
+.directory-table th,
+.directory-table td{
+  padding:12px 14px;
+}
+.contact-inline-form{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  padding:15px;
+  margin:0;
+  border-top:1px solid #d7e4ef;
+  background:rgba(248,251,254,.88);
+}
+@media(max-width:1180px){
+  .app-panel-grid{grid-template-columns:repeat(2,minmax(240px,1fr))}
+  .directory-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .directory-filters{grid-template-columns:1fr 1fr}
+}
+@media(max-width:760px){
+  .app-panel-page .portal-top,
+  .directory-head,
+  .app-panel-grid,
+  .directory-actions,
+  .directory-filters,
+  .contact-inline-form{
+    grid-template-columns:1fr;
+  }
+  .app-panel-page .portal-title,
+  .directory-head .portal-title{
+    justify-self:start;
+  }
+  .app-panel-grid .portal-card{
+    min-height:180px;
+  }
+}
+
+/* Ocupa o ecra todo e deixa os layouts com formulario menor + lista maior. */
+.shell-header,
+.nav-strip-wrap,
+.content{
+  width:calc(100% - 32px)!important;
+  max-width:none!important;
+}
+.content{
+  padding-left:0;
+  padding-right:0;
+}
+.grid.two{
+  grid-template-columns:minmax(300px,390px) minmax(0,1fr);
+  align-items:start;
+}
+.grid.two > .card{
+  min-width:0;
+}
+.grid.two > .card:first-child{
+  position:sticky;
+  top:0;
+}
+.grid.two > .card:nth-child(2){
+  min-height:calc(100vh - 210px);
+}
+.clients-page,
+.suppliers-page,
+.grid.two:has(#quoteForm),
+.grid.two:has(#followForm),
+.grid.two:has(#stockForm),
+.grid.two:has(#createUserForm),
+.grid.two:has(#settingsForm){
+  width:100%;
+}
+.clients-page .card:first-child .form-grid,
+.suppliers-page .card:first-child .form-grid,
+.grid.two:has(#quoteForm) > .card:first-child .form-grid,
+.grid.two:has(#followForm) > .card:first-child .form-grid,
+.grid.two:has(#stockForm) > .card:first-child .form-grid,
+.grid.two:has(#createUserForm) > .card:first-child .form-grid,
+.grid.two:has(#settingsForm) > .card:first-child .form-grid{
+  grid-template-columns:1fr;
+}
+.clients-page .card:first-child .span2,
+.clients-page .card:first-child .span3,
+.suppliers-page .card:first-child .span2,
+.suppliers-page .card:first-child .span3,
+.grid.two:has(#quoteForm) > .card:first-child .span2,
+.grid.two:has(#quoteForm) > .card:first-child .span3,
+.grid.two:has(#followForm) > .card:first-child .span2,
+.grid.two:has(#followForm) > .card:first-child .span3,
+.grid.two:has(#stockForm) > .card:first-child .span2,
+.grid.two:has(#stockForm) > .card:first-child .span3,
+.grid.two:has(#createUserForm) > .card:first-child .span2,
+.grid.two:has(#createUserForm) > .card:first-child .span3,
+.grid.two:has(#settingsForm) > .card:first-child .span2,
+.grid.two:has(#settingsForm) > .card:first-child .span3{
+  grid-column:1/-1;
+}
+.app-panel-page,
+.directory-page{
+  max-width:none;
+  width:100%;
+}
+.app-panel-grid{
+  max-width:none;
+}
+@media(max-width:900px){
+  .grid.two{
+    grid-template-columns:1fr;
+  }
+  .grid.two > .card:first-child{
+    position:static;
+  }
+  .grid.two > .card:nth-child(2){
+    min-height:auto;
+  }
+}

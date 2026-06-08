@@ -13,8 +13,8 @@
   "author": "",
   "license": "UNLICENSED",
   "devDependencies": {
-    "electron": "latest",
-    "electron-builder": "latest"
+    "electron": "31.7.7",
+    "electron-builder": "24.13.3"
   },
   "build": {
     "appId": "pt.autoparts.callcenter",
