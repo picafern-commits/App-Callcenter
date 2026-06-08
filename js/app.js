@@ -4,6 +4,7 @@ const STORAGE_KEY = 'autoparts_callcenter_v1';
 const pages = [
   { id: 'dashboard', icon: '🏁', title: 'Dashboard', subtitle: 'Painel principal da operação' },
   { id: 'clientes', icon: '👤', title: 'Clientes', subtitle: 'Fichas, histórico e contactos' },
+  { id: 'contactos', icon: '☎️', title: 'Diretório de contactos', subtitle: 'Pesquisa rápida de clientes e fornecedores' },
   { id: 'fornecedores', icon: '🏭', title: 'Fornecedores', subtitle: 'Lista de fornecedores e referências' },
   { id: 'orcamentos', icon: '🧾', title: 'Orçamentos', subtitle: 'Criar, enviar e acompanhar propostas' },
   { id: 'users', icon: '🛡️', title: 'Utilizadores', subtitle: 'Equipa, cargos e permissões' },
@@ -13,6 +14,7 @@ const pages = [
 const pageFiles = {
   dashboard: 'index.html',
   clientes: 'clientes.html',
+  contactos: 'contactos.html',
   fornecedores: 'fornecedores.html',
   orcamentos: 'orcamentos.html',
   users: 'users.html',
@@ -39,12 +41,12 @@ function seedData() {
       { id: uid('PED'), createdAt: today(), cliente:'Auto Oficina Braga', telefone:'253000000', email:'geral@oficina.pt', matricula:'88-ZZ-10', marca:'Mercedes', modelo:'Classe A', ano:'2019', motor:'A180d', vin:'', peca:'Farol frente esquerdo', referencia:'FRL-A180', urgencia:'Normal', estado:'Orçamento enviado', operador:'Fátima', observacoes:'Enviar alternativa nova e usada.', fornecedor:'Stock Sul', precoCompra:210, precoVenda:310 }
     ],
     clients: [
-      { id: uid('CLI'), nome:'João Silva', telefone:'912345678', email:'', tipo:'Novo', notas:'Prefere contacto por WhatsApp.' },
-      { id: uid('CLI'), nome:'Auto Oficina Braga', telefone:'253000000', email:'geral@oficina.pt', tipo:'Recorrente', notas:'Cliente profissional.' }
+      { id: uid('CLI'), codigoCliente:'CLI-001', nome:'João Silva', telefone:'912345678', email:'', notas:'Prefere contacto por WhatsApp.' },
+      { id: uid('CLI'), codigoCliente:'CLI-002', nome:'Auto Oficina Braga', telefone:'253000000', email:'geral@oficina.pt', notas:'Cliente profissional.' }
     ],
     suppliers: [
-      { id: uid('FOR'), nomeFornecedor:'Fornecedor Norte', numeroReferencia:'FOR-001', telefone:'253111222', email:'pecas@norte.pt', whatsapp:'253111222', notas:'Usadas / Recondicionadas · Mercedes, BMW, Audi · resposta média 2h.' },
-      { id: uid('FOR'), nomeFornecedor:'Stock Sul', numeroReferencia:'FOR-002', telefone:'219000111', email:'comercial@stocksul.pt', whatsapp:'219000111', notas:'Peças novas · várias marcas · bom preço em óticas.' }
+      { id: uid('FOR'), nomeMarca:'Fornecedor Norte', codigoFicha:'FOR-001' },
+      { id: uid('FOR'), nomeMarca:'Stock Sul', codigoFicha:'FOR-002' }
     ],
     quotes: [],
     followups: [
@@ -136,7 +138,7 @@ function renderPage(id){
   qs('#pageTitle').textContent = meta.title;
   qs('#pageSubtitle').textContent = meta.subtitle;
   qsa('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.page===id));
-  const renderers = { dashboard, 'nova-chamada': novaChamada, pedidos, clientes, fornecedores, orcamentos, agenda, stock, relatorios, users, config };
+  const renderers = { dashboard, 'nova-chamada': novaChamada, pedidos, clientes, contactos, fornecedores, orcamentos, agenda, stock, relatorios, users, config };
   qs('#pageContent').innerHTML = renderers[id]();
   bindPage(id);
 }
@@ -221,45 +223,98 @@ function callsTable(rows, actions=true){
     <tr><td>${esc(c.id)}</td><td><strong>${esc(c.cliente)}</strong><br><span class="muted">${esc(c.telefone)}</span></td><td>${esc(c.marca)} ${esc(c.modelo)}<br><span class="muted">${esc(c.matricula||'Sem matrícula')}</span></td><td>${esc(c.peca)}<br><span class="muted">${esc(c.referencia||'Sem referência')}</span></td><td>${badge(c.urgencia)}</td><td>${badge(c.estado)}</td><td>${money(c.precoVenda)}</td>${actions?`<td><div class="actions"><button class="btn small" data-edit-call="${c.id}">Editar</button><button class="btn success small" data-quote="${c.id}">Orçamento</button><button class="btn danger small" data-delete-call="${c.id}">Apagar</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`;
 }
 function badge(v){
-  const map = {'Normal':'blue','Urgente':'orange','Muito urgente':'red','Novo':'blue','Em pesquisa':'orange','Orçamento enviado':'violet','Confirmado':'green','Concluído':'green','Perdido':'red','Pendente':'orange','Feito':'green','Ativo':'green','Rascunho':'blue'};
+  const map = {'Normal':'blue','Urgente':'orange','Muito urgente':'red','Novo':'blue','Em pesquisa':'orange','Orçamento enviado':'violet','Confirmado':'green','Concluído':'green','Perdido':'red','Pendente':'orange','Feito':'green','Ativo':'green','Rascunho':'blue','Cliente':'green','Fornecedor':'violet','Enviado':'green'};
   return `<span class="badge ${map[v]||''}">${esc(v||'-')}</span>`;
 }
 
 function clientes(){
-  return entityPage('Clientes','clientForm',[
-    ['nome','Nome'],['telefone','Telefone'],['email','Email'],['tipo','Tipo: Novo / Recorrente / VIP'],['notas','Notas']
-  ], state.clients, ['nome','telefone','email','tipo'], 'client');
+  return `<div class="grid two clients-page">
+    <div class="card">
+      <div class="card-head"><h3>Adicionar cliente</h3><span class="muted">O código fica antes do nome na ficha.</span></div>
+      <form id="clientForm" class="form-grid">
+        <input class="field" name="codigoCliente" placeholder="Código cliente" required>
+        <input class="field span2" name="nome" placeholder="Nome do cliente" required>
+        <input class="field" name="telefone" placeholder="Telefone">
+        <input class="field" name="email" placeholder="Email">
+        <textarea class="span3" name="notas" placeholder="Notas"></textarea>
+        <div class="span3"><button class="btn primary" type="submit">Guardar cliente</button></div>
+      </form>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Lista de clientes</h3><span class="muted">${state.clients.length} registos</span></div>
+      <div class="toolbar one"><input id="clientSearch" class="field" placeholder="Pesquisar por código, nome, telefone ou email"></div>
+      <div id="clientsTable">${clientsTable(state.clients)}</div>
+    </div>
+  </div>`;
 }
 function fornecedores(){
   return `<div class="grid two suppliers-page">
     <div class="card">
-      <div class="card-head"><h3>Adicionar fornecedor</h3><span class="muted">Lista simples por fornecedor e número de referência.</span></div>
+      <div class="card-head"><h3>Adicionar fornecedor</h3><span class="muted">Apenas marca e código de ficha.</span></div>
       <form id="supplierForm" class="form-grid">
-        <input class="field span2" name="nomeFornecedor" placeholder="Nome Fornecedor" required>
-        <input class="field" name="numeroReferencia" placeholder="Número referência" required>
-        <input class="field" name="telefone" placeholder="Telefone">
-        <input class="field" name="email" placeholder="Email">
-        <input class="field" name="whatsapp" placeholder="WhatsApp">
-        <textarea class="span3" name="notas" placeholder="Notas internas"></textarea>
+        <input class="field span2" name="nomeMarca" placeholder="Nome da marca" required>
+        <input class="field" name="codigoFicha" placeholder="Código de ficha" required>
         <div class="span3"><button class="btn primary" type="submit">Guardar fornecedor</button></div>
       </form>
     </div>
     <div class="card supplier-list-card">
       <div class="card-head"><h3>Lista de fornecedores</h3><span class="muted">${state.suppliers.length} registos</span></div>
-      <div class="toolbar"><input id="supplierSearch" class="field" placeholder="Pesquisar por nome fornecedor ou número referência"></div>
+      <div class="toolbar one"><input id="supplierSearch" class="field" placeholder="Pesquisar por marca ou código de ficha"></div>
       <div id="suppliersTable">${suppliersTable(state.suppliers)}</div>
     </div>
   </div>`;
 }
-function supplierName(s){ return s.nomeFornecedor || s.nome || ''; }
-function supplierRef(s){ return s.numeroReferencia || s.referenciaFornecedor || s.referencia || ''; }
+function contactos(){
+  const rows = contactRows();
+  return `<div class="card contacts-page">
+    <div class="card-head"><h3>Diretório de contactos</h3><span class="muted">${rows.length} contactos</span></div>
+    <div class="toolbar one"><input id="contactSearch" class="field" placeholder="Pesquisar nome, código, telefone, email ou tipo"></div>
+    <div id="contactsTable">${contactsTable(rows)}</div>
+  </div>`;
+}
+function contactRows(){
+  const clients = state.clients.map(c => ({
+    tipo:'Cliente',
+    codigo: clientCode(c),
+    nome: c.nome || '',
+    telefone: c.telefone || '',
+    email: c.email || ''
+  }));
+  const suppliers = state.suppliers.map(s => ({
+    tipo:'Fornecedor',
+    codigo: supplierRef(s),
+    nome: supplierName(s),
+    telefone: s.telefone || '',
+    email: s.email || ''
+  }));
+  return [...clients, ...suppliers];
+}
+function filterContacts(){
+  const q = (qs('#contactSearch')?.value || '').toLowerCase();
+  return contactRows().filter(r => JSON.stringify(r).toLowerCase().includes(q));
+}
+function contactsTable(rows){
+  if(!rows.length) return '<div class="empty">Sem contactos encontrados.</div>';
+  return `<div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Código</th><th>Nome</th><th>Telefone</th><th>Email</th><th>Ações</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${badge(r.tipo)}</td><td><span class="supplier-ref">${esc(r.codigo || '-')}</span></td><td><strong>${esc(r.nome || '-')}</strong></td><td>${esc(r.telefone || '-')}</td><td>${esc(r.email || '-')}</td><td><div class="actions">${r.telefone ? `<a class="btn small" href="tel:${esc(r.telefone)}">Ligar</a>` : ''}${r.email ? `<a class="btn small" href="mailto:${esc(r.email)}">Email</a>` : ''}</div></td></tr>`).join('')}</tbody></table></div>`;
+}
+function clientCode(c){ return c.codigoCliente || c.codigo || c.tipo || ''; }
+function filterClients(){
+  const q = (qs('#clientSearch')?.value || '').toLowerCase();
+  return state.clients.filter(c => `${clientCode(c)} ${c.nome || ''} ${c.telefone || ''} ${c.email || ''}`.toLowerCase().includes(q));
+}
+function clientsTable(rows){
+  if(!rows.length) return '<div class="empty">Sem clientes registados.</div>';
+  return `<div class="table-wrap"><table><thead><tr><th>Código cliente</th><th>Nome</th><th>Telefone</th><th>Email</th><th>Ações</th></tr></thead><tbody>${rows.map(c=>`<tr><td><span class="supplier-ref">${esc(clientCode(c) || '-')}</span></td><td><strong>${esc(c.nome || '')}</strong></td><td>${esc(c.telefone || '-')}</td><td>${esc(c.email || '-')}</td><td><div class="actions"><button class="btn small" data-edit-entity="client:${c.id}">Editar</button><button class="btn danger small" data-delete-entity="client:${c.id}">Apagar</button></div></td></tr>`).join('')}</tbody></table></div>`;
+}
+function supplierName(s){ return s.nomeMarca || s.nomeFornecedor || s.nome || ''; }
+function supplierRef(s){ return s.codigoFicha || s.numeroReferencia || s.referenciaFornecedor || s.referencia || ''; }
 function filterSuppliers(){
   const q = (qs('#supplierSearch')?.value || '').toLowerCase();
   return state.suppliers.filter(s => `${supplierName(s)} ${supplierRef(s)}`.toLowerCase().includes(q));
 }
 function suppliersTable(rows){
   if(!rows.length) return '<div class="empty">Sem fornecedores registados.</div>';
-  return `<div class="table-wrap"><table class="suppliers-table"><thead><tr><th>Nome Fornecedor</th><th>Número Referência</th><th>Ações</th></tr></thead><tbody>${rows.map(s=>`<tr><td><strong>${esc(supplierName(s))}</strong></td><td><span class="supplier-ref">${esc(supplierRef(s) || '-')}</span></td><td><div class="actions"><button class="btn small" data-edit-entity="supplier:${s.id}">Editar</button><button class="btn danger small" data-delete-entity="supplier:${s.id}">Apagar</button></div></td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="table-wrap"><table class="suppliers-table"><thead><tr><th>Nome da marca</th><th>Código de ficha</th><th>Ações</th></tr></thead><tbody>${rows.map(s=>`<tr><td><strong>${esc(supplierName(s))}</strong></td><td><span class="supplier-ref">${esc(supplierRef(s) || '-')}</span></td><td><div class="actions"><button class="btn small" data-edit-entity="supplier:${s.id}">Editar</button><button class="btn danger small" data-delete-entity="supplier:${s.id}">Apagar</button></div></td></tr>`).join('')}</tbody></table></div>`;
 }
 function stock(){
   return entityPage('Stock / Catálogo','stockForm',[
@@ -280,9 +335,35 @@ function entityTable(rows, cols, type){
 }
 
 function orcamentos(){
-  return `<div class="card"><div class="card-head"><h3>Orçamentos</h3><span class="muted">Criados a partir dos pedidos.</span></div>${state.quotes.length ? quotesTable() : '<div class="empty">Ainda não existem orçamentos. Cria um orçamento a partir da página Pedidos.</div>'}</div>`;
+  const clientOptions = state.clients.map(c=>`<option value="${esc(c.nome)}" data-email="${esc(c.email || '')}" data-phone="${esc(c.telefone || '')}" data-code="${esc(clientCode(c))}">${esc(clientCode(c) ? `${clientCode(c)} - ${c.nome}` : c.nome)}</option>`).join('');
+  return `<div class="grid two quotes-page">
+    <div class="card">
+      <div class="card-head"><h3>Criar orçamento</h3><span class="muted">Depois podes gerar PDF e email.</span></div>
+      <form id="quoteForm" class="form-grid">
+        <select class="select span2" name="cliente" id="quoteClientSelect" required>
+          <option value="">Selecionar cliente</option>${clientOptions}
+        </select>
+        <input class="field" name="codigoCliente" placeholder="Código cliente">
+        <input class="field" name="telefone" placeholder="Telefone">
+        <input class="field span2" name="email" placeholder="Email do cliente">
+        <input class="field" name="viatura" placeholder="Viatura / matrícula">
+        <input class="field span2" name="peca" placeholder="Peça / serviço" required>
+        <input class="field" name="referencia" placeholder="Referência">
+        <input class="field" name="quantidade" type="number" min="1" value="1" placeholder="Qtd">
+        <input class="field" name="precoUnitario" type="number" min="0" step="0.01" placeholder="Preço unitário" required>
+        <input class="field" name="validade" type="date" value="${today()}">
+        <input class="field span2" name="prazoEntrega" placeholder="Prazo de entrega">
+        <textarea class="span3" name="observacoes" placeholder="Notas para o orçamento"></textarea>
+        <div class="span3"><button class="btn primary" type="submit">Criar orçamento</button></div>
+      </form>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Orçamentos</h3><span class="muted">${state.quotes.length} registos</span></div>
+      ${state.quotes.length ? quotesTable() : '<div class="empty">Ainda não existem orçamentos.</div>'}
+    </div>
+  </div>`;
 }
-function quotesTable(){ return `<div class="table-wrap"><table><thead><tr><th>ID</th><th>Cliente</th><th>Peça</th><th>Total</th><th>Estado</th><th>Ações</th></tr></thead><tbody>${state.quotes.map(q=>`<tr><td>${esc(q.id)}</td><td>${esc(q.cliente)}</td><td>${esc(q.peca)}</td><td>${money(q.total)}</td><td>${badge(q.estado)}</td><td><button class="btn small" data-print-quote="${q.id}">Ver PDF</button></td></tr>`).join('')}</tbody></table></div>`; }
+function quotesTable(){ return `<div class="table-wrap"><table><thead><tr><th>ID</th><th>Cliente</th><th>Peça</th><th>Total</th><th>Estado</th><th>Ações</th></tr></thead><tbody>${state.quotes.map(q=>`<tr><td>${esc(q.id)}</td><td><strong>${esc(q.cliente)}</strong><br><span class="muted">${esc(q.email || '')}</span></td><td>${esc(q.peca)}<br><span class="muted">${esc(q.referencia || '')}</span></td><td>${money(q.total)}</td><td>${badge(q.estado)}</td><td><div class="actions"><button class="btn small" data-print-quote="${q.id}">PDF</button><button class="btn success small" data-email-quote="${q.id}">Email</button><button class="btn danger small" data-delete-quote="${q.id}">Apagar</button></div></td></tr>`).join('')}</tbody></table></div>`; }
 
 function agenda(){
   return `<div class="grid two"><div class="card"><div class="card-head"><h3>Novo follow-up</h3></div><form id="followForm" class="form-grid"><input class="field" type="date" name="date" value="${today()}"><input class="field" type="time" name="time"><input class="field" name="title" placeholder="Título"><input class="field span2" name="related" placeholder="Relacionado com"><select class="select" name="status"><option>Pendente</option><option>Feito</option></select><textarea class="span3" name="notes" placeholder="Notas"></textarea><div class="span3"><button class="btn primary">Guardar</button></div></form></div><div class="card"><div class="card-head"><h3>Agenda</h3></div>${entityTable(state.followups, ['date','time','title','related','status'], 'follow')}</div></div>`;
@@ -309,10 +390,15 @@ function config(){
 function bindPage(id){
   qsa('[data-go]').forEach(b=>b.addEventListener('click',()=>goPage(b.dataset.go)));
   qsa('[data-page-card]').forEach(b=>b.addEventListener('click',()=>goPage(b.dataset.pageCard)));
+  const clientSearch = qs('#clientSearch');
+  if(clientSearch) clientSearch.addEventListener('input',()=>{ qs('#clientsTable').innerHTML = clientsTable(filterClients()); bindEntities(); });
+  const contactSearch = qs('#contactSearch');
+  if(contactSearch) contactSearch.addEventListener('input',()=>{ qs('#contactsTable').innerHTML = contactsTable(filterContacts()); });
   const supplierSearch = qs('#supplierSearch');
   if(supplierSearch) supplierSearch.addEventListener('input',()=>{ qs('#suppliersTable').innerHTML = suppliersTable(filterSuppliers()); bindEntities(); });
   if(id==='nova-chamada') bindCallForm();
   if(id==='pedidos') bindPedidos();
+  if(id==='orcamentos') bindQuotes();
   bindEntities();
   if(id==='agenda') bindFollowForm();
   if(id==='config') bindConfig();
@@ -343,13 +429,69 @@ function openCallModal(id){
 }
 function createQuoteFromCall(id){
   const c = state.calls.find(x=>x.id===id); if(!c) return;
-  const q = { id: uid('ORC'), callId:id, cliente:c.cliente, peca:c.peca, total:Number(c.precoVenda||0), estado:'Rascunho', createdAt:today() };
+  const client = state.clients.find(x => x.nome?.toLowerCase() === c.cliente?.toLowerCase() || (c.telefone && x.telefone === c.telefone)) || {};
+  const q = { id: uid('ORC'), callId:id, cliente:c.cliente, codigoCliente:clientCode(client), telefone:c.telefone, email:c.email, viatura:`${c.marca || ''} ${c.modelo || ''} ${c.matricula ? '- ' + c.matricula : ''}`.trim(), peca:c.peca, referencia:c.referencia, quantidade:1, precoUnitario:Number(c.precoVenda||0), total:Number(c.precoVenda||0), validade:today(), prazoEntrega:'A confirmar', observacoes:c.observacoes || '', estado:'Rascunho', createdAt:today() };
   state.quotes.push(q); c.estado='Orçamento enviado'; saveState(); toast('Orçamento criado.'); setTimeout(()=>goPage('orcamentos'), 250);
+}
+function bindQuotes(){
+  const clientSelect = qs('#quoteClientSelect');
+  if(clientSelect) clientSelect.addEventListener('change',()=>{
+    const opt = clientSelect.selectedOptions[0];
+    qs('[name="codigoCliente"]').value = opt?.dataset.code || '';
+    qs('[name="telefone"]').value = opt?.dataset.phone || '';
+    qs('[name="email"]').value = opt?.dataset.email || '';
+  });
+  const form = qs('#quoteForm');
+  if(form) form.addEventListener('submit',e=>{
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    const quantidade = Number(data.quantidade || 1);
+    const precoUnitario = Number(data.precoUnitario || 0);
+    state.quotes.push({ id:uid('ORC'), createdAt:today(), estado:'Rascunho', ...data, quantidade, precoUnitario, total: quantidade * precoUnitario });
+    saveState(); renderPage('orcamentos'); toast('Orçamento criado.');
+  });
+  qsa('[data-print-quote]').forEach(b=>b.addEventListener('click',()=>printQuote(b.dataset.printQuote)));
+  qsa('[data-email-quote]').forEach(b=>b.addEventListener('click',()=>emailQuote(b.dataset.emailQuote)));
+  qsa('[data-delete-quote]').forEach(b=>b.addEventListener('click',()=>{ state.quotes = state.quotes.filter(q=>q.id!==b.dataset.deleteQuote); saveState(); renderPage('orcamentos'); toast('Orçamento apagado.'); }));
+}
+function quoteById(id){ return state.quotes.find(q=>q.id===id); }
+function printQuote(id){
+  const q = quoteById(id); if(!q) return;
+  const win = window.open('', '_blank', 'width=900,height=900');
+  win.document.write(quotePdfHtml(q));
+  win.document.close();
+  win.focus();
+  setTimeout(()=>win.print(), 250);
+}
+function emailQuote(id){
+  const q = quoteById(id); if(!q) return;
+  q.estado = 'Enviado';
+  saveState();
+  const subject = `Orçamento ${q.id} - ${q.peca}`;
+  const body = `Olá ${q.cliente},\n\nEnviamos em anexo o orçamento ${q.id}.\n\nResumo:\n- Peça/serviço: ${q.peca}\n- Referência: ${q.referencia || '-'}\n- Total: ${money(q.total)}\n- Prazo de entrega: ${q.prazoEntrega || 'A confirmar'}\n\nQualquer questão estamos disponíveis.\n\nObrigado,\n${companyName()}`;
+  window.location.href = `mailto:${encodeURIComponent(q.email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  renderPage('orcamentos');
+}
+function quotePdfHtml(q){
+  const iva = Number(q.total || 0) * 0.23;
+  const totalComIva = Number(q.total || 0) + iva;
+  return `<!doctype html><html lang="pt-PT"><head><meta charset="utf-8"><title>Orçamento ${esc(q.id)}</title><style>
+    *{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;color:#12344d;background:#eef4f8}.page{width:210mm;min-height:297mm;margin:0 auto;background:white;padding:20mm}
+    .top{display:flex;justify-content:space-between;gap:24px;border-bottom:4px solid #06447f;padding-bottom:18px}.brand h1{margin:0;color:#06447f}.brand p,.box p{margin:5px 0;color:#49677f}.stamp{font-size:28px;font-weight:900;color:#f58220;text-align:right}.box{border:1px solid #c9d8e5;border-radius:10px;padding:14px;margin-top:20px}
+    table{width:100%;border-collapse:collapse;margin-top:22px}th{background:#06447f;color:white;text-align:left;padding:12px}td{border-bottom:1px solid #dce7f0;padding:12px}.totals{margin-left:auto;width:310px;margin-top:18px}.totals div{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #dce7f0}.totals .grand{font-size:20px;font-weight:900;color:#06447f}.notes{margin-top:26px;line-height:1.5}.footer{margin-top:40px;color:#49677f;font-size:12px;border-top:1px solid #dce7f0;padding-top:12px}@media print{body{background:white}.page{margin:0;box-shadow:none}}
+  </style></head><body><main class="page">
+    <section class="top"><div class="brand"><h1>${esc(companyName())}</h1><p>Callcenter de peças automóveis</p><p>Orçamento gerado em ${esc(today())}</p></div><div><div class="stamp">ORÇAMENTO</div><p><strong>${esc(q.id)}</strong></p><p>Validade: ${esc(q.validade || today())}</p></div></section>
+    <section class="box"><h2>Cliente</h2><p><strong>${esc(q.cliente)}</strong></p><p>Código cliente: ${esc(q.codigoCliente || '-')}</p><p>Telefone: ${esc(q.telefone || '-')} · Email: ${esc(q.email || '-')}</p><p>Viatura: ${esc(q.viatura || '-')}</p></section>
+    <table><thead><tr><th>Descrição</th><th>Referência</th><th>Qtd</th><th>Preço unit.</th><th>Total</th></tr></thead><tbody><tr><td>${esc(q.peca)}</td><td>${esc(q.referencia || '-')}</td><td>${esc(q.quantidade || 1)}</td><td>${money(q.precoUnitario)}</td><td>${money(q.total)}</td></tr></tbody></table>
+    <section class="totals"><div><span>Subtotal</span><strong>${money(q.total)}</strong></div><div><span>IVA 23%</span><strong>${money(iva)}</strong></div><div class="grand"><span>Total</span><strong>${money(totalComIva)}</strong></div></section>
+    <section class="notes"><p><strong>Prazo de entrega:</strong> ${esc(q.prazoEntrega || 'A confirmar')}</p><p><strong>Observações:</strong> ${esc(q.observacoes || '-')}</p></section>
+    <section class="footer">Este orçamento fica sujeito à disponibilidade da peça no momento da confirmação. Para avançar, responda a este email com a confirmação do orçamento.</section>
+  </main></body></html>`;
 }
 function upsertClient(nome, telefone, email){
   if(!nome) return;
   const exists = state.clients.find(c=>c.nome.toLowerCase()===nome.toLowerCase() || (telefone && c.telefone===telefone));
-  if(!exists) state.clients.push({id:uid('CLI'), nome, telefone, email, tipo:'Novo', notas:''});
+  if(!exists) state.clients.push({id:uid('CLI'), codigoCliente:`CLI-${String(state.clients.length + 1).padStart(3,'0')}`, nome, telefone, email, notas:''});
 }
 function bindEntities(){
   const map = { client:[state.clients,'clients'], supplier:[state.suppliers,'suppliers'], stock:[state.stock,'stock'], user:[state.users,'users'], follow:[state.followups,'followups'] };
