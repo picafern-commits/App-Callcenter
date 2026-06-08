@@ -1,0 +1,42 @@
+{
+  "name": "autoparts-callcenter",
+  "version": "1.0.0",
+  "description": "App de callcenter para peças automóveis",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "author": "",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest"
+  },
+  "build": {
+    "appId": "pt.autoparts.callcenter",
+    "productName": "AutoParts CallCenter",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "html/**/*",
+      "css/**/*",
+      "js/**/*",
+      "assets/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}
