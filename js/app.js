@@ -36,6 +36,7 @@ const pages = [
   { id: 'contactos', icon: 'DT', title: 'Diretório de contactos', subtitle: 'Telefones da organização' },
   { id: 'fornecedores', icon: 'FR', title: 'Fornecedores', subtitle: 'Lista de fornecedores e referências' },
   { id: 'orcamentos', icon: 'OR', title: 'Orçamentos', subtitle: 'Criar, enviar e acompanhar propostas' },
+  { id: 'auditoria', icon: 'AU', title: 'Auditoria', subtitle: 'Registos criados e alterados' },
   { id: 'users', icon: 'US', title: 'Utilizadores', subtitle: 'Equipa, cargos e permissões' },
   { id: 'config', icon: 'CF', title: 'Configurações', subtitle: 'GitHub, Electron, Firebase e backups' }
 ];
@@ -46,6 +47,7 @@ const pageFiles = {
   contactos: 'contactos.html',
   fornecedores: 'fornecedores.html',
   orcamentos: 'orcamentos.html',
+  auditoria: 'auditoria.html',
   'nova-chamada': 'nova-chamada.html',
   pedidos: 'pedidos.html',
   agenda: 'agenda.html',
@@ -330,6 +332,7 @@ function pageUrl(id){ return pageFiles[id] || 'index.html'; }
 function goPage(id){ window.location.href = pageUrl(id); }
 function canOpenPage(id){
   if(['dashboard','clientes','contactos','fornecedores','orcamentos'].includes(id)) return true;
+  if(id === 'auditoria') return hasPermission('viewReports') || hasPermission('manageSettings');
   if(id === 'users') return hasPermission('manageUsers') || hasPermission('approveUsers');
   if(id === 'config') return hasPermission('manageSettings');
   return true;
@@ -504,7 +507,7 @@ function renderPage(id){
   qs('#pageTitle').textContent = meta.title;
   qs('#pageSubtitle').textContent = meta.subtitle;
   qsa('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.page===id));
-  const renderers = { dashboard, 'nova-chamada': novaChamada, pedidos, clientes, contactos, fornecedores, orcamentos, agenda, stock, relatorios, users, config };
+  const renderers = { dashboard, 'nova-chamada': novaChamada, pedidos, clientes, contactos, fornecedores, orcamentos, auditoria, agenda, stock, relatorios, users, config };
   qs('#pageContent').innerHTML = renderers[id]();
   bindPage(id);
 }
@@ -884,7 +887,7 @@ function orcamentos(){
     </div>
   </div>`;
 }
-function quotesTable(){ return `<div class="table-wrap"><table><thead><tr><th>ID</th><th>Cliente</th><th>Peça</th><th>Total</th><th>Estado</th><th>Ações</th></tr></thead><tbody>${state.quotes.map(q=>`<tr><td>${esc(q.id)}</td><td><strong>${esc(q.cliente)}</strong><br><span class="muted">${esc(q.email || '')}</span></td><td>${esc(q.peca)}<br><span class="muted">${esc(q.referencia || '')}</span></td><td>${money(q.total)}</td><td>${badge(q.estado)}</td><td><div class="actions"><button class="btn small" data-print-quote="${q.id}">PDF</button><button class="btn success small" data-email-quote="${q.id}">Email</button><button class="btn success small" data-quote-status="${q.id}:Aceite">Aceite</button><button class="btn warn small" data-quote-status="${q.id}:Recusado">Recusado</button>${canDelete()?`<button class="btn danger small" data-delete-quote="${q.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`; }
+function quotesTable(){ return `<div class="table-wrap"><table><thead><tr><th>ID</th><th>Cliente</th><th>Peça</th><th>Total</th><th>Estado</th><th>Ações</th></tr></thead><tbody>${state.quotes.map(q=>`<tr><td>${esc(q.id)}</td><td><strong>${esc(q.cliente)}</strong><br><span class="muted">${esc(q.email || '')}</span></td><td>${esc(q.peca)}<br><span class="muted">${esc(q.referencia || '')}</span></td><td>${money(q.total)}</td><td>${badge(q.estado)}</td><td><div class="actions"><button class="btn small" data-print-quote="${q.id}">PDF</button><button class="btn small" data-copy-quote="${q.id}">Copiar email</button><button class="btn success small" data-email-quote="${q.id}">Email</button><button class="btn success small" data-quote-status="${q.id}:Aceite">Aceite</button><button class="btn warn small" data-quote-status="${q.id}:Recusado">Recusado</button>${canDelete()?`<button class="btn danger small" data-delete-quote="${q.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`; }
 
 function agenda(){
   return `<div class="grid two"><div class="card"><div class="card-head"><h3>Novo follow-up</h3></div><form id="followForm" class="form-grid"><input class="field" type="date" name="date" value="${today()}"><input class="field" type="time" name="time"><input class="field" name="title" placeholder="Título"><input class="field span2" name="related" placeholder="Relacionado com"><select class="select" name="status"><option>Pendente</option><option>Feito</option></select><textarea class="span3" name="notes" placeholder="Notas"></textarea><div class="span3"><button class="btn primary">Guardar</button></div></form></div><div class="card"><div class="card-head"><h3>Agenda</h3></div>${entityTable(state.followups, ['date','time','title','related','status'], 'follow')}</div></div>`;
@@ -896,6 +899,40 @@ function relatorios(){
   const won = state.calls.filter(c=>c.estado==='Concluído').length;
   const lost = state.calls.filter(c=>c.estado==='Perdido').length;
   return `<div class="grid metrics">${metric('Total venda',money(totalVenda),'Todos os pedidos')}${metric('Total compra',money(totalCompra),'Custos registados')}${metric('Margem prevista',money(margem),'Venda - compra')}${metric('Ganhos / Perdidos',`${won} / ${lost}`,'Resultado comercial')}</div><div class="card" style="margin-top:18px"><div class="card-head"><h3>Peças mais procuradas</h3></div>${topParts()}</div>`;
+}
+function auditoria(){
+  const rows = auditRows();
+  return `<div class="card audit-page">
+    <div class="card-head"><h3>Auditoria</h3><span class="muted">${rows.length} movimentos</span></div>
+    <div class="toolbar one"><input id="auditSearch" class="field" placeholder="Pesquisar por página, registo, utilizador ou ação"></div>
+    <div id="auditTable">${auditTable(rows)}</div>
+  </div>`;
+}
+function auditRows(){
+  const sources = [
+    ['Pedidos', state.calls || [], 'cliente'],
+    ['Clientes', state.clients || [], 'nome'],
+    ['Fornecedores', state.suppliers || [], 'nomeMarca'],
+    ['Orçamentos', state.quotes || [], 'cliente'],
+    ['Agenda', state.followups || [], 'title'],
+    ['Stock', state.stock || [], 'nome'],
+    ['Utilizadores', state.users || [], 'email'],
+    ['Diretório', state.contactGroups || [], 'nome']
+  ];
+  return sources.flatMap(([page, rows, labelKey]) => rows.flatMap(row => {
+    const label = row[labelKey] || row.nome || row.id || '-';
+    const base = [];
+    if(row.createdAt || row.createdBy) base.push({ page, label, action:'Criado', date:row.createdAt || '-', by:row.createdBy || '-' });
+    if(row.updatedAtLocal || row.updatedByLocal) base.push({ page, label, action:'Atualizado', date:row.updatedAtLocal || row.updatedAt || '-', by:row.updatedByLocal || row.updatedBy || '-' });
+    (row.history || []).forEach(h => base.push({ page, label, action:h.action || 'Histórico', date:h.date || '-', by:h.by || '-' }));
+    return base;
+  })).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+}
+function auditTable(rows){
+  const q = (qs('#auditSearch')?.value || '').toLowerCase();
+  const filtered = rows.filter(r => `${r.page} ${r.label} ${r.action} ${r.date} ${r.by}`.toLowerCase().includes(q)).slice(0,250);
+  if(!filtered.length) return '<div class="empty">Sem movimentos encontrados.</div>';
+  return `<div class="table-wrap"><table><thead><tr><th>Data</th><th>Página</th><th>Registo</th><th>Ação</th><th>Utilizador</th></tr></thead><tbody>${filtered.map(r=>`<tr><td>${esc(r.date)}</td><td>${esc(r.page)}</td><td><strong>${esc(r.label)}</strong></td><td>${esc(r.action)}</td><td>${esc(r.by)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function topParts(){
   const count = {};
@@ -927,6 +964,7 @@ function bindPage(id){
   if(id==='nova-chamada') bindCallForm();
   if(id==='pedidos') bindPedidos();
   if(id==='orcamentos') bindQuotes();
+  if(id==='auditoria') bindAudit();
   if(id==='contactos') bindContactDirectory();
   if(id==='users') bindUsersPage();
   bindEntities();
@@ -987,11 +1025,16 @@ function bindQuotes(){
     saveState(); renderPage('orcamentos'); toast('Orçamento criado.');
   });
   qsa('[data-print-quote]').forEach(b=>b.addEventListener('click',()=>printQuote(b.dataset.printQuote)));
+  qsa('[data-copy-quote]').forEach(b=>b.addEventListener('click',()=>copyQuoteEmail(b.dataset.copyQuote)));
   qsa('[data-email-quote]').forEach(b=>b.addEventListener('click',()=>emailQuote(b.dataset.emailQuote)));
   qsa('[data-quote-status]').forEach(b=>b.addEventListener('click',()=>{ if(!canEditOperational()) return toast('Sem permissão para alterar orçamento.'); const [id,status]=b.dataset.quoteStatus.split(':'); const q=quoteById(id); if(!q) return; q.estado=status; auditUpdate(q,`Marcado como ${status}`); saveState(); renderPage('orcamentos'); toast('Estado atualizado.'); }));
   qsa('[data-delete-quote]').forEach(b=>b.addEventListener('click',()=>{ if(!canDelete()) return toast('Sem permissão para apagar.'); state.quotes = state.quotes.filter(q=>q.id!==b.dataset.deleteQuote); saveState(); renderPage('orcamentos'); toast('Orçamento apagado.'); }));
 }
 function quoteById(id){ return state.quotes.find(q=>q.id===id); }
+function bindAudit(){
+  const search = qs('#auditSearch');
+  if(search) search.addEventListener('input',()=>{ qs('#auditTable').innerHTML = auditTable(auditRows()); });
+}
 function printQuote(id){
   const q = quoteById(id); if(!q) return;
   const win = window.open('', '_blank', 'width=900,height=900');
@@ -1005,10 +1048,28 @@ function emailQuote(id){
   q.estado = 'Enviado';
   auditUpdate(q,'Email preparado');
   saveState();
-  const subject = `Orçamento ${q.id} - ${q.peca}`;
-  const body = `Olá ${q.cliente},\n\nEnviamos em anexo o orçamento ${q.id}.\n\nResumo:\n- Peça/serviço: ${q.peca}\n- Referência: ${q.referencia || '-'}\n- Total: ${money(q.total)}\n- Prazo de entrega: ${q.prazoEntrega || 'A confirmar'}\n\nQualquer questão estamos disponíveis.\n\nObrigado,\n${companyName()}`;
+  const { subject, body } = quoteEmailContent(q);
   window.location.href = `mailto:${encodeURIComponent(q.email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   renderPage('orcamentos');
+}
+async function copyQuoteEmail(id){
+  const q = quoteById(id); if(!q) return;
+  const { subject, body } = quoteEmailContent(q);
+  const text = `Assunto: ${subject}\n\n${body}`;
+  try {
+    await navigator.clipboard.writeText(text);
+    auditUpdate(q,'Email copiado');
+    saveState();
+    toast('Email copiado.');
+  } catch {
+    openModal('Email do orçamento', `<textarea class="span3" style="width:100%;min-height:260px">${esc(text)}</textarea>`);
+  }
+}
+function quoteEmailContent(q){
+  return {
+    subject: `Orçamento ${q.id} - ${q.peca}`,
+    body: `Olá ${q.cliente},\n\nEnviamos em anexo o orçamento ${q.id}.\n\nResumo:\n- Peça/serviço: ${q.peca}\n- Referência: ${q.referencia || '-'}\n- Total: ${money(q.total)}\n- Prazo de entrega: ${q.prazoEntrega || 'A confirmar'}\n\nQualquer questão estamos disponíveis.\n\nObrigado,\n${companyName()}`
+  };
 }
 function quotePdfHtml(q){
   const iva = Number(q.total || 0) * 0.23;
