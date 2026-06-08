@@ -353,6 +353,7 @@ async function init(){
   buildNav();
   bindShell();
   restoreLogin();
+  if(state.currentUser) showApp();
   await initFirebase();
   if (firebaseReady) {
     firebaseAuth.onAuthStateChanged(async user => {
@@ -372,8 +373,10 @@ async function init(){
         showApp();
         toast('Firebase ligado.');
       } else {
-        state.currentUser = null;
-        saveLocalOnly();
+        if(state.currentUser) {
+          showApp();
+          return;
+        }
         qs('#appShell').classList.add('hidden');
         qs('#loginScreen').classList.remove('hidden');
       }
@@ -479,6 +482,8 @@ function buildNav(){
 }
 
 function bindShell(){
+  if(qs('#homeBtn')?.dataset.boundShell) return;
+  qs('#homeBtn').dataset.boundShell = '1';
   qs('#homeBtn').addEventListener('click',()=>goPage('dashboard'));
   qs('#logoutBtn').addEventListener('click',async ()=>{
     stopFirebaseListeners();
@@ -505,13 +510,9 @@ function renderPage(id){
 }
 
 function dashboard(){
-  const total = state.calls.length;
   const clientesCount = state.clients.length;
-  const quotes = state.quotes.length;
-  const fornecedoresCount = state.suppliers.length;
   const urgentes = state.calls.filter(c=>['Urgente','Muito urgente'].includes(c.urgencia) && !['Concluído','Perdido'].includes(c.estado)).length;
   const followHoje = state.followups.filter(f=>f.date===today() && f.status!=='Feito').length;
-  const pendentes = state.users.filter(u=>u.status==='Pendente').length;
   const vendaPrevista = state.quotes.reduce((sum,q)=>sum+Number(q.total||0),0);
   const appCards = pages.filter(p => p.id !== 'dashboard' && canOpenPage(p.id)).map(p => `
     <button class="portal-card" data-page-card="${p.id}">
@@ -541,18 +542,6 @@ function dashboard(){
         <div><b>${urgentes}</b><span>Pedidos urgentes</span></div>
         <div><b>${followHoje}</b><span>Follow-ups hoje</span></div>
         <div><b>${money(vendaPrevista)}</b><span>Venda prevista</span></div>
-      </div>
-
-      <div class="card dashboard-work">
-        <div class="card-head"><h3>Operação de hoje</h3><span class="muted">${total} pedidos registados</span></div>
-        <div class="quick-metrics">
-          <button class="mini-metric" data-go="pedidos"><b>${urgentes}</b><span>Pedidos urgentes</span></button>
-          <button class="mini-metric" data-go="agenda"><b>${followHoje}</b><span>Follow-ups hoje</span></button>
-          <button class="mini-metric" data-go="orcamentos"><b>${quotes}</b><span>Orçamentos ativos</span></button>
-          <button class="mini-metric" data-go="users"><b>${pendentes}</b><span>Contas pendentes</span></button>
-        </div>
-        <div class="toolbar one global-search-box"><input id="globalSearch" class="field" placeholder="Pesquisar cliente, telefone, matrícula, peça, orçamento ou contacto"></div>
-        <div id="globalSearchResults">${globalSearchResults('')}</div>
       </div>
 
       <div class="portal-grid app-panel-grid">
@@ -694,11 +683,23 @@ function contactos(){
     </div>
 
     <div id="directoryInsertPanel" class="card directory-insert hidden">
-      <div class="card-head"><h3>Novo grupo</h3><span class="muted">Ex: Callcenter Lisboa</span></div>
-      <form id="contactGroupForm" class="form-grid">
-        <input class="field span2" name="nome" placeholder="Nome do grupo" required>
-        <div><button class="btn primary" type="submit">Criar grupo</button></div>
-      </form>
+      <div class="card-head"><h3>Gestão do diretório</h3><span class="muted">Adicionar grupos e contactos num só local.</span></div>
+      <div class="directory-manage">
+        <form id="contactGroupForm" class="form-grid">
+          <input class="field span2" name="nome" placeholder="Novo grupo / secção" required>
+          <div><button class="btn primary" type="submit">Criar grupo</button></div>
+        </form>
+        <form id="contactForm" class="form-grid">
+          <select class="select" name="groupId" required><option value="">Escolher secção</option>${sectionOptions}</select>
+          <input class="field" name="nome" placeholder="Nome" required>
+          <input class="field" name="extensao" placeholder="Extensão">
+          <input class="field" name="telefone" placeholder="Telefone">
+          <input class="field" name="telemovel" placeholder="Telemóvel">
+          <input class="field" name="email" type="email" placeholder="Email">
+          <input class="field" name="local" placeholder="Local / Empresa">
+          <div><button class="btn primary" type="submit">Adicionar contacto</button></div>
+        </form>
+      </div>
     </div>
 
     <div id="contactsTable">${contactGroupsView(filterContactGroups())}</div>
@@ -738,22 +739,13 @@ function contactGroupsView(groups){
       </button>
       <div class="directory-body ${group.aberto ? '' : 'hidden'}">
         ${contactsTable(group)}
-        <form class="form-grid contact-inline-form" data-contact-form="${group.id}">
-          <input class="field" name="nome" placeholder="Nome" required>
-          <input class="field" name="extensao" placeholder="Extensao">
-          <input class="field" name="telefone" placeholder="Telefone">
-          <input class="field" name="telemovel" placeholder="Telemovel">
-          <input class="field" name="email" type="email" placeholder="Email">
-          <input class="field" name="local" placeholder="Local / Empresa">
-          <div class="actions"><button class="btn primary small" type="submit">Adicionar</button><button class="btn danger small" type="button" data-delete-contact-group="${group.id}">Apagar grupo</button></div>
-        </form>
       </div>
     </div>`).join('')}</div>`;
 }
 function contactsTable(group){
   const rows = group.contactos || [];
   if(!rows.length) return '<div class="empty">Sem contactos neste grupo.</div>';
-  return `<div class="table-wrap directory-table"><table><thead><tr><th>Nome</th><th>Extensao</th><th>Telefone</th><th>Telemovel</th><th>Email</th><th>Local</th><th>Acoes</th></tr></thead><tbody>${rows.map(c=>`<tr><td><strong>${esc(c.nome || '-')}</strong></td><td>${esc(c.extensao || '-')}</td><td>${esc(c.telefone || '-')}</td><td>${esc(c.telemovel || '-')}</td><td>${esc(c.email || '-')}</td><td>${esc(c.local || '-')}</td><td><div class="actions">${c.telemovel ? `<a class="btn small" href="tel:${esc(c.telemovel)}">Telm.</a>` : ''}${c.telefone ? `<a class="btn small" href="tel:${esc(c.telefone)}">Tel.</a>` : ''}${c.email ? `<a class="btn small" href="mailto:${esc(c.email)}">Email</a>` : ''}<button class="btn danger small" data-delete-contact="${group.id}:${c.id}">Apagar</button></div></td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="table-wrap directory-table"><table><thead><tr><th>Nome</th><th>Extensao</th><th>Telefone</th><th>Telemovel</th><th>Email</th><th>Local</th><th>Acoes</th></tr></thead><tbody>${rows.map(c=>`<tr><td><strong>${esc(c.nome || '-')}</strong></td><td>${esc(c.extensao || '-')}</td><td>${esc(c.telefone || '-')}</td><td>${esc(c.telemovel || '-')}</td><td>${esc(c.email || '-')}</td><td>${esc(c.local || '-')}</td><td><div class="actions">${c.telemovel ? `<a class="btn small" href="tel:${esc(c.telemovel)}">Telm.</a>` : ''}${c.telefone ? `<a class="btn small" href="tel:${esc(c.telefone)}">Tel.</a>` : ''}${c.email ? `<a class="btn small" href="mailto:${esc(c.email)}">Email</a>` : ''}<button class="btn small" data-edit-contact="${group.id}:${c.id}">Editar</button><button class="btn danger small" data-delete-contact="${group.id}:${c.id}">Apagar</button></div></td></tr>`).join('')}</tbody></table></div>`;
 }
 function clientCode(c){ return c.codigoCliente || c.codigo || c.tipo || ''; }
 function filterClients(){
@@ -1072,24 +1064,30 @@ function bindContactDirectory(){
     saveState(); renderPage('contactos'); toast('Grupo criado.');
   });
   }
+  const contactForm = qs('#contactForm');
+  if(contactForm && !contactForm.dataset.boundContact) {
+    contactForm.dataset.boundContact = '1';
+    contactForm.addEventListener('submit', e=>{
+      e.preventDefault();
+      if(!canEditOperational()) return toast('Sem permissão para alterar contactos.');
+      const data = Object.fromEntries(new FormData(e.target).entries());
+      const group = (state.contactGroups || []).find(g=>g.id===data.groupId);
+      if(!group) return toast('Escolhe a secção do contacto.');
+      delete data.groupId;
+      group.contactos = group.contactos || [];
+      group.contactos.push(auditCreate({ id:uid('CNT'), ...data }));
+      group.aberto = true;
+      auditUpdate(group,'Contacto adicionado');
+      saveState(); renderPage('contactos'); toast('Contacto adicionado.');
+    });
+  }
   qsa('[data-toggle-contact-group]').forEach(btn=>btn.addEventListener('click',()=>{
     const group = (state.contactGroups || []).find(g=>g.id===btn.dataset.toggleContactGroup);
     if(!group) return;
     group.aberto = !group.aberto;
     saveState(); renderPage('contactos');
   }));
-  qsa('[data-contact-form]').forEach(form=>form.addEventListener('submit',e=>{
-    e.preventDefault();
-    if(!canEditOperational()) return toast('Sem permissão para alterar contactos.');
-    const group = (state.contactGroups || []).find(g=>g.id===form.dataset.contactForm);
-    if(!group) return;
-    const data = Object.fromEntries(new FormData(e.target).entries());
-    group.contactos = group.contactos || [];
-    group.contactos.push(auditCreate({ id:uid('CNT'), ...data }));
-    group.aberto = true;
-    auditUpdate(group,'Contacto adicionado');
-    saveState(); renderPage('contactos'); toast('Contacto adicionado.');
-  }));
+  qsa('[data-edit-contact]').forEach(btn=>btn.addEventListener('click',()=>openContactModal(btn.dataset.editContact)));
   qsa('[data-delete-contact]').forEach(btn=>btn.addEventListener('click',()=>{
     if(!canDelete()) return toast('Sem permissão para apagar.');
     const [groupId, contactId] = btn.dataset.deleteContact.split(':');
@@ -1109,6 +1107,29 @@ function refreshContactDirectory(){
   if(!table) return;
   table.innerHTML = contactGroupsView(filterContactGroups());
   bindContactDirectory();
+}
+function openContactModal(ref){
+  if(!canEditOperational()) return toast('Sem permissão para alterar contactos.');
+  const [groupId, contactId] = ref.split(':');
+  const group = (state.contactGroups || []).find(g=>g.id===groupId);
+  const contact = group?.contactos?.find(c=>c.id===contactId);
+  if(!group || !contact) return;
+  openModal('Editar contacto', `<form id="editContactForm" class="form-grid">
+    <input class="field" name="nome" placeholder="Nome" value="${esc(contact.nome || '')}" required>
+    <input class="field" name="extensao" placeholder="Extensão" value="${esc(contact.extensao || '')}">
+    <input class="field" name="telefone" placeholder="Telefone" value="${esc(contact.telefone || '')}">
+    <input class="field" name="telemovel" placeholder="Telemóvel" value="${esc(contact.telemovel || '')}">
+    <input class="field" name="email" type="email" placeholder="Email" value="${esc(contact.email || '')}">
+    <input class="field" name="local" placeholder="Local / Empresa" value="${esc(contact.local || '')}">
+    <div class="span3"><button class="btn primary">Guardar contacto</button></div>
+  </form>`);
+  qs('#editContactForm').addEventListener('submit', e=>{
+    e.preventDefault();
+    Object.assign(contact, Object.fromEntries(new FormData(e.target).entries()));
+    auditUpdate(contact,'Contacto editado');
+    auditUpdate(group,'Contacto editado');
+    saveState(); closeModal(); renderPage('contactos'); toast('Contacto atualizado.');
+  });
 }
 function exportContactsCsv(){
   const rows = [['Secao','Nome','Extensao','Telefone','Telemovel','Email','Local']];

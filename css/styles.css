@@ -538,6 +538,165 @@ body > *{
   }
 }
 
+/* Limpeza visual final: menos ruido, mais espaco e formularios centralizados. */
+html{
+  background:#f4f8fb!important;
+}
+body:before{
+  opacity:.28!important;
+  filter:blur(10px)!important;
+}
+body:after{
+  background:rgba(246,250,253,.88)!important;
+}
+.shell-header,
+.nav-strip,
+.card,
+.directory-group,
+.directory-filters,
+.directory-insert,
+.portal-kpis div,
+.login-card{
+  background:rgba(255,255,255,.92)!important;
+  border-color:#dbe7f0!important;
+  box-shadow:0 8px 20px rgba(7,52,95,.07)!important;
+  backdrop-filter:blur(10px);
+}
+.card,
+.directory-group,
+.directory-filters,
+.directory-insert{
+  border-radius:10px!important;
+}
+.card:before{
+  display:none;
+}
+.portal-logo-mark,
+.brand-mark{
+  box-shadow:none!important;
+}
+.portal-title h2,
+.header-copy h2,
+.card h3{
+  letter-spacing:0;
+}
+.app-panel-page .portal-top{
+  padding:4px 0 0;
+  margin-bottom:16px;
+}
+.portal-kpis{
+  gap:12px;
+  margin-bottom:18px;
+}
+.portal-kpis div{
+  padding:14px;
+  text-align:left;
+}
+.portal-kpis b{
+  font-size:24px;
+}
+.portal-kpis span{
+  font-size:12px;
+}
+.app-panel-grid{
+  gap:14px;
+}
+.app-panel-grid .portal-card{
+  min-height:145px;
+  align-items:flex-start;
+  text-align:left;
+  padding:20px;
+  border-radius:10px;
+  background:#0f4773!important;
+  box-shadow:0 8px 18px rgba(7,52,95,.12)!important;
+}
+.app-panel-grid .portal-card strong{
+  font-size:19px;
+}
+.app-panel-grid .portal-card span{
+  max-width:none;
+  font-size:14px;
+}
+.portal-icon{
+  margin:0 0 14px!important;
+}
+.dashboard-work{
+  display:none!important;
+}
+.directory-head{
+  grid-template-columns:1fr auto;
+  margin-bottom:16px;
+}
+.directory-head .portal-title{
+  display:none;
+}
+.directory-actions{
+  grid-template-columns:repeat(6,minmax(105px,1fr));
+  gap:10px;
+}
+.directory-actions .btn{
+  min-height:42px;
+  font-size:14px;
+}
+.directory-filters{
+  padding:12px;
+  gap:10px;
+}
+.directory-manage{
+  display:grid;
+  gap:14px;
+}
+.directory-manage form{
+  padding:12px;
+  border:1px solid #dbe7f0;
+  border-radius:9px;
+  background:#f8fbfd;
+}
+.contact-inline-form{
+  display:none!important;
+}
+.directory-toggle{
+  min-height:52px;
+  background:#f8fbfd!important;
+}
+.directory-table th{
+  background:#0f4773!important;
+}
+th{
+  background:#0f4773!important;
+}
+td{
+  background:white!important;
+}
+tr:nth-child(even) td{
+  background:#f8fbfd!important;
+}
+.btn{
+  border-radius:8px;
+  box-shadow:none!important;
+}
+.btn.primary{
+  background:#0f5792!important;
+}
+.btn:hover{
+  filter:none;
+  transform:none;
+}
+@media(max-width:1180px){
+  .directory-head,
+  .directory-actions,
+  .directory-filters{
+    grid-template-columns:1fr 1fr;
+  }
+}
+@media(max-width:760px){
+  .directory-head,
+  .directory-actions,
+  .directory-filters{
+    grid-template-columns:1fr;
+  }
+}
+
 /* Ocupa o ecra todo e deixa os layouts com formulario menor + lista maior. */
 .shell-header,
 .nav-strip-wrap,
