@@ -11,7 +11,8 @@ const FIREBASE_COLLECTIONS = {
   quotes: 'orcamentos',
   followups: 'agenda',
   stock: 'stock',
-  users: 'utilizadores'
+  users: 'utilizadores',
+  contactGroups: 'diretorioContactos'
 };
 const firebaseConfig = {
   apiKey: "AIzaSyDlSqa8bPMGmYMgla-vn7j73eJyp0_eVJI",
@@ -85,6 +86,25 @@ function seedData() {
     users: [
       { id: uid('USR'), nome:'Ricardo', email:'pica.fern@gmail.com', role:'Admin Master', status:'Ativo' },
       { id: uid('USR'), nome:'Operador 1', email:'operador@empresa.pt', role:'Operador', status:'Ativo' }
+    ],
+    contactGroups: [
+      {
+        id: uid('DIR'),
+        nome:'Callcenter Lisboa',
+        aberto:true,
+        contactos:[
+          { id: uid('CNT'), nome:'Ricardo', telemovel:'912345678', telefone:'213000000', email:'pica.fern@gmail.com' },
+          { id: uid('CNT'), nome:'Operador Lisboa', telemovel:'913000000', telefone:'213000001', email:'lisboa@empresa.pt' }
+        ]
+      },
+      {
+        id: uid('DIR'),
+        nome:'Callcenter Porto',
+        aberto:false,
+        contactos:[
+          { id: uid('CNT'), nome:'Apoio Porto', telemovel:'914000000', telefone:'223000000', email:'porto@empresa.pt' }
+        ]
+      }
     ]
   };
 }
@@ -495,37 +515,58 @@ function fornecedores(){
   </div>`;
 }
 function contactos(){
-  const rows = contactRows();
-  return `<div class="card contacts-page">
-    <div class="card-head"><h3>Diretório de contactos</h3><span class="muted">${rows.length} contactos</span></div>
-    <div class="toolbar one"><input id="contactSearch" class="field" placeholder="Pesquisar nome, código, telefone, email ou tipo"></div>
-    <div id="contactsTable">${contactsTable(rows)}</div>
+  return `<div class="grid two contacts-page">
+    <div class="card">
+      <div class="card-head"><h3>Novo grupo</h3><span class="muted">Ex: Callcenter Lisboa</span></div>
+      <form id="contactGroupForm" class="form-grid">
+        <input class="field span3" name="nome" placeholder="Nome do grupo" required>
+        <div class="span3"><button class="btn primary" type="submit">Criar grupo</button></div>
+      </form>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Diretório de contactos</h3><span class="muted">${contactCount()} contactos</span></div>
+      <div class="toolbar one"><input id="contactSearch" class="field" placeholder="Pesquisar nome, telemóvel, telefone, email ou grupo"></div>
+      <div id="contactsTable">${contactGroupsView(filterContactGroups())}</div>
+    </div>
   </div>`;
 }
-function contactRows(){
-  const clients = state.clients.map(c => ({
-    tipo:'Cliente',
-    codigo: clientCode(c),
-    nome: c.nome || '',
-    telefone: c.telefone || '',
-    email: c.email || ''
-  }));
-  const suppliers = state.suppliers.map(s => ({
-    tipo:'Fornecedor',
-    codigo: supplierRef(s),
-    nome: supplierName(s),
-    telefone: s.telefone || '',
-    email: s.email || ''
-  }));
-  return [...clients, ...suppliers];
+function contactCount(){
+  return (state.contactGroups || []).reduce((sum, group)=>sum + (group.contactos || []).length, 0);
 }
-function filterContacts(){
+function filterContactGroups(){
   const q = (qs('#contactSearch')?.value || '').toLowerCase();
-  return contactRows().filter(r => JSON.stringify(r).toLowerCase().includes(q));
+  const groups = state.contactGroups || [];
+  if(!q) return groups;
+  return groups.map(group => {
+    const groupMatch = (group.nome || '').toLowerCase().includes(q);
+    const contactos = (group.contactos || []).filter(c => `${group.nome || ''} ${c.nome || ''} ${c.telemovel || ''} ${c.telefone || ''} ${c.email || ''}`.toLowerCase().includes(q));
+    return groupMatch ? { ...group, aberto:true } : { ...group, aberto:true, contactos };
+  }).filter(group => (group.contactos || []).length || (group.nome || '').toLowerCase().includes(q));
 }
-function contactsTable(rows){
-  if(!rows.length) return '<div class="empty">Sem contactos encontrados.</div>';
-  return `<div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Código</th><th>Nome</th><th>Telefone</th><th>Email</th><th>Ações</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${badge(r.tipo)}</td><td><span class="supplier-ref">${esc(r.codigo || '-')}</span></td><td><strong>${esc(r.nome || '-')}</strong></td><td>${esc(r.telefone || '-')}</td><td>${esc(r.email || '-')}</td><td><div class="actions">${r.telefone ? `<a class="btn small" href="tel:${esc(r.telefone)}">Ligar</a>` : ''}${r.email ? `<a class="btn small" href="mailto:${esc(r.email)}">Email</a>` : ''}</div></td></tr>`).join('')}</tbody></table></div>`;
+function contactGroupsView(groups){
+  if(!groups.length) return '<div class="empty">Sem grupos ou contactos encontrados.</div>';
+  return `<div class="directory-list">${groups.map(group => `
+    <div class="directory-group">
+      <button class="directory-toggle" data-toggle-contact-group="${group.id}">
+        <strong>${esc(group.nome)}</strong>
+        <span>${(group.contactos || []).length} contactos</span>
+      </button>
+      <div class="directory-body ${group.aberto ? '' : 'hidden'}">
+        ${contactsTable(group)}
+        <form class="form-grid contact-inline-form" data-contact-form="${group.id}">
+          <input class="field" name="nome" placeholder="Nome" required>
+          <input class="field" name="telemovel" placeholder="Telemóvel">
+          <input class="field" name="telefone" placeholder="Telefone">
+          <input class="field span2" name="email" type="email" placeholder="Email">
+          <div class="actions"><button class="btn primary small" type="submit">Adicionar</button><button class="btn danger small" type="button" data-delete-contact-group="${group.id}">Apagar grupo</button></div>
+        </form>
+      </div>
+    </div>`).join('')}</div>`;
+}
+function contactsTable(group){
+  const rows = group.contactos || [];
+  if(!rows.length) return '<div class="empty">Sem contactos neste grupo.</div>';
+  return `<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Telemóvel</th><th>Telefone</th><th>Email</th><th>Ações</th></tr></thead><tbody>${rows.map(c=>`<tr><td><strong>${esc(c.nome || '-')}</strong></td><td>${esc(c.telemovel || '-')}</td><td>${esc(c.telefone || '-')}</td><td>${esc(c.email || '-')}</td><td><div class="actions">${c.telemovel ? `<a class="btn small" href="tel:${esc(c.telemovel)}">Telemóvel</a>` : ''}${c.telefone ? `<a class="btn small" href="tel:${esc(c.telefone)}">Telefone</a>` : ''}${c.email ? `<a class="btn small" href="mailto:${esc(c.email)}">Email</a>` : ''}<button class="btn danger small" data-delete-contact="${group.id}:${c.id}">Apagar</button></div></td></tr>`).join('')}</tbody></table></div>`;
 }
 function clientCode(c){ return c.codigoCliente || c.codigo || c.tipo || ''; }
 function filterClients(){
@@ -552,9 +593,43 @@ function stock(){
   ], state.stock, ['referencia','nome','marca','modelo','estado','local','venda','qtd'], 'stock');
 }
 function users(){
-  return entityPage('Utilizadores','userForm',[
-    ['nome','Nome'],['email','Email'],['role','Role'],['status','Estado']
-  ], state.users, ['nome','email','role','status'], 'user');
+  const isAdmin = isAdminMaster();
+  return `<div class="grid two users-page">
+    <div class="card">
+      <div class="card-head"><h3>Criar conta</h3><span class="badge ${isAdmin?'green':'orange'}">${isAdmin?'Admin Master':'Sem permissão'}</span></div>
+      ${isAdmin ? `<form id="createUserForm" class="form-grid">
+        <input class="field" name="nome" placeholder="Nome" required>
+        <input class="field" name="email" type="email" placeholder="Email" required>
+        <input class="field" name="password" type="password" placeholder="Password inicial" required>
+        <select class="select" name="role" required>
+          <option>Operador</option>
+          <option>Supervisor</option>
+          <option>Admin</option>
+          <option>Admin Master</option>
+        </select>
+        <select class="select" name="status"><option>Ativo</option><option>Inativo</option></select>
+        <div class="span3"><button class="btn primary" type="submit">Criar conta</button></div>
+      </form>` : '<div class="empty">Só o Admin Master pode criar contas e escolher roles.</div>'}
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Utilizadores</h3><span class="muted">${state.users.length} registos</span></div>
+      ${usersTable(state.users)}
+    </div>
+  </div>`;
+}
+function currentUserRecord(){
+  const email = (state.currentUser?.email || firebaseAuth?.currentUser?.email || '').toLowerCase();
+  return (state.users || []).find(u => (u.email || '').toLowerCase() === email);
+}
+function isAdminMaster(){
+  const email = (state.currentUser?.email || firebaseAuth?.currentUser?.email || '').toLowerCase();
+  const user = currentUserRecord();
+  return user?.role === 'Admin Master' || email === 'pica.fern@gmail.com';
+}
+function usersTable(rows){
+  if(!rows.length) return '<div class="empty">Sem utilizadores.</div>';
+  const actions = isAdminMaster();
+  return `<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Email</th><th>Role</th><th>Estado</th>${actions?'<th>Ações</th>':''}</tr></thead><tbody>${rows.map(u=>`<tr><td><strong>${esc(u.nome || '-')}</strong></td><td>${esc(u.email || '-')}</td><td>${badge(u.role || '-')}</td><td>${badge(u.status || '-')}</td>${actions?`<td><div class="actions"><button class="btn small" data-edit-entity="user:${u.id}">Editar</button><button class="btn danger small" data-delete-entity="user:${u.id}">Apagar</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`;
 }
 function entityPage(title, formId, fields, rows, cols, type){
   return `<div class="grid two"><div class="card"><div class="card-head"><h3>Adicionar ${title}</h3></div><form id="${formId}" class="form-grid">${fields.map(f=>`<input class="field ${f[0]==='notas'?'span3':''}" name="${f[0]}" placeholder="${f[1]}">`).join('')}<div class="span3"><button class="btn primary" type="submit">Guardar</button></div></form></div><div class="card"><div class="card-head"><h3>Lista</h3><span class="muted">${rows.length} registos</span></div>${entityTable(rows, cols, type)}</div></div>`;
@@ -614,7 +689,7 @@ function topParts(){
   return `<div class="table-wrap"><table><thead><tr><th>Peça</th><th>Pedidos</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r[0])}</td><td>${r[1]}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function config(){
-  return `<div class="grid two"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>Firebase</h3><span class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">Dados separados no Firestore por página: clientes, fornecedores, orçamentos, pedidos, agenda, stock, utilizadores e configurações.</p><div class="actions"><button class="btn" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div></div>`;
+  return `<div class="grid two"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>Firebase</h3><span class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">Dados separados no Firestore por página: clientes, fornecedores, orçamentos, pedidos, agenda, stock, utilizadores, diretório de contactos e configurações.</p><div class="actions"><button class="btn" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div></div>`;
 }
 
 function bindPage(id){
@@ -623,12 +698,14 @@ function bindPage(id){
   const clientSearch = qs('#clientSearch');
   if(clientSearch) clientSearch.addEventListener('input',()=>{ qs('#clientsTable').innerHTML = clientsTable(filterClients()); bindEntities(); });
   const contactSearch = qs('#contactSearch');
-  if(contactSearch) contactSearch.addEventListener('input',()=>{ qs('#contactsTable').innerHTML = contactsTable(filterContacts()); });
+  if(contactSearch) contactSearch.addEventListener('input',()=>{ qs('#contactsTable').innerHTML = contactGroupsView(filterContactGroups()); bindContactDirectory(); });
   const supplierSearch = qs('#supplierSearch');
   if(supplierSearch) supplierSearch.addEventListener('input',()=>{ qs('#suppliersTable').innerHTML = suppliersTable(filterSuppliers()); bindEntities(); });
   if(id==='nova-chamada') bindCallForm();
   if(id==='pedidos') bindPedidos();
   if(id==='orcamentos') bindQuotes();
+  if(id==='contactos') bindContactDirectory();
+  if(id==='users') bindUsersPage();
   bindEntities();
   if(id==='agenda') bindFollowForm();
   if(id==='config') bindConfig();
@@ -723,10 +800,90 @@ function upsertClient(nome, telefone, email){
   const exists = state.clients.find(c=>c.nome.toLowerCase()===nome.toLowerCase() || (telefone && c.telefone===telefone));
   if(!exists) state.clients.push({id:uid('CLI'), codigoCliente:`CLI-${String(state.clients.length + 1).padStart(3,'0')}`, nome, telefone, email, notas:''});
 }
+function bindContactDirectory(){
+  const groupForm = qs('#contactGroupForm');
+  if(groupForm) groupForm.addEventListener('submit',e=>{
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    state.contactGroups = state.contactGroups || [];
+    state.contactGroups.push({ id:uid('DIR'), nome:data.nome, aberto:true, contactos:[] });
+    saveState(); renderPage('contactos'); toast('Grupo criado.');
+  });
+  qsa('[data-toggle-contact-group]').forEach(btn=>btn.addEventListener('click',()=>{
+    const group = (state.contactGroups || []).find(g=>g.id===btn.dataset.toggleContactGroup);
+    if(!group) return;
+    group.aberto = !group.aberto;
+    saveState(); renderPage('contactos');
+  }));
+  qsa('[data-contact-form]').forEach(form=>form.addEventListener('submit',e=>{
+    e.preventDefault();
+    const group = (state.contactGroups || []).find(g=>g.id===form.dataset.contactForm);
+    if(!group) return;
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    group.contactos = group.contactos || [];
+    group.contactos.push({ id:uid('CNT'), ...data });
+    group.aberto = true;
+    saveState(); renderPage('contactos'); toast('Contacto adicionado.');
+  }));
+  qsa('[data-delete-contact]').forEach(btn=>btn.addEventListener('click',()=>{
+    const [groupId, contactId] = btn.dataset.deleteContact.split(':');
+    const group = (state.contactGroups || []).find(g=>g.id===groupId);
+    if(!group) return;
+    group.contactos = (group.contactos || []).filter(c=>c.id!==contactId);
+    saveState(); renderPage('contactos'); toast('Contacto apagado.');
+  }));
+  qsa('[data-delete-contact-group]').forEach(btn=>btn.addEventListener('click',()=>{
+    state.contactGroups = (state.contactGroups || []).filter(g=>g.id!==btn.dataset.deleteContactGroup);
+    saveState(); renderPage('contactos'); toast('Grupo apagado.');
+  }));
+}
+function bindUsersPage(){
+  const form = qs('#createUserForm');
+  if(!form) return;
+  form.addEventListener('submit', async e=>{
+    e.preventDefault();
+    if(!isAdminMaster()) return toast('Só o Admin Master pode criar contas.');
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    const user = { id: uid('USR'), nome:data.nome, email:data.email, role:data.role, status:data.status || 'Ativo' };
+    try {
+      const created = await createFirebaseUserAsAdmin(data.email, data.password);
+      if(created?.uid) user.id = created.uid;
+      upsertAppUser(user);
+      saveState(); renderPage('users'); toast('Conta criada com sucesso.');
+    } catch (err) {
+      console.warn('Create user failed', err);
+      if(err.code === 'auth/email-already-in-use') {
+        upsertAppUser(user);
+        saveState(); renderPage('users'); toast('Email já existia. Role atualizado na app.');
+      } else {
+        toast('Não foi possível criar a conta. Confirma Firebase Auth.');
+      }
+    }
+  });
+}
+async function createFirebaseUserAsAdmin(email, password){
+  if(!firebaseReady || !firebase.auth) return null;
+  const appName = `create-user-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const secondaryApp = firebase.initializeApp(firebaseConfig, appName);
+  try {
+    const credential = await secondaryApp.auth().createUserWithEmailAndPassword(email, password);
+    await secondaryApp.auth().signOut();
+    return credential.user;
+  } finally {
+    await secondaryApp.delete();
+  }
+}
+function upsertAppUser(user){
+  state.users = state.users || [];
+  delete user.password;
+  const index = state.users.findIndex(u => (u.email || '').toLowerCase() === (user.email || '').toLowerCase() || u.id === user.id);
+  if(index >= 0) state.users[index] = { ...state.users[index], ...user };
+  else state.users.push(user);
+}
 function bindEntities(){
   const map = { client:[state.clients,'clients'], supplier:[state.suppliers,'suppliers'], stock:[state.stock,'stock'], user:[state.users,'users'], follow:[state.followups,'followups'] };
-  qsa('[data-delete-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.deleteEntity.split(':'); const target=map[type]; state[target[1]] = target[0].filter(x=>x.id!==id); saveState(); renderPage(currentPage); toast('Registo apagado.'); }));
-  qsa('[data-edit-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.editEntity.split(':'); openEntityModal(type,id); }));
+  qsa('[data-delete-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.deleteEntity.split(':'); if(type==='user' && !isAdminMaster()) return toast('Só o Admin Master pode alterar utilizadores.'); const target=map[type]; state[target[1]] = target[0].filter(x=>x.id!==id); saveState(); renderPage(currentPage); toast('Registo apagado.'); }));
+  qsa('[data-edit-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.editEntity.split(':'); if(type==='user' && !isAdminMaster()) return toast('Só o Admin Master pode alterar utilizadores.'); openEntityModal(type,id); }));
   const forms = [{id:'clientForm',key:'clients',prefix:'CLI'},{id:'supplierForm',key:'suppliers',prefix:'FOR'},{id:'stockForm',key:'stock',prefix:'STK'},{id:'userForm',key:'users',prefix:'USR'}];
   forms.forEach(f=>{ const form=qs('#'+f.id); if(form) form.addEventListener('submit',e=>{ e.preventDefault(); state[f.key].push({id:uid(f.prefix),...Object.fromEntries(new FormData(e.target).entries())}); saveState(); renderPage(currentPage); toast('Registo guardado.'); }); });
 }
