@@ -1,5 +1,20 @@
 const APP_VERSION = '1.5.0';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
+const FIREBASE_STATE_COLLECTION = 'appState';
+const FIREBASE_STATE_DOC = 'main';
+const firebaseConfig = {
+  apiKey: "AIzaSyDlSqa8bPMGmYMgla-vn7j73eJyp0_eVJI",
+  authDomain: "appcallcenter-161c8.firebaseapp.com",
+  projectId: "appcallcenter-161c8",
+  storageBucket: "appcallcenter-161c8.firebasestorage.app",
+  messagingSenderId: "967665645707",
+  appId: "1:967665645707:web:c69721f41cf5c19ca33c8e"
+};
+
+let firebaseReady = false;
+let firebaseAuth = null;
+let firebaseDb = null;
+let cloudSaveTimer = null;
 
 const pages = [
   { id: 'dashboard', icon: '🏁', title: 'Dashboard', subtitle: 'Painel principal da operação' },
@@ -71,7 +86,80 @@ function loadState() {
     return seedData();
   }
 }
-function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function saveState(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  scheduleCloudSave();
+}
+function saveLocalOnly(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function firebaseStatus(){
+  if (!firebaseReady) return 'Modo local';
+  return firebaseAuth?.currentUser ? 'Firebase ligado' : 'Firebase pronto';
+}
+function cloudSafeState(){
+  return { ...state, currentUser: null };
+}
+function scheduleCloudSave(){
+  if (!firebaseReady || !firebaseAuth?.currentUser || !firebaseDb) return;
+  clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(pushCloudState, 450);
+}
+async function pushCloudState(){
+  if (!firebaseReady || !firebaseAuth?.currentUser || !firebaseDb) return;
+  try {
+    await firebaseDb.collection(FIREBASE_STATE_COLLECTION).doc(FIREBASE_STATE_DOC).set({
+      state: cloudSafeState(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: firebaseAuth.currentUser.email || ''
+    }, { merge: true });
+  } catch (err) {
+    console.warn('Firebase save failed', err);
+    toast('Guardado localmente. Firebase sem permissões.');
+  }
+}
+async function loadCloudState(){
+  if (!firebaseReady || !firebaseAuth?.currentUser || !firebaseDb) return;
+  try {
+    const snap = await firebaseDb.collection(FIREBASE_STATE_COLLECTION).doc(FIREBASE_STATE_DOC).get();
+    const authUser = firebaseAuth.currentUser;
+    if (snap.exists && snap.data()?.state) {
+      state = { ...seedData(), ...snap.data().state, currentUser: { email: authUser.email, name: (authUser.email || 'Admin').split('@')[0] } };
+    } else {
+      state.currentUser = { email: authUser.email, name: (authUser.email || 'Admin').split('@')[0] };
+      await pushCloudState();
+    }
+    saveLocalOnly();
+  } catch (err) {
+    console.warn('Firebase load failed', err);
+    toast('Firebase sem permissões. A usar dados locais.');
+  }
+}
+function loadScript(src){
+  return new Promise((resolve, reject)=>{
+    if ([...document.scripts].some(s => s.src === src)) return resolve();
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+async function initFirebase(){
+  try {
+    await loadScript('https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js');
+    await loadScript('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js');
+    await loadScript('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js');
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    firebaseAuth = firebase.auth();
+    firebaseDb = firebase.firestore();
+    firebaseReady = true;
+    return true;
+  } catch (err) {
+    console.warn('Firebase unavailable', err);
+    firebaseReady = false;
+    return false;
+  }
+}
 function uid(prefix){ return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6).toUpperCase()}`; }
 function today(){ return new Date().toISOString().slice(0,10); }
 function money(v){ return Number(v || 0).toLocaleString('pt-PT',{style:'currency',currency:'EUR'}); }
@@ -95,10 +183,26 @@ function showApp(){
   renderPage(currentPage);
 }
 
-function init(){
+async function init(){
   buildNav();
   bindShell();
   restoreLogin();
+  await initFirebase();
+  if (firebaseReady) {
+    firebaseAuth.onAuthStateChanged(async user => {
+      if (user) {
+        await loadCloudState();
+        showApp();
+        toast('Firebase ligado.');
+      } else {
+        state.currentUser = null;
+        saveLocalOnly();
+        qs('#appShell').classList.add('hidden');
+        qs('#loginScreen').classList.remove('hidden');
+      }
+    });
+    return;
+  }
   if(state.currentUser) showApp();
 }
 
@@ -110,10 +214,29 @@ function restoreLogin(){
   qs('#loginPassword').addEventListener('keydown', e => { if(e.key === 'Enter') login(); });
 }
 
-function login(){
+async function login(){
   const email = qs('#loginEmail').value.trim();
+  const password = qs('#loginPassword').value;
   if(!email) return toast('Mete o email para entrar.');
   if(qs('#rememberLogin').checked) localStorage.setItem('autoparts_login_email', email);
+  if (firebaseReady) {
+    if(!password) return toast('Mete a password para entrar no Firebase.');
+    try {
+      await firebaseAuth.signInWithEmailAndPassword(email, password);
+      return;
+    } catch (err) {
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+        try {
+          await firebaseAuth.createUserWithEmailAndPassword(email, password);
+          return;
+        } catch (createErr) {
+          console.warn('Firebase account create failed', createErr);
+        }
+      }
+      console.warn('Firebase login failed', err);
+      return toast('Login Firebase falhou. Confirma email/password e Auth ativo.');
+    }
+  }
   state.currentUser = { email, name: email.split('@')[0] };
   saveState();
   showApp();
@@ -125,8 +248,9 @@ function buildNav(){
 
 function bindShell(){
   qs('#homeBtn').addEventListener('click',()=>goPage('dashboard'));
-  qs('#logoutBtn').addEventListener('click',()=>{
-    state.currentUser = null; saveState();
+  qs('#logoutBtn').addEventListener('click',async ()=>{
+    if (firebaseReady && firebaseAuth?.currentUser) await firebaseAuth.signOut();
+    state.currentUser = null; saveLocalOnly();
     qs('#appShell').classList.add('hidden');
     qs('#loginScreen').classList.remove('hidden');
   });
@@ -384,7 +508,7 @@ function topParts(){
   return `<div class="table-wrap"><table><thead><tr><th>Peça</th><th>Pedidos</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r[0])}</td><td>${r[1]}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function config(){
-  return `<div class="grid two"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><label class="checkline span3"><input type="checkbox" name="firebaseEnabled" ${state.settings.firebaseEnabled?'checked':''}> Preparar ligação Firebase</label><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>GitHub + Electron</h3></div><p class="muted">Esta versão já está pronta para publicar no GitHub Pages e tem estrutura preparada para Electron. A navegação passou a ser superior, sem sidebar, para dar um visual mais limpo e próprio.</p><div class="actions"><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div></div>`;
+  return `<div class="grid two"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>Firebase</h3><span class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">Dados sincronizados no Firestore em appState/main quando o login Firebase está ativo.</p><div class="actions"><button class="btn" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div></div>`;
 }
 
 function bindPage(id){
@@ -511,7 +635,8 @@ function bindFollowForm(){
   qs('#followForm').addEventListener('submit',e=>{ e.preventDefault(); state.followups.push({id:uid('AGE'),...Object.fromEntries(new FormData(e.target).entries())}); saveState(); renderPage('agenda'); toast('Follow-up guardado.'); });
 }
 function bindConfig(){
-  qs('#settingsForm').addEventListener('submit',e=>{ e.preventDefault(); const fd=new FormData(e.target); state.settings={ companyName:fd.get('companyName'), dailyBackupHour:fd.get('dailyBackupHour'), githubUrl:fd.get('githubUrl'), firebaseEnabled:fd.get('firebaseEnabled')==='on'}; saveState(); toast('Configurações guardadas.'); renderPage('config'); });
+  qs('#settingsForm').addEventListener('submit',e=>{ e.preventDefault(); const fd=new FormData(e.target); state.settings={ companyName:fd.get('companyName'), dailyBackupHour:fd.get('dailyBackupHour'), githubUrl:fd.get('githubUrl'), firebaseEnabled:firebaseReady}; saveState(); toast('Configurações guardadas.'); renderPage('config'); });
+  qs('#syncFirebaseBtn').addEventListener('click',async()=>{ await pushCloudState(); toast(firebaseReady ? 'Sincronizado com Firebase.' : 'Firebase indisponível.'); renderPage('config'); });
   qs('#exportJsonBtn').addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='autoparts-callcenter-export.json'; a.click(); URL.revokeObjectURL(a.href); });
   qs('#resetDemoBtn').addEventListener('click',()=>{ localStorage.removeItem(STORAGE_KEY); state=seedData(); toast('Demo reposta.'); setTimeout(()=>goPage('dashboard'), 250); });
 }
