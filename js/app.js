@@ -1,4 +1,4 @@
-const APP_VERSION = '1.6.1';
+const APP_VERSION = '1.7.0';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session_user';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
@@ -333,6 +333,36 @@ function toast(msg){ const el = qs('#toast'); el.textContent = msg; el.classList
 function qs(s){ return document.querySelector(s); }
 function qsa(s){ return [...document.querySelectorAll(s)]; }
 function companyName(){ return state.settings?.companyName || 'AutoParts CallCenter'; }
+
+function azPageHeader(title, subtitle, icon='📊', showBack=true){
+  return `<div class="az-page-head">
+    <div class="az-logo-block">
+      <div class="az-logo">az</div>
+      <div>
+        <h1>${esc(companyName()).toUpperCase()}</h1>
+        <small>Callcenter de peças automóveis</small>
+      </div>
+    </div>
+    <div class="az-title-block">
+      <h2>${icon} ${esc(title)}</h2>
+      <p>${esc(subtitle)}</p>
+    </div>
+    <div class="az-head-actions">
+      ${showBack ? `<button class="btn primary small" data-go="dashboard">← Voltar</button>` : ''}
+    </div>
+  </div>`;
+}
+function azActionBar(searchId='', formId=''){
+  return `<div class="az-action-row">
+    <button class="az-action-btn active" data-focus-search="${esc(searchId)}">🔍 Pesquisar</button>
+    <button class="az-action-btn" data-focus-form="${esc(formId)}">＋ Inserir</button>
+    <button class="az-action-btn light" data-expand-groups>📖 Expandir</button>
+    <button class="az-action-btn danger-light" data-collapse-groups>▮ Colapsar</button>
+    <button class="az-action-btn success-light" data-export-page>📊 Exportar</button>
+    <button class="az-action-btn light" data-refresh-page>🔄 Atualizar</button>
+  </div>`;
+}
+
 function pageUrl(id){ return pageFiles[id] || 'index.html'; }
 function goPage(id){ window.location.href = pageUrl(id); }
 function canOpenPage(id){
@@ -532,58 +562,24 @@ function renderPage(id){
 }
 
 function dashboard(){
-  const total = state.calls.length;
-  const clientesCount = state.clients.length;
-  const quotes = state.quotes.length;
-  const fornecedoresCount = state.suppliers.length;
-  const urgentes = state.calls.filter(c=>['Urgente','Muito urgente'].includes(c.urgencia) && !['Concluído','Perdido'].includes(c.estado)).length;
-  const followHoje = state.followups.filter(f=>f.date===today() && f.status!=='Feito').length;
-  const pendentes = state.users.filter(u=>u.status==='Pendente').length;
-  const vendaPrevista = state.quotes.reduce((sum,q)=>sum+Number(q.total||0),0);
-  const appCards = pages.filter(p => p.id !== 'dashboard' && canOpenPage(p.id)).map(p => `
-    <button class="portal-card" data-page-card="${p.id}">
-      <div class="portal-icon">${p.icon}</div>
-      <strong>${esc(p.title)}</strong>
-      <span>${esc(p.subtitle)}</span>
-    </button>`).join('');
-
+  const cards = [
+    { id:'contactos', icon:'☎️', title:'Diretório', text:'Telefones, contactos e grupos da organização' },
+    { id:'clientes', icon:'👥', title:'Clientes', text:'Gestão de fichas, códigos e contactos de clientes' },
+    { id:'fornecedores', icon:'🏭', title:'Fornecedores', text:'Lista de fornecedores e códigos de referência' },
+    { id:'orcamentos', icon:'🧾', title:'Orçamentos', text:'Criação e consulta de propostas comerciais' },
+    { id:'users', icon:'🛡️', title:'Utilizadores', text:'Contas, permissões e estados de acesso' },
+    { id:'config', icon:'⚙️', title:'Configurações', text:'Firebase, empresa, GitHub e exportações' }
+  ].filter(c => canOpenPage(c.id));
   return `
-    <div class="portal-page">
-      <div class="portal-top">
-        <div class="portal-logo">
-          <div class="portal-logo-mark">AP</div>
-          <div>
-            <h1>${esc(companyName())}</h1>
-            <small>Callcenter de peças automóveis</small>
-          </div>
-        </div>
-        <div class="portal-title">
-          <h2>📊 Painel Central</h2>
-          <p>Acede rapidamente aos módulos ativos da empresa</p>
-        </div>
-      </div>
-
-      <div class="portal-kpis">
-        <div><b>${clientesCount}</b><span>Clientes</span></div>
-        <div><b>${fornecedoresCount}</b><span>Fornecedores</span></div>
-        <div><b>${quotes}</b><span>Orçamentos</span></div>
-        <div><b>${money(vendaPrevista)}</b><span>Venda prevista</span></div>
-      </div>
-
-      <div class="card dashboard-work">
-        <div class="card-head"><h3>Operação de hoje</h3><span class="muted">${total} pedidos registados</span></div>
-        <div class="quick-metrics">
-          <button class="mini-metric" data-go="pedidos"><b>${urgentes}</b><span>Pedidos urgentes</span></button>
-          <button class="mini-metric" data-go="agenda"><b>${followHoje}</b><span>Follow-ups hoje</span></button>
-          <button class="mini-metric" data-go="orcamentos"><b>${quotes}</b><span>Orçamentos ativos</span></button>
-          <button class="mini-metric" data-go="users"><b>${pendentes}</b><span>Contas pendentes</span></button>
-        </div>
-        <div class="toolbar one global-search-box"><input id="globalSearch" class="field" placeholder="Pesquisar cliente, telefone, matrícula, peça, orçamento ou contacto"></div>
-        <div id="globalSearchResults">${globalSearchResults('')}</div>
-      </div>
-
-      <div class="portal-grid">
-        ${appCards}
+    <div class="az-portal">
+      ${azPageHeader('PAINEL DE APLICAÇÕES','Acede rapidamente às ferramentas da empresa','📊',false)}
+      <div class="az-app-grid">
+        ${cards.map(c => `
+          <button class="az-app-card" data-page-card="${c.id}">
+            <div class="az-app-icon">${c.icon}</div>
+            <strong>${esc(c.title)}</strong>
+            <span>${esc(c.text)}</span>
+          </button>`).join('')}
       </div>
     </div>`;
 }
@@ -648,55 +644,82 @@ function badge(v){
 }
 
 function clientes(){
-  return `<div class="grid two clients-page">
-    <div class="card">
-      <div class="card-head"><h3>Adicionar cliente</h3><span class="muted">O código fica antes do nome na ficha.</span></div>
-      <form id="clientForm" class="form-grid">
-        <input class="field" name="codigoCliente" placeholder="Código cliente" required>
-        <input class="field span2" name="nome" placeholder="Nome do cliente" required>
-        <input class="field" name="telefone" placeholder="Telefone">
-        <input class="field" name="email" placeholder="Email">
-        <textarea class="span3" name="notas" placeholder="Notas"></textarea>
-        <div class="span3"><button class="btn primary" type="submit">Guardar cliente</button></div>
-      </form>
+  return `<div class="az-module-page">
+    ${azPageHeader('GESTÃO DE CLIENTES','Lista de clientes com pesquisa rápida e ficha individual','👥')}
+    ${azActionBar('clientSearch','clientForm')}
+    <div class="az-filter-panel">
+      <label>🔍 Pesquisa geral<input id="clientSearch" class="field" placeholder="Nome, código, telefone ou email"></label>
+      <label>🏢 Tipo<select class="select"><option>Todos</option><option>Cliente particular</option><option>Oficina</option><option>Empresa</option></select></label>
+      <label>📍 Local / Empresa<select class="select"><option>Todos</option><option>Braga</option><option>Porto</option><option>Lisboa</option></select></label>
+      <button class="btn ghost" data-clear-search="clientSearch">× Limpar Filtros</button>
     </div>
-    <div class="card">
-      <div class="card-head"><h3>Lista de clientes</h3><span class="muted">${state.clients.length} registos</span></div>
-      <div class="toolbar one"><input id="clientSearch" class="field" placeholder="Pesquisar por código, nome, telefone ou email"></div>
-      <div id="clientsTable">${clientsTable(state.clients)}</div>
+    <div class="grid two az-main-grid clients-page">
+      <div class="card az-insert-card">
+        <div class="card-head"><h3>＋ Inserir cliente</h3><span class="muted">Código antes do nome na ficha</span></div>
+        <form id="clientForm" class="form-grid">
+          <input class="field" name="codigoCliente" placeholder="Código cliente" required>
+          <input class="field span2" name="nome" placeholder="Nome do cliente" required>
+          <input class="field" name="telefone" placeholder="Telefone">
+          <input class="field" name="email" placeholder="Email">
+          <textarea class="span3" name="notas" placeholder="Notas"></textarea>
+          <div class="span3"><button class="btn primary" type="submit">Guardar cliente</button></div>
+        </form>
+      </div>
+      <div class="az-section-card">
+        <div class="az-section-title"><span>👥 Clientes</span><b>${state.clients.length}</b></div>
+        <div id="clientsTable">${clientsTable(state.clients)}</div>
+      </div>
     </div>
   </div>`;
 }
 function fornecedores(){
-  return `<div class="grid two suppliers-page">
-    <div class="card">
-      <div class="card-head"><h3>Adicionar fornecedor</h3><span class="muted">Apenas marca e código de ficha.</span></div>
-      <form id="supplierForm" class="form-grid">
-        <input class="field span2" name="nomeMarca" placeholder="Nome da marca" required>
-        <input class="field" name="codigoFicha" placeholder="Código de ficha" required>
-        <div class="span3"><button class="btn primary" type="submit">Guardar fornecedor</button></div>
-      </form>
+  return `<div class="az-module-page">
+    ${azPageHeader('GESTÃO DE FORNECEDORES','Fornecedores organizados por nome e número de referência','🏭')}
+    ${azActionBar('supplierSearch','supplierForm')}
+    <div class="az-filter-panel">
+      <label>🔍 Pesquisa geral<input id="supplierSearch" class="field" placeholder="Nome fornecedor ou número referência"></label>
+      <label>📦 Secção<select class="select"><option>Todas</option><option>Peças novas</option><option>Peças usadas</option><option>Recondicionadas</option></select></label>
+      <label>📍 Local / Empresa<select class="select"><option>Todos</option><option>Braga</option><option>Porto</option><option>Lisboa</option></select></label>
+      <button class="btn ghost" data-clear-search="supplierSearch">× Limpar Filtros</button>
     </div>
-    <div class="card supplier-list-card">
-      <div class="card-head"><h3>Lista de fornecedores</h3><span class="muted">${state.suppliers.length} registos</span></div>
-      <div class="toolbar one"><input id="supplierSearch" class="field" placeholder="Pesquisar por marca ou código de ficha"></div>
-      <div id="suppliersTable">${suppliersTable(state.suppliers)}</div>
+    <div class="grid two az-main-grid suppliers-page">
+      <div class="card az-insert-card">
+        <div class="card-head"><h3>＋ Inserir fornecedor</h3><span class="muted">Nome fornecedor + referência</span></div>
+        <form id="supplierForm" class="form-grid">
+          <input class="field span2" name="nomeMarca" placeholder="Nome Fornecedor" required>
+          <input class="field" name="codigoFicha" placeholder="Número referência" required>
+          <div class="span3"><button class="btn primary" type="submit">Guardar fornecedor</button></div>
+        </form>
+      </div>
+      <div class="az-section-card supplier-list-card">
+        <div class="az-section-title"><span>🏭 Fornecedores</span><b>${state.suppliers.length}</b></div>
+        <div id="suppliersTable">${suppliersTable(state.suppliers)}</div>
+      </div>
     </div>
   </div>`;
 }
 function contactos(){
-  return `<div class="grid two contacts-page">
-    <div class="card">
-      <div class="card-head"><h3>Novo grupo</h3><span class="muted">Ex: Callcenter Lisboa</span></div>
-      <form id="contactGroupForm" class="form-grid">
-        <input class="field span3" name="nome" placeholder="Nome do grupo" required>
-        <div class="span3"><button class="btn primary" type="submit">Criar grupo</button></div>
-      </form>
+  return `<div class="az-module-page">
+    ${azPageHeader('DIRETÓRIO DE CONTACTOS','Pesquisa rápida por nome, telefone, telemóvel, email ou grupo','☎️')}
+    ${azActionBar('contactSearch','contactGroupForm')}
+    <div class="az-filter-panel">
+      <label>🔍 Pesquisa geral<input id="contactSearch" class="field" placeholder="Nome, email, telefone, secção ou local..."></label>
+      <label>🏢 Secção<select id="contactGroupSelect" class="select"><option value="">Todas</option>${(state.contactGroups || []).map(g=>`<option>${esc(g.nome)}</option>`).join('')}</select></label>
+      <label>📍 Local / Empresa<select class="select"><option>Todos</option><option>Autozitânia</option><option>Braga</option><option>Callcenter</option></select></label>
+      <button class="btn ghost" data-clear-search="contactSearch">× Limpar Filtros</button>
     </div>
-    <div class="card">
-      <div class="card-head"><h3>Diretório de contactos</h3><span class="muted">${contactCount()} contactos</span></div>
-      <div class="toolbar one"><input id="contactSearch" class="field" placeholder="Pesquisar nome, telemóvel, telefone, email ou grupo"></div>
-      <div id="contactsTable">${contactGroupsView(filterContactGroups())}</div>
+    <div class="grid two az-main-grid contacts-page">
+      <div class="card az-insert-card">
+        <div class="card-head"><h3>＋ Inserir secção</h3><span class="muted">Ex: Administração, Fornecedores, Vendas</span></div>
+        <form id="contactGroupForm" class="form-grid">
+          <input class="field span3" name="nome" placeholder="Nome da secção / grupo" required>
+          <div class="span3"><button class="btn primary" type="submit">Criar secção</button></div>
+        </form>
+      </div>
+      <div class="az-section-card">
+        <div class="az-section-title"><span>☎️ Diretório</span><b>${contactCount()}</b></div>
+        <div id="contactsTable">${contactGroupsView(filterContactGroups())}</div>
+      </div>
     </div>
   </div>`;
 }
@@ -784,26 +807,36 @@ function stock(){
 }
 function users(){
   const isAdmin = isAdminMaster();
-  return `<div class="grid two users-page">
-    <div class="card">
-      <div class="card-head"><h3>Criar conta</h3><span class="badge ${isAdmin?'green':'orange'}">${isAdmin?'Admin Master':'Sem permissão'}</span></div>
-      ${isAdmin ? `<form id="createUserForm" class="form-grid">
-        <input class="field" name="nome" placeholder="Nome" required>
-        <input class="field" name="email" type="email" placeholder="Email" required>
-        <input class="field" name="password" type="password" placeholder="Password inicial" required>
-        <select class="select" name="role" required>
-          <option>Operador</option>
-          <option>Supervisor</option>
-          <option>Admin</option>
-          <option>Admin Master</option>
-        </select>
-        <select class="select" name="status"><option>Ativo</option><option>Pendente</option><option>Inativo</option></select>
-        <div class="span3"><button class="btn primary" type="submit">Criar conta</button></div>
-      </form>` : '<div class="empty">Só o Admin Master pode criar contas e escolher roles.</div>'}
+  return `<div class="az-module-page">
+    ${azPageHeader('UTILIZADORES','Contas, permissões e estados de acesso','🛡️')}
+    ${azActionBar('', 'createUserForm')}
+    <div class="az-filter-panel">
+      <label>🔍 Pesquisa geral<input class="field" placeholder="Nome, email, role ou estado"></label>
+      <label>🛡️ Role<select class="select"><option>Todos</option><option>Admin Master</option><option>Admin</option><option>Supervisor</option><option>Operador</option></select></label>
+      <label>✅ Estado<select class="select"><option>Todos</option><option>Ativo</option><option>Pendente</option><option>Inativo</option></select></label>
+      <button class="btn ghost">× Limpar Filtros</button>
     </div>
-    <div class="card">
-      <div class="card-head"><h3>Utilizadores</h3><span class="muted">${state.users.length} registos</span></div>
-      ${usersTable(state.users)}
+    <div class="grid two az-main-grid users-page">
+      <div class="card az-insert-card">
+        <div class="card-head"><h3>＋ Criar conta</h3><span class="badge ${isAdmin?'green':'orange'}">${isAdmin?'Admin Master':'Sem permissão'}</span></div>
+        ${isAdmin ? `<form id="createUserForm" class="form-grid">
+          <input class="field" name="nome" placeholder="Nome" required>
+          <input class="field" name="email" type="email" placeholder="Email" required>
+          <input class="field" name="password" type="password" placeholder="Password inicial" required>
+          <select class="select" name="role" required>
+            <option>Operador</option>
+            <option>Supervisor</option>
+            <option>Admin</option>
+            <option>Admin Master</option>
+          </select>
+          <select class="select" name="status"><option>Ativo</option><option>Pendente</option><option>Inativo</option></select>
+          <div class="span3"><button class="btn primary" type="submit">Criar conta</button></div>
+        </form>` : '<div class="empty">Só o Admin Master pode criar contas e escolher roles.</div>'}
+      </div>
+      <div class="az-section-card">
+        <div class="az-section-title"><span>🛡️ Utilizadores</span><b>${state.users.length}</b></div>
+        ${usersTable(state.users)}
+      </div>
     </div>
   </div>`;
 }
@@ -846,32 +879,42 @@ function entityTable(rows, cols, type){
 
 function orcamentos(){
   const clientOptions = state.clients.map(c=>`<option value="${esc(c.nome)}" data-email="${esc(c.email || '')}" data-phone="${esc(c.telefone || '')}" data-code="${esc(clientCode(c))}">${esc(clientCode(c) ? `${clientCode(c)} - ${c.nome}` : c.nome)}</option>`).join('');
-  return `<div class="grid two quotes-page">
-    <div class="card">
-      <div class="card-head"><h3>Criar orçamento</h3><span class="muted">Depois podes gerar PDF e email.</span></div>
-      <form id="quoteForm" class="form-grid">
-        <select class="select span2" name="cliente" id="quoteClientSelect" required>
-          <option value="">Selecionar cliente</option>${clientOptions}
-        </select>
-        <input class="field" name="codigoCliente" placeholder="Código cliente">
-        <input class="field" name="telefone" placeholder="Telefone">
-        <input class="field span2" name="email" placeholder="Email do cliente">
-        <input class="field" name="viatura" placeholder="Viatura / matrícula">
-        <input class="field span2" name="peca" placeholder="Peça / serviço" required>
-        <input class="field" name="referencia" placeholder="Referência">
-        <input class="field" name="quantidade" type="number" min="1" value="1" placeholder="Qtd">
-        <input class="field" name="precoUnitario" type="number" min="0" step="0.01" placeholder="Preço unitário" required>
-        <select class="select" name="estado"><option>Rascunho</option><option>Enviado</option><option>Aceite</option><option>Recusado</option></select>
-        <input class="field" name="validade" type="date" value="${today()}">
-        <input class="field span2" name="prazoEntrega" placeholder="Prazo de entrega">
-        <input class="field span3" name="condicoes" placeholder="Condições comerciais" value="Preços sujeitos a disponibilidade da peça no momento da confirmação.">
-        <textarea class="span3" name="observacoes" placeholder="Notas para o orçamento"></textarea>
-        <div class="span3"><button class="btn primary" type="submit">Criar orçamento</button></div>
-      </form>
+  return `<div class="az-module-page">
+    ${azPageHeader('ORÇAMENTOS','Criar e consultar propostas comerciais','🧾')}
+    ${azActionBar('', 'quoteForm')}
+    <div class="az-filter-panel">
+      <label>🔍 Pesquisa geral<input class="field" placeholder="Cliente, peça, referência ou estado"></label>
+      <label>📄 Estado<select class="select"><option>Todos</option><option>Rascunho</option><option>Enviado</option><option>Aceite</option><option>Recusado</option></select></label>
+      <label>📍 Local / Empresa<select class="select"><option>Todos</option></select></label>
+      <button class="btn ghost">× Limpar Filtros</button>
     </div>
-    <div class="card">
-      <div class="card-head"><h3>Orçamentos</h3><span class="muted">${state.quotes.length} registos</span></div>
-      ${state.quotes.length ? quotesTable() : '<div class="empty">Ainda não existem orçamentos.</div>'}
+    <div class="grid two az-main-grid quotes-page">
+      <div class="card az-insert-card">
+        <div class="card-head"><h3>＋ Criar orçamento</h3><span class="muted">Depois podes gerar PDF e email</span></div>
+        <form id="quoteForm" class="form-grid">
+          <select class="select span2" name="cliente" id="quoteClientSelect" required>
+            <option value="">Selecionar cliente</option>${clientOptions}
+          </select>
+          <input class="field" name="codigoCliente" placeholder="Código cliente">
+          <input class="field" name="telefone" placeholder="Telefone">
+          <input class="field span2" name="email" placeholder="Email do cliente">
+          <input class="field" name="viatura" placeholder="Viatura / matrícula">
+          <input class="field span2" name="peca" placeholder="Peça / serviço" required>
+          <input class="field" name="referencia" placeholder="Referência">
+          <input class="field" name="quantidade" type="number" min="1" value="1" placeholder="Qtd">
+          <input class="field" name="precoUnitario" type="number" min="0" step="0.01" placeholder="Preço unitário" required>
+          <select class="select" name="estado"><option>Rascunho</option><option>Enviado</option><option>Aceite</option><option>Recusado</option></select>
+          <input class="field" name="validade" type="date" value="${today()}">
+          <input class="field span2" name="prazoEntrega" placeholder="Prazo de entrega">
+          <input class="field span3" name="condicoes" placeholder="Condições comerciais" value="Preços sujeitos a disponibilidade da peça no momento da confirmação.">
+          <textarea class="span3" name="observacoes" placeholder="Notas para o orçamento"></textarea>
+          <div class="span3"><button class="btn primary" type="submit">Criar orçamento</button></div>
+        </form>
+      </div>
+      <div class="az-section-card">
+        <div class="az-section-title"><span>🧾 Orçamentos</span><b>${state.quotes.length}</b></div>
+        ${state.quotes.length ? quotesTable() : '<div class="empty">Ainda não existem orçamentos.</div>'}
+      </div>
     </div>
   </div>`;
 }
@@ -896,12 +939,41 @@ function topParts(){
   return `<div class="table-wrap"><table><thead><tr><th>Peça</th><th>Pedidos</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r[0])}</td><td>${r[1]}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function config(){
-  return `<div class="grid two"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="companyNif" placeholder="NIF" value="${esc(state.settings.companyNif || '')}"><input class="field span3" name="companyAddress" placeholder="Morada" value="${esc(state.settings.companyAddress || '')}"><input class="field" name="companyPhone" placeholder="Telefone empresa" value="${esc(state.settings.companyPhone || '')}"><input class="field" name="companyEmail" placeholder="Email empresa" value="${esc(state.settings.companyEmail || '')}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>Firebase</h3><span class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">Dados separados no Firestore por página: clientes, fornecedores, orçamentos, pedidos, agenda, stock, utilizadores, diretório de contactos e configurações.</p><div class="actions"><button class="btn" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div></div>`;
+  return `<div class="az-module-page">
+    ${azPageHeader('CONFIGURAÇÕES','Empresa, Firebase, GitHub e exportações','⚙️')}
+    ${azActionBar('', 'settingsForm')}
+    <div class="grid two az-main-grid">
+      <div class="card az-insert-card">
+        <div class="card-head"><h3>⚙️ Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div>
+        <form id="settingsForm" class="form-grid">
+          <input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}">
+          <input class="field" name="companyNif" placeholder="NIF" value="${esc(state.settings.companyNif || '')}">
+          <input class="field span3" name="companyAddress" placeholder="Morada" value="${esc(state.settings.companyAddress || '')}">
+          <input class="field" name="companyPhone" placeholder="Telefone empresa" value="${esc(state.settings.companyPhone || '')}">
+          <input class="field" name="companyEmail" placeholder="Email empresa" value="${esc(state.settings.companyEmail || '')}">
+          <input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}">
+          <input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}">
+          <div class="span3"><button class="btn primary">Guardar configurações</button></div>
+        </form>
+      </div>
+      <div class="az-section-card">
+        <div class="az-section-title"><span>🔥 Firebase</span><b>${esc(firebaseStatus())}</b></div>
+        <p class="muted">Dados separados no Firestore por página: clientes, fornecedores, orçamentos, utilizadores, diretório de contactos e configurações.</p>
+        <div class="actions"><button class="btn primary" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div>
+      </div>
+    </div>
+  </div>`;
 }
-
 function bindPage(id){
   qsa('[data-go]').forEach(b=>b.addEventListener('click',()=>goPage(b.dataset.go)));
   qsa('[data-page-card]').forEach(b=>b.addEventListener('click',()=>goPage(b.dataset.pageCard)));
+  qsa('[data-focus-search]').forEach(b=>b.addEventListener('click',()=>{ const id=b.dataset.focusSearch; if(id && qs('#'+id)) qs('#'+id).focus(); }));
+  qsa('[data-focus-form]').forEach(b=>b.addEventListener('click',()=>{ const id=b.dataset.focusForm; const form=id?qs('#'+id):null; if(form) form.scrollIntoView({behavior:'smooth',block:'center'}); }));
+  qsa('[data-clear-search]').forEach(b=>b.addEventListener('click',()=>{ const id=b.dataset.clearSearch; const el=qs('#'+id); if(el){ el.value=''; el.dispatchEvent(new Event('input')); el.focus(); } }));
+  qsa('[data-refresh-page]').forEach(b=>b.addEventListener('click',()=>renderPage(currentPage)));
+  qsa('[data-export-page]').forEach(b=>b.addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`autoparts-${currentPage}-export.json`; a.click(); URL.revokeObjectURL(a.href); }));
+  qsa('[data-expand-groups]').forEach(b=>b.addEventListener('click',()=>{ (state.contactGroups||[]).forEach(g=>g.aberto=true); saveState(); renderPage(currentPage); }));
+  qsa('[data-collapse-groups]').forEach(b=>b.addEventListener('click',()=>{ (state.contactGroups||[]).forEach(g=>g.aberto=false); saveState(); renderPage(currentPage); }));
   qsa('[data-client-detail]').forEach(b=>b.addEventListener('click',()=>openClientDetail(b.dataset.clientDetail)));
   const globalSearch = qs('#globalSearch');
   if(globalSearch) globalSearch.addEventListener('input',()=>{ qs('#globalSearchResults').innerHTML = globalSearchResults(globalSearch.value); bindGlobalResults(); });
