@@ -1,5 +1,6 @@
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.6.1';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
+const SESSION_KEY = 'autoparts_callcenter_session_user';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
 const FIREBASE_LEGACY_STATE_DOC = 'main';
 const FIREBASE_META_COLLECTION = 'meta';
@@ -133,6 +134,26 @@ function loadState() {
   } catch {
     return seedData();
   }
+}
+function loadSessionUser(){
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+function saveSessionUser(user){
+  if(!user) return;
+  localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+}
+function clearSessionUser(){ localStorage.removeItem(SESSION_KEY); }
+function restoreSessionUser(){
+  const savedUser = loadSessionUser();
+  if(!savedUser?.email) return false;
+  state.currentUser = savedUser;
+  saveLocalOnly();
+  return true;
 }
 function saveState(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -339,11 +360,23 @@ async function init(){
   buildNav();
   bindShell();
   restoreLogin();
+
+  // Mantém a sessão visível ao trocar de ficheiro HTML.
+  // Sem isto, cada página nova carregava primeiro o login até o Firebase responder.
+  const hadLocalSession = restoreSessionUser();
+  if(hadLocalSession || state.currentUser) showApp();
+
   await initFirebase();
   if (firebaseReady) {
     firebaseAuth.onAuthStateChanged(async user => {
       if (user) {
         await loadCloudState();
+        state.currentUser = {
+          email: user.email,
+          name: (user.displayName || user.email || 'Admin').split('@')[0]
+        };
+        saveSessionUser(state.currentUser);
+        saveLocalOnly();
         if (pendingSignupUser && pendingSignupUser.email?.toLowerCase() === user.email?.toLowerCase()) {
           upsertAppUser({ ...pendingSignupUser, id:user.uid });
           pendingSignupUser = null;
@@ -351,13 +384,20 @@ async function init(){
         }
         if(!userIsActive()) {
           toast('Conta pendente de aprovação pelo Admin Master.');
+          clearSessionUser();
+          state.currentUser = null;
+          saveLocalOnly();
           qs('#appShell').classList.add('hidden');
           qs('#loginScreen').classList.remove('hidden');
           return;
         }
         showApp();
-        toast('Firebase ligado.');
       } else {
+        const restored = restoreSessionUser();
+        if(restored) {
+          showApp();
+          return;
+        }
         state.currentUser = null;
         saveLocalOnly();
         qs('#appShell').classList.add('hidden');
@@ -366,7 +406,6 @@ async function init(){
     });
     return;
   }
-  if(state.currentUser) showApp();
 }
 
 function restoreLogin(){
@@ -425,6 +464,7 @@ async function login(){
     }
   }
   state.currentUser = { email, name: email.split('@')[0] };
+  saveSessionUser(state.currentUser);
   saveState();
   showApp();
 }
@@ -469,6 +509,7 @@ function bindShell(){
   qs('#logoutBtn').addEventListener('click',async ()=>{
     stopFirebaseListeners();
     if (firebaseReady && firebaseAuth?.currentUser) await firebaseAuth.signOut();
+    clearSessionUser();
     state.currentUser = null; saveLocalOnly();
     qs('#appShell').classList.add('hidden');
     qs('#loginScreen').classList.remove('hidden');
