@@ -1,30 +1,20 @@
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 
 const pages = [
   { id: 'dashboard', icon: '🏁', title: 'Dashboard', subtitle: 'Painel principal da operação' },
-  { id: 'nova-chamada', icon: '📞', title: 'Nova Chamada', subtitle: 'Registar atendimento e pedido de peça' },
-  { id: 'pedidos', icon: '🧩', title: 'Pedidos de Peças', subtitle: 'Acompanhamento por estado, urgência e operador' },
   { id: 'clientes', icon: '👤', title: 'Clientes', subtitle: 'Fichas, histórico e contactos' },
   { id: 'fornecedores', icon: '🏭', title: 'Fornecedores', subtitle: 'Lista de fornecedores e referências' },
   { id: 'orcamentos', icon: '🧾', title: 'Orçamentos', subtitle: 'Criar, enviar e acompanhar propostas' },
-  { id: 'agenda', icon: '🗓️', title: 'Agenda / Follow-ups', subtitle: 'Ligações, respostas e lembretes' },
-  { id: 'stock', icon: '📦', title: 'Stock / Catálogo', subtitle: 'Peças disponíveis e compatibilidades' },
-  { id: 'relatorios', icon: '📈', title: 'Relatórios', subtitle: 'Performance, vendas e margens' },
   { id: 'users', icon: '🛡️', title: 'Utilizadores', subtitle: 'Equipa, cargos e permissões' },
   { id: 'config', icon: '⚙️', title: 'Configurações', subtitle: 'GitHub, Electron, Firebase e backups' }
 ];
 
 const pageFiles = {
   dashboard: 'index.html',
-  'nova-chamada': 'nova-chamada.html',
-  pedidos: 'pedidos.html',
   clientes: 'clientes.html',
   fornecedores: 'fornecedores.html',
   orcamentos: 'orcamentos.html',
-  agenda: 'agenda.html',
-  stock: 'stock.html',
-  relatorios: 'relatorios.html',
   users: 'users.html',
   config: 'configuracoes.html'
 };
@@ -133,7 +123,6 @@ function buildNav(){
 
 function bindShell(){
   qs('#homeBtn').addEventListener('click',()=>goPage('dashboard'));
-  qs('#quickCallBtn').addEventListener('click',()=>goPage('nova-chamada'));
   qs('#logoutBtn').addEventListener('click',()=>{
     state.currentUser = null; saveState();
     qs('#appShell').classList.add('hidden');
@@ -154,9 +143,9 @@ function renderPage(id){
 
 function dashboard(){
   const total = state.calls.length;
-  const pend = state.calls.filter(c=>!['Concluído','Perdido'].includes(c.estado)).length;
+  const clientesCount = state.clients.length;
   const quotes = state.quotes.length;
-  const todayFollowups = state.followups.filter(f=>f.date===today()).length;
+  const fornecedoresCount = state.suppliers.length;
   const appCards = pages.filter(p => p.id !== 'dashboard').map(p => `
     <button class="portal-card" data-page-card="${p.id}">
       <div class="portal-icon">${p.icon}</div>
@@ -176,15 +165,15 @@ function dashboard(){
         </div>
         <div class="portal-title">
           <h2>📊 Painel Central</h2>
-          <p>Acede rapidamente às ferramentas da empresa</p>
+          <p>Acede rapidamente aos módulos ativos da empresa</p>
         </div>
       </div>
 
       <div class="portal-kpis">
-        <div><b>${total}</b><span>Pedidos totais</span></div>
-        <div><b>${pend}</b><span>Em aberto</span></div>
+        <div><b>${clientesCount}</b><span>Clientes</span></div>
+        <div><b>${fornecedoresCount}</b><span>Fornecedores</span></div>
         <div><b>${quotes}</b><span>Orçamentos</span></div>
-        <div><b>${todayFollowups}</b><span>Follow-ups hoje</span></div>
+        <div><b>${total}</b><span>Registos internos</span></div>
       </div>
 
       <div class="portal-grid">
