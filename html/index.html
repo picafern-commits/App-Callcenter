@@ -23,34 +23,33 @@
   </div>
 
   <div id="appShell" class="app-shell hidden">
-    <aside class="sidebar">
-      <div class="side-brand">
+    <header class="shell-header">
+      <div class="header-brand">
         <div class="brand-mark small">AP</div>
         <div>
           <strong>AutoParts</strong>
           <span>CallCenter</span>
         </div>
       </div>
-      <nav id="navMenu"></nav>
-      <div class="side-footer">
-        <button id="backgroundBtn" class="btn ghost">Segundo plano</button>
+
+      <div class="header-copy">
+        <h2 id="pageTitle">Dashboard</h2>
+        <span id="pageSubtitle">Central de controlo do callcenter</span>
+      </div>
+
+      <div class="top-actions">
+        <button id="homeBtn" class="btn ghost">Início</button>
+        <button id="quickCallBtn" class="btn primary">+ Nova chamada</button>
+        <span id="userBadge" class="user-badge">Admin</span>
         <button id="logoutBtn" class="btn danger-soft">Fechar app</button>
       </div>
-    </aside>
+    </header>
+
+    <div class="nav-strip-wrap">
+      <nav id="navMenu" class="nav-strip"></nav>
+    </div>
 
     <main class="main">
-      <header class="topbar">
-        <button id="menuBtn" class="icon-btn">☰</button>
-        <div>
-          <h2 id="pageTitle">Dashboard</h2>
-          <span id="pageSubtitle">Central de controlo do callcenter</span>
-        </div>
-        <div class="top-actions">
-          <button id="quickCallBtn" class="btn primary">+ Nova chamada</button>
-          <span id="userBadge" class="user-badge">Admin</span>
-        </div>
-      </header>
-
       <section id="pageContent" class="content"></section>
     </main>
   </div>

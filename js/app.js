@@ -1,18 +1,18 @@
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 
 const pages = [
-  { id: 'dashboard', icon: '📊', title: 'Dashboard', subtitle: 'Central de controlo do callcenter' },
+  { id: 'dashboard', icon: '🏁', title: 'Dashboard', subtitle: 'Painel principal da operação' },
   { id: 'nova-chamada', icon: '📞', title: 'Nova Chamada', subtitle: 'Registar atendimento e pedido de peça' },
   { id: 'pedidos', icon: '🧩', title: 'Pedidos de Peças', subtitle: 'Acompanhamento por estado, urgência e operador' },
   { id: 'clientes', icon: '👤', title: 'Clientes', subtitle: 'Fichas, histórico e contactos' },
-  { id: 'fornecedores', icon: '🏭', title: 'Fornecedores', subtitle: 'Contactos, cotações e avaliação' },
+  { id: 'fornecedores', icon: '🏭', title: 'Fornecedores', subtitle: 'Lista de fornecedores e referências' },
   { id: 'orcamentos', icon: '🧾', title: 'Orçamentos', subtitle: 'Criar, enviar e acompanhar propostas' },
   { id: 'agenda', icon: '🗓️', title: 'Agenda / Follow-ups', subtitle: 'Ligações, respostas e lembretes' },
   { id: 'stock', icon: '📦', title: 'Stock / Catálogo', subtitle: 'Peças disponíveis e compatibilidades' },
   { id: 'relatorios', icon: '📈', title: 'Relatórios', subtitle: 'Performance, vendas e margens' },
   { id: 'users', icon: '🛡️', title: 'Utilizadores', subtitle: 'Equipa, cargos e permissões' },
-  { id: 'config', icon: '⚙️', title: 'Configurações', subtitle: 'Firebase, GitHub, Electron e backups' }
+  { id: 'config', icon: '⚙️', title: 'Configurações', subtitle: 'GitHub, Electron, Firebase e backups' }
 ];
 
 const states = ['Novo', 'Em pesquisa', 'Orçamento enviado', 'Confirmado', 'Perdido', 'Concluído'];
@@ -31,8 +31,8 @@ function seedData() {
     },
     currentUser: null,
     calls: [
-      { id: uid('PED'), createdAt: today(), cliente:'João Silva', telefone:'912345678', email:'', matricula:'12-AB-34', marca:'BMW', modelo:'320d', ano:'2016', motor:'2.0 Diesel', vin:'', peca:'Alternador', referencia:'', urgencia:'Urgente', estado:'Em pesquisa', operador:'Ricardo', observacoes:'Cliente quer resposta ainda hoje.', fornecedor:'', precoCompra:120, precoVenda:185 },
-      { id: uid('PED'), createdAt: today(), cliente:'Auto Oficina Braga', telefone:'253000000', email:'geral@oficina.pt', matricula:'88-ZZ-10', marca:'Mercedes', modelo:'Classe A', ano:'2019', motor:'A180d', vin:'', peca:'Farol frente esquerdo', referencia:'', urgencia:'Normal', estado:'Orçamento enviado', operador:'Fátima', observacoes:'Enviar alternativa nova e usada.', fornecedor:'Fornecedor Norte', precoCompra:210, precoVenda:310 }
+      { id: uid('PED'), createdAt: today(), cliente:'João Silva', telefone:'912345678', email:'', matricula:'12-AB-34', marca:'BMW', modelo:'320d', ano:'2016', motor:'2.0 Diesel', vin:'', peca:'Alternador', referencia:'ALT-320D', urgencia:'Urgente', estado:'Em pesquisa', operador:'Ricardo', observacoes:'Cliente quer resposta ainda hoje.', fornecedor:'Fornecedor Norte', precoCompra:120, precoVenda:185 },
+      { id: uid('PED'), createdAt: today(), cliente:'Auto Oficina Braga', telefone:'253000000', email:'geral@oficina.pt', matricula:'88-ZZ-10', marca:'Mercedes', modelo:'Classe A', ano:'2019', motor:'A180d', vin:'', peca:'Farol frente esquerdo', referencia:'FRL-A180', urgencia:'Normal', estado:'Orçamento enviado', operador:'Fátima', observacoes:'Enviar alternativa nova e usada.', fornecedor:'Stock Sul', precoCompra:210, precoVenda:310 }
     ],
     clients: [
       { id: uid('CLI'), nome:'João Silva', telefone:'912345678', email:'', tipo:'Novo', notas:'Prefere contacto por WhatsApp.' },
@@ -40,7 +40,7 @@ function seedData() {
     ],
     suppliers: [
       { id: uid('FOR'), nomeFornecedor:'Fornecedor Norte', numeroReferencia:'FOR-001', telefone:'253111222', email:'pecas@norte.pt', whatsapp:'253111222', notas:'Usadas / Recondicionadas · Mercedes, BMW, Audi · resposta média 2h.' },
-      { id: uid('FOR'), nomeFornecedor:'Stock Sul', numeroReferencia:'FOR-002', telefone:'219000111', email:'comercial@stocksul.pt', whatsapp:'219000111', notas:'Peças novas · todas as marcas · bom preço em óticas.' }
+      { id: uid('FOR'), nomeFornecedor:'Stock Sul', numeroReferencia:'FOR-002', telefone:'219000111', email:'comercial@stocksul.pt', whatsapp:'219000111', notas:'Peças novas · várias marcas · bom preço em óticas.' }
     ],
     quotes: [],
     followups: [
@@ -73,6 +73,7 @@ function esc(v){ return String(v ?? '').replace(/[&<>'"]/g, m => ({'&':'&amp;','
 function toast(msg){ const el = qs('#toast'); el.textContent = msg; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'),2600); }
 function qs(s){ return document.querySelector(s); }
 function qsa(s){ return [...document.querySelectorAll(s)]; }
+function companyName(){ return state.settings?.companyName || 'AutoParts CallCenter'; }
 
 function init(){
   buildNav();
@@ -106,12 +107,12 @@ function buildNav(){
 }
 
 function bindShell(){
-  qs('#menuBtn').addEventListener('click',()=>qs('.sidebar').classList.toggle('open'));
+  qs('#homeBtn').addEventListener('click',()=>renderPage('dashboard'));
   qs('#quickCallBtn').addEventListener('click',()=>renderPage('nova-chamada'));
-  qs('#backgroundBtn').addEventListener('click',()=>toast('No Electron, podes minimizar a janela para trabalhar em segundo plano.'));
   qs('#logoutBtn').addEventListener('click',()=>{
     state.currentUser = null; saveState();
-    qs('#appShell').classList.add('hidden'); qs('#loginScreen').classList.remove('hidden');
+    qs('#appShell').classList.add('hidden');
+    qs('#loginScreen').classList.remove('hidden');
   });
 }
 
@@ -121,48 +122,109 @@ function renderPage(id){
   qs('#pageTitle').textContent = meta.title;
   qs('#pageSubtitle').textContent = meta.subtitle;
   qsa('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.page===id));
-  qs('.sidebar').classList.remove('open');
   const renderers = { dashboard, 'nova-chamada': novaChamada, pedidos, clientes, fornecedores, orcamentos, agenda, stock, relatorios, users, config };
   qs('#pageContent').innerHTML = renderers[id]();
   bindPage(id);
 }
 
 function dashboard(){
+  const total = state.calls.length;
+  const pend = state.calls.filter(c=>!['Concluído','Perdido'].includes(c.estado)).length;
+  const quotes = state.quotes.length;
+  const suppliers = state.suppliers.length;
+  const todayFollowups = state.followups.filter(f=>f.date===today()).length;
+  const totalVenda = state.calls.reduce((a,c)=>a+Number(c.precoVenda||0),0);
+  const totalCompra = state.calls.reduce((a,c)=>a+Number(c.precoCompra||0),0);
+  const margem = totalVenda - totalCompra;
+  const percent = total ? Math.round((state.calls.filter(c=>c.estado==='Concluído').length / total) * 100) : 0;
+
   const appCards = pages.filter(p => p.id !== 'dashboard').map(p => `
     <button class="launcher-card" data-page-card="${p.id}">
-      <div class="launcher-icon">${p.icon}</div>
+      <div class="launcher-topline">
+        <div class="launcher-icon">${p.icon}</div>
+        <span class="card-tag">Abrir</span>
+      </div>
       <strong>${esc(p.title)}</strong>
       <span>${esc(p.subtitle)}</span>
     </button>`).join('');
-  const total = state.calls.length;
-  const pend = state.calls.filter(c=>!['Concluído','Perdido'].includes(c.estado)).length;
-  const suppliers = state.suppliers.length;
-  const followToday = state.followups.filter(f=>f.date===today()).length;
+
+  const pendingList = state.calls.filter(c=>!['Concluído','Perdido'].includes(c.estado)).slice(0,4);
+  const followList = state.followups.slice(0,4);
+  const supplierList = state.suppliers.slice(0,4);
+
   return `
-    <div class="launcher-page">
-      <div class="launcher-top">
-        <div class="launcher-logo">
-          <div class="launcher-logo-mark">AZ</div>
-          <div>
-            <h1>AUTOZITÂNIA</h1>
-            <small>Sistema callcenter de peças automóveis</small>
+    <div class="dashboard-wrap">
+      <div class="hero-panel">
+        <div>
+          <span class="hero-eyebrow">⚡ CENTRAL OPERACIONAL</span>
+          <h1>${esc(companyName())}</h1>
+          <p>Plataforma interna para atendimento, pesquisa de peças, gestão de fornecedores, orçamentos e acompanhamento comercial. Mantive o login e removi a sidebar para dar um aspeto mais limpo e mais próprio.</p>
+          <div class="hero-actions">
+            <button class="btn primary" data-go="nova-chamada">+ Registar chamada</button>
+            <button class="btn ghost" data-go="pedidos">Ver pedidos</button>
+            <button class="btn ghost" data-go="fornecedores">Abrir fornecedores</button>
+          </div>
+          <div class="hero-highlights">
+            <div class="highlight-box"><strong>${total}</strong><span>Pedidos totais</span></div>
+            <div class="highlight-box"><strong>${pend}</strong><span>Pedidos pendentes</span></div>
+            <div class="highlight-box"><strong>${quotes}</strong><span>Orçamentos criados</span></div>
           </div>
         </div>
-        <div class="launcher-title">
-          <h2>📊 PAINEL DE APLICAÇÕES</h2>
-          <p>Acede rapidamente às ferramentas da empresa</p>
+        <div class="hero-side">
+          <div class="status-panel">
+            <div class="panel-label">Resumo comercial</div>
+            <div class="big-number">${money(margem)}</div>
+            <div class="panel-sub">Margem prevista atual</div>
+            <div class="progress-list">
+              <div class="progress-item">
+                <span><b>Taxa concluída</b><b>${percent}%</b></span>
+                <div class="progress-bar"><i style="width:${percent}%"></i></div>
+              </div>
+              <div class="progress-item">
+                <span><b>Venda prevista</b><b>${money(totalVenda)}</b></span>
+                <div class="progress-bar"><i style="width:${Math.min(100, totalVenda ? 72 : 0)}%"></i></div>
+              </div>
+              <div class="progress-item">
+                <span><b>Compra prevista</b><b>${money(totalCompra)}</b></span>
+                <div class="progress-bar"><i style="width:${Math.min(100, totalCompra ? 54 : 0)}%"></i></div>
+              </div>
+            </div>
+          </div>
+          <div class="today-panel">
+            <div class="panel-label">Hoje</div>
+            <div class="big-number">${todayFollowups}</div>
+            <div class="panel-sub">Follow-ups agendados para hoje</div>
+          </div>
         </div>
       </div>
 
-      <div class="launcher-stats">
-        <div><strong>${total}</strong><span>Pedidos</span></div>
-        <div><strong>${pend}</strong><span>Pendentes</span></div>
-        <div><strong>${suppliers}</strong><span>Fornecedores</span></div>
-        <div><strong>${followToday}</strong><span>Follow-ups hoje</span></div>
+      <div class="section-head">
+        <h3>Ferramentas da aplicação</h3>
+        <span class="muted">Acesso rápido sem sidebar</span>
       </div>
-
       <div class="launcher-grid">
         ${appCards}
+      </div>
+
+      <div class="quick-grid">
+        <div class="quick-card">
+          <h4>Pedidos em aberto</h4>
+          <div class="quick-list">
+            ${pendingList.length ? pendingList.map(c => `<div class="quick-line"><div><strong>${esc(c.cliente)}</strong><small>${esc(c.peca)} · ${esc(c.marca)} ${esc(c.modelo)}</small></div>${badge(c.estado)}</div>`).join('') : '<div class="empty">Sem pedidos em aberto.</div>'}
+          </div>
+        </div>
+        <div class="quick-card">
+          <h4>Agenda rápida</h4>
+          <div class="quick-list">
+            ${followList.length ? followList.map(f => `<div class="quick-line"><div><strong>${esc(f.title)}</strong><small>${esc(f.date)} ${esc(f.time || '')} · ${esc(f.related || '')}</small></div>${badge(f.status)}</div>`).join('') : '<div class="empty">Sem follow-ups.</div>'}
+          </div>
+        </div>
+        <div class="quick-card">
+          <h4>Fornecedores recentes</h4>
+          <div class="quick-list">
+            ${supplierList.length ? supplierList.map(s => `<div class="quick-line"><div><strong>${esc(supplierName(s))}</strong><small>Ref.: ${esc(supplierRef(s) || '-')}</small></div><span class="badge blue">Fornecedor</span></div>`).join('') : '<div class="empty">Sem fornecedores.</div>'}
+          </div>
+        </div>
       </div>
     </div>`;
 }
@@ -206,11 +268,8 @@ function callsTable(rows, actions=true){
     <tr><td>${esc(c.id)}</td><td><strong>${esc(c.cliente)}</strong><br><span class="muted">${esc(c.telefone)}</span></td><td>${esc(c.marca)} ${esc(c.modelo)}<br><span class="muted">${esc(c.matricula||'Sem matrícula')}</span></td><td>${esc(c.peca)}<br><span class="muted">${esc(c.referencia||'Sem referência')}</span></td><td>${badge(c.urgencia)}</td><td>${badge(c.estado)}</td><td>${money(c.precoVenda)}</td>${actions?`<td><div class="actions"><button class="btn small" data-edit-call="${c.id}">Editar</button><button class="btn success small" data-quote="${c.id}">Orçamento</button><button class="btn danger small" data-delete-call="${c.id}">Apagar</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`;
 }
 function badge(v){
-  const map = {'Normal':'blue','Urgente':'orange','Muito urgente':'red','Novo':'blue','Em pesquisa':'orange','Orçamento enviado':'violet','Confirmado':'green','Concluído':'green','Perdido':'red','Pendente':'orange','Feito':'green','Ativo':'green'};
+  const map = {'Normal':'blue','Urgente':'orange','Muito urgente':'red','Novo':'blue','Em pesquisa':'orange','Orçamento enviado':'violet','Confirmado':'green','Concluído':'green','Perdido':'red','Pendente':'orange','Feito':'green','Ativo':'green','Rascunho':'blue'};
   return `<span class="badge ${map[v]||''}">${esc(v||'-')}</span>`;
-}
-function kanban(){
-  return `<div class="kanban">${states.slice(0,5).map(st=>`<div class="lane"><h4>${st}</h4>${state.calls.filter(c=>c.estado===st).map(c=>`<div class="mini-card"><strong>${esc(c.cliente)}</strong><span>${esc(c.peca)} · ${esc(c.marca)} ${esc(c.modelo)}</span></div>`).join('') || '<div class="muted">Sem pedidos</div>'}</div>`).join('')}</div>`;
 }
 
 function clientes(){
@@ -221,7 +280,7 @@ function clientes(){
 function fornecedores(){
   return `<div class="grid two suppliers-page">
     <div class="card">
-      <div class="card-head"><h3>Adicionar fornecedor</h3><span class="muted">Lista simples por fornecedor e referência.</span></div>
+      <div class="card-head"><h3>Adicionar fornecedor</h3><span class="muted">Lista simples por fornecedor e número de referência.</span></div>
       <form id="supplierForm" class="form-grid">
         <input class="field span2" name="nomeFornecedor" placeholder="Nome Fornecedor" required>
         <input class="field" name="numeroReferencia" placeholder="Número referência" required>
@@ -291,7 +350,7 @@ function topParts(){
   return `<div class="table-wrap"><table><thead><tr><th>Peça</th><th>Pedidos</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r[0])}</td><td>${r[1]}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function config(){
-  return `<div class="grid two"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><label class="checkline span3"><input type="checkbox" name="firebaseEnabled" ${state.settings.firebaseEnabled?'checked':''}> Preparar ligação Firebase</label><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>GitHub + Electron</h3></div><p class="muted">Esta versão já está pronta para publicar no GitHub Pages. Para Electron, o ficheiro principal é <strong>electron/main.js</strong>. Se quiseres que o programa abra o link do GitHub, basta arrancar com a variável APP_URL.</p><div class="actions"><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div></div>`;
+  return `<div class="grid two"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><label class="checkline span3"><input type="checkbox" name="firebaseEnabled" ${state.settings.firebaseEnabled?'checked':''}> Preparar ligação Firebase</label><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>GitHub + Electron</h3></div><p class="muted">Esta versão já está pronta para publicar no GitHub Pages e tem estrutura preparada para Electron. A navegação passou a ser superior, sem sidebar, para dar um visual mais limpo e próprio.</p><div class="actions"><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div></div>`;
 }
 
 function bindPage(id){
@@ -357,7 +416,7 @@ function bindFollowForm(){
   qs('#followForm').addEventListener('submit',e=>{ e.preventDefault(); state.followups.push({id:uid('AGE'),...Object.fromEntries(new FormData(e.target).entries())}); saveState(); renderPage('agenda'); toast('Follow-up guardado.'); });
 }
 function bindConfig(){
-  qs('#settingsForm').addEventListener('submit',e=>{ e.preventDefault(); const fd=new FormData(e.target); state.settings={ companyName:fd.get('companyName'), dailyBackupHour:fd.get('dailyBackupHour'), githubUrl:fd.get('githubUrl'), firebaseEnabled:fd.get('firebaseEnabled')==='on'}; saveState(); toast('Configurações guardadas.'); });
+  qs('#settingsForm').addEventListener('submit',e=>{ e.preventDefault(); const fd=new FormData(e.target); state.settings={ companyName:fd.get('companyName'), dailyBackupHour:fd.get('dailyBackupHour'), githubUrl:fd.get('githubUrl'), firebaseEnabled:fd.get('firebaseEnabled')==='on'}; saveState(); toast('Configurações guardadas.'); renderPage('config'); });
   qs('#exportJsonBtn').addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='autoparts-callcenter-export.json'; a.click(); URL.revokeObjectURL(a.href); });
   qs('#resetDemoBtn').addEventListener('click',()=>{ localStorage.removeItem(STORAGE_KEY); state=seedData(); renderPage('dashboard'); toast('Demo reposta.'); });
 }
