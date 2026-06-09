@@ -1,4 +1,4 @@
-const APP_VERSION = '2.2.3';
+const APP_VERSION = '2.2.4';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -1274,6 +1274,7 @@ function contactsCards(group){
       </div>
       <div class="contact-actions premium">
         ${c.email ? `<a class="btn small ghost" href="mailto:${esc(c.email)}">${ICONS.email}<span>Email</span></a><button class="mini-copy-btn" type="button" data-copy="${esc(c.email)}">${ICONS.copy}</button>` : ''}
+        ${canEditOperational()?`<button class="btn small ghost" type="button" data-edit-contact="${group.id}:${c.id}">${ICONS.edit}<span>Editar</span></button>`:''}
         ${canDelete()?`<button class="btn danger small" data-delete-contact="${group.id}:${c.id}">Apagar</button>`:''}
       </div>
     </article>`).join('')}</div>`;
@@ -2297,6 +2298,42 @@ function openQuickContactModal(groupId){
   qs('#saveContactCloseBtn')?.addEventListener('click',()=>addContact(true));
 }
 
+
+function openEditContactModal(groupId, contactId){
+  if(!canEditOperational()) return toast('Sem permissão para editar contactos.');
+  normalizeContactDirectory();
+  const group = (state.contactGroups || []).find(g=>g.id===groupId);
+  const contact = group?.contactos?.find(c=>c.id===contactId);
+  if(!group || !contact) return toast('Contacto não encontrado.');
+  openModal(`Editar contacto · ${esc(contactWarehouse(group))} / ${esc(contactSection(group))}`, `
+    <form id="editContactForm" class="form-grid quick-contact-modal">
+      <input class="field span3" name="nome" placeholder="Nome do contacto" value="${esc(contact.nome || '')}" required autofocus>
+      <input class="field" name="telemovel" placeholder="Telemóvel" value="${esc(contact.telemovel || '')}">
+      <input class="field" name="telefone" placeholder="Telefone fixo" value="${esc(contact.telefone || '')}">
+      <input class="field" name="email" type="email" placeholder="Email" value="${esc(contact.email || '')}">
+      <div class="span3 actions quick-modal-actions">
+        <button class="btn primary" type="submit">Guardar alterações</button>
+        <button class="btn ghost" type="button" id="cancelEditContactBtn">Cancelar</button>
+      </div>
+    </form>
+  `);
+  qs('#editContactForm')?.addEventListener('submit', e=>{
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    if(!data.nome?.trim()) return toast('Mete o nome do contacto.');
+    contact.nome = (data.nome || '').trim();
+    contact.telemovel = (data.telemovel || '').trim();
+    contact.telefone = (data.telefone || '').trim();
+    contact.email = (data.email || '').trim();
+    group.aberto = true;
+    saveState();
+    closeModal();
+    renderPage('contactos');
+    toast('Contacto atualizado.');
+  });
+  qs('#cancelEditContactBtn')?.addEventListener('click', closeModal);
+}
+
 function bindContactDirectory(){
   const quickForm = qs('#quickContactForm');
   if(quickForm) quickForm.addEventListener('submit',e=>{
@@ -2356,6 +2393,11 @@ function bindContactDirectory(){
     group.seccao = seccao.trim() || 'Geral';
     group.nome = group.seccao;
     saveState(); renderPage('contactos'); toast('Secção atualizada.');
+  }));
+
+  qsa('[data-edit-contact]').forEach(btn=>btn.addEventListener('click',()=>{
+    const [groupId, contactId] = btn.dataset.editContact.split(':');
+    openEditContactModal(groupId, contactId);
   }));
 
   qsa('[data-delete-contact]').forEach(btn=>btn.addEventListener('click',()=>{
