@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, Menu, session } = require('electron');
+const { app, BrowserWindow, shell, Menu, session, screen } = require('electron');
 const path = require('path');
 
 // Electron deve abrir o GitHub Pages como app principal.
@@ -6,7 +6,7 @@ const path = require('path');
 // abre automaticamente a versão local em vez de bloquear a app.
 const START_MAXIMIZED = process.env.START_MAXIMIZED !== '0';
 const LOCAL_ONLY = process.env.LOCAL_ONLY === '1';
-const CUSTOM_APP_URL = process.env.APP_URL || '';
+const CUSTOM_APP_URL = process.env.APP_URL || 'https://picafern-commits.github.io/App-Callcenter-main/html/login.html';
 
 const GITHUB_CANDIDATES = [
   CUSTOM_APP_URL,
@@ -100,12 +100,34 @@ async function loadGithubOrLocal(win) {
   return loadLocalFallback(win);
 }
 
+
+function getWindowProfile() {
+  const display = screen.getPrimaryDisplay();
+  const { width, height } = display.workAreaSize;
+  const scaleFactor = display.scaleFactor || 1;
+
+  // Electron recebe medidas em DIP, que já respeitam a escala do Windows.
+  // Por isso usamos a área útil real do monitor, em vez de tamanhos fixos gigantes.
+  const targetWidth = Math.max(980, Math.min(width, Math.round(width * 0.96)));
+  const targetHeight = Math.max(680, Math.min(height, Math.round(height * 0.94)));
+  const minWidth = Math.min(980, Math.max(820, width - 80));
+  const minHeight = Math.min(680, Math.max(560, height - 80));
+
+  let zoom = 1;
+  if (width <= 1280 || height <= 720) zoom = 0.92;
+  else if (width <= 1366 || height <= 800) zoom = 0.96;
+  else if (width >= 2200 && scaleFactor <= 1.25) zoom = 1.04;
+
+  return { targetWidth, targetHeight, minWidth, minHeight, zoom, scaleFactor };
+}
+
 function createWindow() {
+  const profile = getWindowProfile();
   mainWindow = new BrowserWindow({
-    width: 1480,
-    height: 940,
-    minWidth: 1180,
-    minHeight: 760,
+    width: profile.targetWidth,
+    height: profile.targetHeight,
+    minWidth: profile.minWidth,
+    minHeight: profile.minHeight,
     backgroundColor: '#edf4fb',
     title: 'AutoParts CallCenter',
     autoHideMenuBar: true,
@@ -115,11 +137,20 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true,
       spellcheck: true,
-      zoomFactor: 1.0
     }
   });
 
   Menu.setApplicationMenu(null);
+
+  mainWindow.webContents.setZoomFactor(profile.zoom);
+
+  screen.on('display-metrics-changed', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const nextProfile = getWindowProfile();
+    mainWindow.setMinimumSize(nextProfile.minWidth, nextProfile.minHeight);
+    mainWindow.webContents.setZoomFactor(nextProfile.zoom);
+    mainWindow.webContents.executeJavaScript('window.dispatchEvent(new Event(\"resize\"));').catch(()=>{});
+  });
 
   mainWindow.once('ready-to-show', () => {
     if (START_MAXIMIZED) mainWindow.maximize();
@@ -128,9 +159,9 @@ function createWindow() {
 
   loadGithubOrLocal(mainWindow);
 
-  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
-    console.warn('did-fail-load:', errorCode, errorDescription, validatedURL);
-    if (validatedURL && validatedURL.startsWith('http')) loadLocalFallback(mainWindow);
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    console.warn('did-fail-load:', errorCode, errorDescription, validatedURL, 'mainFrame:', isMainFrame);
+    if (isMainFrame && validatedURL && validatedURL.startsWith('http')) loadLocalFallback(mainWindow);
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

@@ -1,4 +1,4 @@
-const APP_VERSION = '1.9.3';
+const APP_VERSION = '1.9.5';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -35,6 +35,10 @@ let firebaseDb = null;
 let cloudSaveTimer = null;
 let firebaseUnsubscribers = [];
 let pendingSignupUser = null;
+let cloudReadOnlyMode = false;
+function isElectronApp(){
+  return new URLSearchParams(window.location.search).get('electron') === '1' || navigator.userAgent.toLowerCase().includes('electron');
+}
 
 const pages = [
   { id: 'dashboard', icon: '🏁', title: 'Dashboard', subtitle: 'Painel principal da operação' },
@@ -87,7 +91,7 @@ function seedData() {
       firebaseEnabled: false,
       dailyBackupHour: '19:30',
       theme: 'normal',
-      resolution: 'standard',
+      resolution: 'auto',
       colorScheme: 'az',
       spellcheckEnabled: true,
       operatorPageAccess: {
@@ -234,15 +238,16 @@ function saveLocalOnly(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state
 function appIsVisible(){ return !qs('#appShell')?.classList.contains('hidden'); }
 function firebaseStatus(){
   if (!firebaseReady) return 'Modo local';
+  if(firebaseAuth?.currentUser?.isAnonymous || cloudReadOnlyMode) return 'Firebase leitura';
   return firebaseAuth?.currentUser ? 'Firebase ligado' : 'Firebase pronto';
 }
 function scheduleCloudSave(){
-  if (!firebaseReady || !firebaseAuth?.currentUser || !firebaseDb) return;
+  if (!firebaseReady || !firebaseAuth?.currentUser || !firebaseDb || cloudReadOnlyMode) return;
   clearTimeout(cloudSaveTimer);
   cloudSaveTimer = setTimeout(pushCloudState, 450);
 }
 async function pushCloudState(){
-  if (!firebaseReady || !firebaseAuth?.currentUser || !firebaseDb) return;
+  if (!firebaseReady || !firebaseAuth?.currentUser || !firebaseDb || cloudReadOnlyMode) return;
   try {
     await saveFirebaseCollections();
   } catch (err) {
@@ -295,13 +300,18 @@ async function syncCollection(collectionName, rows, allowDelete=false){
 
   if (ops) await batch.commit();
 }
-async function loadCloudState(){
+async function loadCloudState(options = {}){
   if (!firebaseReady || !firebaseAuth?.currentUser || !firebaseDb) return;
   try {
     const authUser = firebaseAuth.currentUser;
+    const previousUser = state.currentUser;
     const base = seedData();
     const metaSnap = await firebaseDb.collection(FIREBASE_META_COLLECTION).doc(FIREBASE_META_DOC).get();
-    state = { ...base, currentUser: { email: authUser.email, name: (authUser.email || 'Admin').split('@')[0] } };
+    const authEmail = authUser.email || '';
+    const nextCurrentUser = authEmail
+      ? { email: authEmail, name: authEmail.split('@')[0] }
+      : (previousUser || { email:'local@electron.app', name:'Local' });
+    state = { ...base, currentUser: nextCurrentUser };
 
     if (metaSnap.exists && metaSnap.data()?.settings) {
       state.settings = { ...base.settings, ...metaSnap.data().settings, firebaseEnabled: true };
@@ -316,10 +326,11 @@ async function loadCloudState(){
       loadedRows += state[stateKey].length;
     }
 
-    if (!loadedRows) {
+    if (!loadedRows && !authUser.isAnonymous) {
       await migrateLegacyCloudState(base);
     }
 
+    cloudReadOnlyMode = !!authUser.isAnonymous || !!options.readOnly;
     saveLocalOnly();
     startFirebaseListeners();
   } catch (err) {
@@ -423,13 +434,24 @@ function currentTheme(){
 }
 function getLocalResolution(){
   const value = localStorage.getItem(RESOLUTION_KEY);
-  return ['compact','standard','wide','large'].includes(value) ? value : '';
+  return ['auto','compact','standard','wide','large'].includes(value) ? value : '';
 }
 function currentResolution(){
-  return getLocalResolution() || state.settings?.resolution || 'standard';
+  return getLocalResolution() || state.settings?.resolution || 'auto';
+}
+function effectiveResolution(){
+  const selected = currentResolution();
+  if(selected !== 'auto') return selected;
+  const w = window.innerWidth || document.documentElement.clientWidth || 1366;
+  const h = window.innerHeight || document.documentElement.clientHeight || 768;
+  const dpr = window.devicePixelRatio || 1;
+  if(w <= 1280 || h <= 720) return 'compact';
+  if(w >= 2100 && dpr <= 1.25) return 'large';
+  if(w >= 1600) return 'wide';
+  return 'standard';
 }
 function persistResolution(value){
-  const next = ['compact','standard','wide','large'].includes(value) ? value : 'standard';
+  const next = ['auto','compact','standard','wide','large'].includes(value) ? value : 'auto';
   localStorage.setItem(RESOLUTION_KEY, next);
   state.settings = state.settings || {};
   state.settings.resolution = next;
@@ -459,11 +481,14 @@ function persistTheme(theme){
 function applyTheme(){
   const dark = currentTheme() === 'dark';
   const resolution = currentResolution();
+  const resolvedResolution = effectiveResolution();
   const scheme = currentColorScheme();
   document.documentElement.classList.toggle('theme-dark', dark);
   document.body.classList.toggle('theme-dark', dark);
   document.body.classList.toggle('admin-master', isAdminMaster());
-  ['compact','standard','wide','large'].forEach(v=>{ document.documentElement.classList.toggle(`res-${v}`, resolution===v); document.body.classList.toggle(`res-${v}`, resolution===v); });
+  document.documentElement.classList.toggle('res-auto', resolution === 'auto');
+  document.body.classList.toggle('res-auto', resolution === 'auto');
+  ['compact','standard','wide','large'].forEach(v=>{ document.documentElement.classList.toggle(`res-${v}`, resolvedResolution===v); document.body.classList.toggle(`res-${v}`, resolvedResolution===v); });
   ['az','ocean','graphite','emerald','sunset'].forEach(v=>{ document.documentElement.classList.toggle(`scheme-${v}`, scheme===v); document.body.classList.toggle(`scheme-${v}`, scheme===v); });
   const btn = qs('#themeToggleBtn');
   if(btn) btn.textContent = dark ? 'Modo Normal' : 'Darkmode';
@@ -543,6 +568,13 @@ async function init(){
   if (firebaseReady) {
     firebaseAuth.onAuthStateChanged(async user => {
       if (user) {
+        if(user.isAnonymous) {
+          await loadCloudState({ readOnly:true });
+          const stored = getStoredSession();
+          if(stored?.email && !state.currentUser?.email) state.currentUser = { email: stored.email, name: stored.name || String(stored.email).split('@')[0] };
+          if(stored?.email && !appIsVisible() && !isLoginPage()) showApp();
+          return;
+        }
         await loadCloudState();
         if (pendingSignupUser && pendingSignupUser.email?.toLowerCase() === user.email?.toLowerCase()) {
           upsertAppUser({ ...pendingSignupUser, id:user.uid });
@@ -643,15 +675,31 @@ function localLoginUserForEmail(email){
   }
   return { id:uid('USR'), nome:cleanEmail.split('@')[0], email:cleanEmail, role:'Operador', status:'Ativo', pageAccess:{}, actionAccess:{} };
 }
-function finishLocalLogin(email, reason=''){
+async function ensureFirebaseReadForLocalSession(){
+  if(!firebaseReady || !firebaseAuth || firebaseAuth.currentUser) return false;
+  try {
+    if(firebaseAuth.signInAnonymously) {
+      await firebaseAuth.signInAnonymously();
+      await loadCloudState({ readOnly:true });
+      toast('Firebase ligado em modo leitura.');
+      return true;
+    }
+  } catch(err) {
+    console.warn('Firebase anonymous/read fallback failed', err);
+  }
+  return false;
+}
+async function finishLocalLogin(email, reason=''){
   const user = localLoginUserForEmail(email);
   if(!user) return toast('Conta não encontrada.');
   if(String(user.status || 'Ativo').toLowerCase() === 'pendente') return toast('Conta pendente de aprovação pelo Admin Master.');
   if(String(user.status || 'Ativo').toLowerCase() === 'inativo') return toast('Conta inativa. Fala com o Admin Master.');
   state.currentUser = { email:user.email, name:user.nome || String(user.email).split('@')[0] };
   setStoredSession(state.currentUser);
-  saveState(reason || 'Login local');
-  if(reason) toast(reason);
+  saveLocalOnly();
+  const cloudRead = await ensureFirebaseReadForLocalSession();
+  saveState(reason || (cloudRead ? 'Login local com leitura Firebase' : 'Login local'));
+  if(reason && !cloudRead) toast(reason);
   showApp();
 }
 async function login(){
@@ -667,11 +715,11 @@ async function login(){
       return;
     } catch (err) {
       console.warn('Firebase login failed; using local fallback when possible', err);
-      finishLocalLogin(email, 'Firebase falhou. Entrei em modo local.');
+      await finishLocalLogin(email, 'Firebase falhou. Entrei em modo local.');
       return;
     }
   }
-  finishLocalLogin(email);
+  await finishLocalLogin(email);
 }
 async function signupFromLogin(){
   if(!firebaseReady) return toast('Firebase indisponível. Tenta novamente com internet.');
@@ -1574,6 +1622,7 @@ function configsUser(){
   const resolution = currentResolution();
   const scheme = currentColorScheme();
   const resolutionOptions = [
+    ['auto','Auto Windows','Ajusta automaticamente à resolução/escala do Windows'],
     ['compact','Compacto','Mais informação no ecrã'],
     ['standard','Normal','Equilíbrio recomendado'],
     ['wide','Largo','Usa mais largura do ecrã'],
@@ -2666,3 +2715,5 @@ function openTvMode(){
 
 
 document.addEventListener('DOMContentLoaded', init);
+
+window.addEventListener('resize', () => { if(currentResolution && currentResolution() === 'auto') applyTheme(); });
