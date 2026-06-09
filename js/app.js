@@ -1,4 +1,4 @@
-const APP_VERSION = '2.2.6';
+const APP_VERSION = '2.2.7';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -265,17 +265,14 @@ function restoreConfigAccordionState(){
   });
 }
 function scheduleFirebasePageRefresh(reason='firebase'){
+  // A Firebase deve sincronizar dados em segundo plano.
+  // Antes isto redesenhava a página a cada snapshot e parecia que a app dava refresh sozinha.
   if(!appIsVisible()) return;
-  if(qs('#modalRoot') && !qs('#modalRoot').classList.contains('hidden')) return;
-  if(currentPage === 'config' || currentPage === 'configs-user') {
-    applyTheme();
-    updateFirebaseStatusBadge();
-    return;
-  }
+  applyTheme();
+  updateFirebaseStatusBadge();
+  document.body.classList.add('firebase-synced-soft');
   clearTimeout(firebaseRefreshTimer);
-  firebaseRefreshTimer = setTimeout(()=>{
-    if(appIsVisible() && currentPage !== 'config' && currentPage !== 'configs-user') renderPage(currentPage);
-  }, 220);
+  firebaseRefreshTimer = setTimeout(()=>document.body.classList.remove('firebase-synced-soft'), 700);
 }
 function updateFirebaseStatusBadge(){
   const badge = qs('#firebaseStatusBadge');

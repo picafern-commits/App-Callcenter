@@ -3414,3 +3414,9 @@ body.theme-dark .user-create-help{
 body.theme-dark .user-create-help strong{
   color:var(--text);
 }
+
+
+/* v2.2.7 - Firebase sync sem refresh visual */
+body.firebase-synced-soft #firebaseStatusBadge{
+  box-shadow:0 0 0 4px rgba(7,148,85,.10);
+}
