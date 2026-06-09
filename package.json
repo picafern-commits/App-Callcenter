@@ -1,6 +1,6 @@
 {
   "name": "autoparts-callcenter",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "description": "App de callcenter para peças automóveis",
   "main": "electron/main.js",
   "scripts": {
