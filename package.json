@@ -1,6 +1,6 @@
 {
   "name": "autoparts-callcenter",
-  "version": "1.9.7",
+  "version": "2.0.0",
   "description": "Launcher Electron para GitHub Pages da app callcenter de peças automóveis",
   "main": "electron/main.js",
   "scripts": {
@@ -10,7 +10,7 @@
     "dist": "electron-builder",
     "dist:win": "electron-builder --win --x64",
     "pack:win": "electron-builder --dir --win --x64",
-    "start:github": "set APP_URL=https://picafern-commits.github.io/App-Callcenter-main/html/login.html&& electron ."
+    "start:github": "set APP_URL=https://picafern-commits.github.io/App-Callcenter/html/login.html&& electron ."
   },
   "author": "",
   "license": "UNLICENSED",

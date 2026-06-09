@@ -3,7 +3,7 @@ const path = require('path');
 
 // Electron passa a ser apenas um launcher do GitHub Pages.
 // Assim, as alterações feitas no GitHub aparecem no Electron sem recriar setup.
-const DEFAULT_GITHUB_URL = 'https://picafern-commits.github.io/App-Callcenter-main/html/login.html';
+const DEFAULT_GITHUB_URL = 'https://picafern-commits.github.io/App-Callcenter/html/login.html';
 const APP_URL = process.env.APP_URL || DEFAULT_GITHUB_URL;
 const LOCAL_FALLBACK = process.env.LOCAL_FALLBACK === '1';
 const START_MAXIMIZED = process.env.START_MAXIMIZED !== '0';

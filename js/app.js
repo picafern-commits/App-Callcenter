@@ -1,4 +1,4 @@
-const APP_VERSION = '1.9.7';
+const APP_VERSION = '2.0.0';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -498,6 +498,9 @@ function applyTheme(){
   document.documentElement.classList.toggle('theme-dark', dark);
   document.body.classList.toggle('theme-dark', dark);
   document.body.classList.toggle('admin-master', isAdminMaster());
+  const roleSlug = normalizeText(currentRole ? currentRole() : '').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'operador';
+  ['role-admin-master','role-admin','role-supervisor','role-operador'].forEach(cls=>document.body.classList.remove(cls));
+  document.body.classList.add(`role-${roleSlug}`);
   document.documentElement.classList.toggle('electron-mode', isElectronMode());
   document.body.classList.toggle('electron-mode', isElectronMode());
   document.documentElement.classList.toggle('res-auto', resolution === 'auto');
@@ -565,6 +568,7 @@ function showApp(){
   buildNav();
   bindShell();
   ensureGlobalSearchBox();
+  ensureCompanyMiniBadge();
   checkAutoBackup();
   if(qs('#userBadge')) qs('#userBadge').textContent = state.currentUser?.name || 'Admin';
   renderPage(currentPage);
@@ -876,6 +880,7 @@ function renderPage(id){
   }
   currentPage = id;
   qs('#appShell')?.classList.toggle('dashboard-mode', id === 'dashboard');
+  applyTheme();
   updateGlobalSearchVisibility(id);
   const meta = pages.find(p=>p.id===id) || pages[0];
   qs('#pageTitle').textContent = meta.title;
@@ -1983,7 +1988,9 @@ async function importPageExcel(pageId, file){
     const count = applyImportedRows(pageId, cfg, normalized);
     saveState();
     renderPage(pageId);
-    toast(`${count} linha(s) importada(s) do Excel.`);
+    const total = cfg.single ? 1 : ((Array.isArray(state[cfg.key]) ? state[cfg.key].length : Object.keys(state[cfg.key]||{}).length));
+    const extra = pageId === 'fornecedores' ? ` · lista atual: ${total} registo(s)` : '';
+    toast(`${count} linha(s) importada(s) do Excel${extra}.`);
   } catch(err){
     console.error(err);
     toast(err?.message || 'Não consegui importar esse ficheiro Excel.');
@@ -2070,7 +2077,15 @@ function applyImportedRows(pageId, cfg, rows){
 }
 function uniqueExcelMatch(pageId, existing, row){
   if(pageId === 'clientes') return row.email && existing.email === row.email || row.telefone && existing.telefone === row.telefone || row.codigoCliente && existing.codigoCliente === row.codigoCliente;
-  if(pageId === 'fornecedores') return row.codigoFicha && existing.codigoFicha === row.codigoFicha;
+  if(pageId === 'fornecedores') {
+    const rowCode = normalizeText(row.codigoFicha);
+    const exCode = normalizeText(existing.codigoFicha);
+    const rowName = normalizeText(supplierName(row));
+    const exName = normalizeText(supplierName(existing));
+    if(rowCode && exCode) return rowCode === exCode && rowName === exName;
+    if(rowName) return rowName === exName;
+    return false;
+  }
   if(pageId === 'users') return row.email && existing.email === row.email;
   if(pageId === 'orcamentos') return false;
   return false;
@@ -2571,6 +2586,17 @@ function ensureGlobalSearchBox(){
   if(copy) copy.insertAdjacentHTML('afterend', html);
   updateGlobalSearchVisibility(currentPage);
 }
+function ensureCompanyMiniBadge(){
+  const brand = qs('.header-brand');
+  if(!brand) return;
+  const existing = qs('#companyMiniBadge');
+  const name = companyName();
+  const initials = String(name || 'Empresa').split(/\s+/).filter(Boolean).slice(0,2).map(v=>v[0]?.toUpperCase() || '').join('') || 'EM';
+  const html = `<div id="companyMiniBadge" class="company-mini-badge" title="${esc(name)}"><span class="company-mini-mark">${esc(initials)}</span><small>${esc(name)}</small></div>`;
+  if(existing) existing.outerHTML = html;
+  else brand.insertAdjacentHTML('beforeend', html);
+}
+
 function updateGlobalSearchVisibility(pageId){
   const wrap = qs('#globalSearchWrap');
   if(wrap) wrap.classList.toggle('hidden', pageId === 'dashboard');
