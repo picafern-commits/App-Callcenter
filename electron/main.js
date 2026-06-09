@@ -4,6 +4,7 @@ const path = require('path');
 // Electron passa a ser apenas um launcher do GitHub Pages.
 // Assim, as alterações feitas no GitHub aparecem no Electron sem recriar setup.
 const DEFAULT_GITHUB_URL = 'https://picafern-commits.github.io/App-Callcenter/html/login.html';
+const WINDOW_ICON = path.join(__dirname, '..', 'assets', 'bragalis-callcenter.ico');
 const APP_URL = process.env.APP_URL || DEFAULT_GITHUB_URL;
 const LOCAL_FALLBACK = process.env.LOCAL_FALLBACK === '1';
 const START_MAXIMIZED = process.env.START_MAXIMIZED !== '0';
@@ -107,6 +108,7 @@ function createWindow() {
     minHeight: profile.minHeight,
     backgroundColor: '#edf4fb',
     title: 'AutoParts CallCenter',
+    icon: WINDOW_ICON,
     autoHideMenuBar: true,
     show: false,
     webPreferences: {
@@ -167,6 +169,7 @@ function createWindow() {
 }
 
 app.setName('AutoParts CallCenter');
+app.setAppUserModelId('pt.autoparts.callcenter');
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {

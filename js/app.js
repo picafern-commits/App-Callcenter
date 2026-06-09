@@ -1,4 +1,4 @@
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.2.0';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -39,16 +39,36 @@ let cloudReadOnlyMode = false;
 function isElectronApp(){
   return new URLSearchParams(window.location.search).get('electron') === '1' || navigator.userAgent.toLowerCase().includes('electron');
 }
+function svgIcon(pathD, viewBox='0 0 24 24'){
+  return `<svg class="ui-icon" viewBox="${viewBox}" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="${pathD}"></path></svg>`;
+}
+const ICONS = {
+  dashboard: svgIcon('M3 13.2h8V3H3zm10 7.8h8V11h-8zM3 21h8v-5.8H3zm10-10h8V3h-8z'),
+  clientes: svgIcon('M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M9.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8m9.5 10v-2a4 4 0 0 0-3-3.87M14.5 3.13a4 4 0 0 1 0 7.75'),
+  contactos: svgIcon('M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.09 2h3a2 2 0 0 1 2 1.72c.13.98.37 1.94.72 2.86a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.22-1.27a2 2 0 0 1 2.1-.45c.92.35 1.88.59 2.86.72A2 2 0 0 1 22 16.9'),
+  fornecedores: svgIcon('M3 21h18M5 21V7l7-4 7 4v14M9 9h6M9 13h6M9 17h6'),
+  orcamentos: svgIcon('M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8M8 9h2'),
+  users: svgIcon('M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75'),
+  configsUser: svgIcon('M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8'),
+  config: svgIcon('M12 1.75l2.1 2.24 3.02-.2.82 2.9 2.74 1.27-1.1 2.82 1.1 2.82-2.74 1.27-.82 2.9-3.02-.2L12 22.25l-2.1-2.24-3.02.2-.82-2.9-2.74-1.27 1.1-2.82-1.1-2.82 2.74-1.27.82-2.9 3.02.2L12 1.75zM12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7'),
+  phone: svgIcon('M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.09 2h3a2 2 0 0 1 2 1.72c.13.98.37 1.94.72 2.86a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.22-1.27a2 2 0 0 1 2.1-.45c.92.35 1.88.59 2.86.72A2 2 0 0 1 22 16.9'),
+  mobile: svgIcon('M12 17h.01M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z'),
+  email: svgIcon('M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm0 2 8 6 8-6'),
+  copy: svgIcon('M9 9h10v12H9zM5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'),
+  edit: svgIcon('M12 20h9M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4Z'),
+  view: svgIcon('M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6'),
+  arrow: svgIcon('M5 12h14M12 5l7 7-7 7')
+};
 
 const pages = [
-  { id: 'dashboard', icon: '🏁', title: 'Dashboard', subtitle: 'Painel principal da operação' },
-  { id: 'clientes', icon: '👤', title: 'Clientes', subtitle: 'Fichas, histórico e contactos' },
-  { id: 'contactos', icon: '☎️', title: 'Diretório de contactos', subtitle: 'Pesquisa rápida de clientes e fornecedores' },
-  { id: 'fornecedores', icon: '🏭', title: 'Fornecedores', subtitle: 'Lista de fornecedores e referências' },
-  { id: 'orcamentos', icon: '🧾', title: 'Orçamentos', subtitle: 'Criar, enviar e acompanhar propostas' },
-  { id: 'users', icon: '🛡️', title: 'Utilizadores', subtitle: 'Equipa, cargos e permissões' },
-  { id: 'configs-user', icon: '🎛️', title: 'Minhas Configs', subtitle: 'Tema e preferências do utilizador' },
-  { id: 'config', icon: '⚙️', title: 'Configurações', subtitle: 'GitHub, Electron, Firebase e backups' }
+  { id: 'dashboard', icon: ICONS.dashboard, title: 'Dashboard', short: 'Portal', subtitle: 'Painel principal da operação' },
+  { id: 'clientes', icon: ICONS.clientes, title: 'Clientes', short: 'Clientes', subtitle: 'Fichas, histórico e contactos' },
+  { id: 'contactos', icon: ICONS.contactos, title: 'Diretório de contactos', short: 'Diretório', subtitle: 'Pesquisa rápida de clientes e fornecedores' },
+  { id: 'fornecedores', icon: ICONS.fornecedores, title: 'Fornecedores', short: 'Fornecedores', subtitle: 'Lista de fornecedores e referências' },
+  { id: 'orcamentos', icon: ICONS.orcamentos, title: 'Orçamentos', short: 'Orçamentos', subtitle: 'Criar, enviar e acompanhar propostas' },
+  { id: 'users', icon: ICONS.users, title: 'Utilizadores', short: 'Users', subtitle: 'Equipa, cargos e permissões' },
+  { id: 'configs-user', icon: ICONS.configsUser, title: 'Minhas Configs', short: 'Configs', subtitle: 'Tema e preferências do utilizador' },
+  { id: 'config', icon: ICONS.config, title: 'Configurações', short: 'Admin', subtitle: 'GitHub, Electron, Firebase e backups' }
 ];
 
 const pageFiles = {
@@ -471,13 +491,13 @@ function persistResolution(value){
 }
 function getLocalColorScheme(){
   const value = localStorage.getItem(COLOR_SCHEME_KEY);
-  return ['az','ocean','graphite','emerald','sunset'].includes(value) ? value : '';
+  return ['az','graphite','ice','night'].includes(value) ? value : '';
 }
 function currentColorScheme(){
   return getLocalColorScheme() || state.settings?.colorScheme || 'az';
 }
 function persistColorScheme(value){
-  const next = ['az','ocean','graphite','emerald','sunset'].includes(value) ? value : 'az';
+  const next = ['az','graphite','ice','night'].includes(value) ? value : 'az';
   localStorage.setItem(COLOR_SCHEME_KEY, next);
   state.settings = state.settings || {};
   state.settings.colorScheme = next;
@@ -506,7 +526,7 @@ function applyTheme(){
   document.documentElement.classList.toggle('res-auto', resolution === 'auto');
   document.body.classList.toggle('res-auto', resolution === 'auto');
   ['compact','standard','wide','large'].forEach(v=>{ document.documentElement.classList.toggle(`res-${v}`, resolvedResolution===v); document.body.classList.toggle(`res-${v}`, resolvedResolution===v); });
-  ['az','ocean','graphite','emerald','sunset'].forEach(v=>{ document.documentElement.classList.toggle(`scheme-${v}`, scheme===v); document.body.classList.toggle(`scheme-${v}`, scheme===v); });
+  ['az','graphite','ice','night'].forEach(v=>{ document.documentElement.classList.toggle(`scheme-${v}`, scheme===v); document.body.classList.toggle(`scheme-${v}`, scheme===v); });
   const btn = qs('#themeToggleBtn');
   if(btn) btn.textContent = dark ? 'Modo Normal' : 'Darkmode';
 }
@@ -540,7 +560,13 @@ function userCanOpenManagedPage(user, pageId){
   return operatorPageAccess()[pageId] !== false;
 }
 function pageUrl(id){ return pageFiles[id] || 'index.html'; }
-function goPage(id){ window.location.href = pageUrl(id); }
+function setPendingPageLoader(target){ try{ sessionStorage.setItem('apcc_pending_page', target || currentPage || ''); }catch{} }
+function clearPendingPageLoader(){ try{ sessionStorage.removeItem('apcc_pending_page'); }catch{} }
+function pageSkeleton(id){
+  const meta = pages.find(p=>p.id===id) || pages[0];
+  return `<div class="page-skeleton"><div class="skeleton-head"><div class="skeleton-chip"></div><div class="skeleton-title"></div><div class="skeleton-line"></div></div><div class="skeleton-grid"><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div></div><div class="skeleton-footer"></div></div>`;
+}
+function goPage(id){ setPendingPageLoader(id); document.body.classList.add('page-changing'); const shell = qs('#pageContent'); if(shell) shell.innerHTML = pageSkeleton(id); window.location.href = pageUrl(id); }
 function canOpenPage(id){
   if(id === 'dashboard' || id === 'configs-user') return true;
   if(isAdminMaster()) return true;
@@ -569,6 +595,7 @@ function showApp(){
   bindShell();
   ensureGlobalSearchBox();
   ensureCompanyMiniBadge();
+  ensureBrandFavicon();
   checkAutoBackup();
   if(qs('#userBadge')) qs('#userBadge').textContent = state.currentUser?.name || 'Admin';
   renderPage(currentPage);
@@ -887,10 +914,20 @@ function renderPage(id){
   qs('#pageSubtitle').textContent = meta.subtitle;
   qsa('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.page===id));
   const renderers = { dashboard, 'nova-chamada': novaChamada, pedidos, clientes, contactos, fornecedores, orcamentos, agenda, stock, relatorios, users, 'configs-user': configsUser, config };
-  const pageBody = renderers[id]();
-  qs('#pageContent').innerHTML = `${excelToolbar(id)}${pageBody}`;
-  bindPage(id);
-  applySpellcheckEnhancements(qs('#pageContent'));
+  const content = qs('#pageContent');
+  if(content){
+    content.innerHTML = pageSkeleton(id);
+    document.body.classList.add('page-loading');
+  }
+  const paint = ()=>{
+    const pageBody = renderers[id]();
+    qs('#pageContent').innerHTML = `${excelToolbar(id)}${pageBody}`;
+    bindPage(id);
+    applySpellcheckEnhancements(qs('#pageContent'));
+    document.body.classList.remove('page-loading','page-changing');
+    clearPendingPageLoader();
+  };
+  window.requestAnimationFrame(()=>setTimeout(paint, 90));
 }
 
 
@@ -941,28 +978,44 @@ function personalStat(label, value, note){
 function dashboard(){
   const visiblePages = pages.filter(p => p.id !== 'dashboard' && canOpenPage(p.id));
   const userName = currentDisplayName();
+  const stats = personalDashboardData();
+  const hour = new Date().getHours();
+  const greet = hour < 12 ? 'Bom dia' : (hour < 19 ? 'Boa tarde' : 'Boa noite');
   return `
-    <div class="dashboard-apps-only">
-      <div class="dashboard-user-corner">
-        <div class="dashboard-user-chip">
-          <span class="dashboard-user-avatar">${esc(userName.charAt(0).toUpperCase())}</span>
-          <div>
-            <small>Utilizador</small>
-            <strong>${esc(userName)}</strong>
-          </div>
+    <div class="dashboard-apps-only premium-dashboard">
+      <div class="dashboard-hero">
+        <div class="dashboard-hero-copy">
+          <span class="hero-kicker">${greet}, ${esc(userName)}</span>
+          <h1>Portal do Callcenter</h1>
+          <p>Acede rapidamente às áreas principais da operação.</p>
+          <div class="dashboard-mini-stats">${personalStat('Pedidos abertos', stats.open, 'em curso')}${personalStat('Urgentes', stats.urgent, 'prioridade')}${personalStat('Orçamentos', stats.quoted, 'emitidos')}${personalStat('Margem', money(stats.margin), 'estimada')}</div>
         </div>
-        <button id="dashboardLogoutBtn" class="btn danger-soft dashboard-logout" type="button">Terminar sessão</button>
+        <div class="dashboard-user-corner">
+          <div class="dashboard-user-chip">
+            <span class="dashboard-user-avatar">${esc(userName.charAt(0).toUpperCase())}</span>
+            <div>
+              <small>Utilizador ativo</small>
+              <strong>${esc(userName)}</strong>
+            </div>
+          </div>
+          <button id="dashboardLogoutBtn" class="btn danger-soft dashboard-logout" type="button">Terminar sessão</button>
+        </div>
+        <div class="dashboard-az-watermark"></div>
       </div>
       <div class="apps-center">
-        <div class="apps-title">
+        <div class="apps-title premium">
           <span>Menu principal</span>
-          <h1>Escolhe uma página</h1>
+          <h2>Escolhe a página</h2>
         </div>
-        <div class="apps-button-grid">
+        <div class="apps-button-grid premium">
           ${visiblePages.map(p => `
-            <button class="big-page-button" data-page-card="${p.id}">
+            <button class="big-page-button premium" data-page-card="${p.id}">
               <span class="big-page-icon">${p.icon}</span>
-              <strong>${esc(p.title)}</strong>
+              <div class="big-page-copy">
+                <strong>${esc(p.title)}</strong>
+                <small>${esc(p.subtitle || '')}</small>
+              </div>
+              <span class="big-page-arrow">${ICONS.arrow}</span>
             </button>`).join('')}
         </div>
       </div>
@@ -1212,15 +1265,16 @@ function contactGroupsView(groups){
 }
 function contactSectionView(group){
   const rows = group.contactos || [];
-  return `<div class="directory-section">
-    <button class="section-toggle" data-toggle-contact-group="${group.id}">
-      <span><b>${esc(contactSection(group))}</b><small>${rows.length} contactos</small></span>
-      <i>${group.aberto ? '−' : '+'}</i>
+  return `<div class="directory-section premium">
+    <button class="section-toggle premium" data-toggle-contact-group="${group.id}">
+      <span class="section-toggle-copy"><b>${esc(contactSection(group))}</b><small>${rows.length} contacto(s)</small></span>
+      <span class="section-toggle-icon">${group.aberto ? '−' : '+'}</span>
     </button>
     <div class="section-body ${group.aberto ? '' : 'hidden'}">
-      <div class="section-actions">
-        ${canEditOperational()?`<button class="btn primary small" data-add-contact-section="${group.id}">+ Contacto</button><button class="btn small" data-edit-contact-section="${group.id}">Editar secção</button>`:''}
-        ${canDelete()?`<button class="btn danger small" data-delete-contact-group="${group.id}">Apagar secção</button>`:''}
+      <div class="section-actions chips-row">
+        <span class="info-chip">${rows.length} contacto(s)</span>
+        ${canEditOperational()?`<button class="btn small ghost" data-add-contact-section="${group.id}">+ Contacto</button><button class="btn small" data-edit-contact-section="${group.id}">Editar secção</button>`:''}
+        ${canDelete()?`<button class="btn danger small" data-delete-contact-group="${group.id}">Apagar</button>`:''}
       </div>
       ${contactsCards(group)}
     </div>
@@ -1229,18 +1283,18 @@ function contactSectionView(group){
 function contactsCards(group){
   const rows = group.contactos || [];
   if(!rows.length) return '<div class="empty compact-empty">Sem contactos nesta secção.</div>';
-  return `<div class="contact-card-grid">${rows.map(c=>`
-    <article class="contact-card">
+  return `<div class="contact-card-grid premium">${rows.map(c=>`
+    <article class="contact-card premium">
       <div class="contact-main">
         <strong>${esc(c.nome || '-')}</strong>
         <span>${esc(c.email || 'Sem email')}</span>
       </div>
-      <div class="contact-lines">
-        ${c.telemovel ? `<a href="tel:${esc(c.telemovel)}">📱 ${esc(c.telemovel)}</a>` : '<span>📱 Sem telemóvel</span>'}
-        ${c.telefone ? `<a href="tel:${esc(c.telefone)}">☎️ ${esc(c.telefone)}</a>` : '<span>☎️ Sem telefone</span>'}
+      <div class="contact-lines premium">
+        ${c.telemovel ? `<a href="tel:${esc(c.telemovel)}"><i>${ICONS.mobile}</i><span>${esc(c.telemovel)}</span></a><button class="mini-copy-btn" type="button" data-copy="${esc(c.telemovel)}">${ICONS.copy}</button>` : '<span><i>'+ICONS.mobile+'</i><span>Sem telemóvel</span></span>'}
+        ${c.telefone ? `<a href="tel:${esc(c.telefone)}"><i>${ICONS.phone}</i><span>${esc(c.telefone)}</span></a><button class="mini-copy-btn" type="button" data-copy="${esc(c.telefone)}">${ICONS.copy}</button>` : '<span><i>'+ICONS.phone+'</i><span>Sem telefone</span></span>'}
       </div>
-      <div class="contact-actions">
-        ${c.email ? `<a class="btn small" href="mailto:${esc(c.email)}">Email</a>` : ''}
+      <div class="contact-actions premium">
+        ${c.email ? `<a class="btn small ghost" href="mailto:${esc(c.email)}">${ICONS.email}<span>Email</span></a><button class="mini-copy-btn" type="button" data-copy="${esc(c.email)}">${ICONS.copy}</button>` : ''}
         ${canDelete()?`<button class="btn danger small" data-delete-contact="${group.id}:${c.id}">Apagar</button>`:''}
       </div>
     </article>`).join('')}</div>`;
@@ -1335,8 +1389,8 @@ function filterSuppliers(){
 }
 function suppliersTable(rows){
   if(!rows.length) return '<div class="empty">Sem fornecedores registados.</div>';
-  return `<div class="clean-card-list supplier-card-list">${rows.map(s=>`
-    <article class="clean-data-card supplier-data-card">
+  return `<div class="supplier-list-shell"><div class="supplier-list-head"><span>Fornecedor</span><span>Código</span><span>Ações</span></div><div class="clean-card-list supplier-card-list premium">${rows.map(s=>`
+    <article class="clean-data-card supplier-data-card premium">
       <div class="data-card-main supplier-name-box">
         <strong>${esc(supplierName(s) || '-')}</strong>
         <small>Fornecedor</small>
@@ -1345,10 +1399,10 @@ function suppliersTable(rows){
         <span class="data-card-code big-visible-code">${esc(supplierRef(s) || 'Sem código')}</span>
       </div>
       <div class="actions data-card-actions supplier-actions-box">
-        ${canEditOperational()?`<button class="btn small" data-edit-entity="supplier:${s.id}">Editar</button>`:'<span class="muted">Consulta</span>'}
+        ${canEditOperational()?`<button class="btn small ghost" data-edit-entity="supplier:${s.id}">${ICONS.edit}<span>Editar</span></button>`:`<button class="btn small ghost" data-view-entity="supplier:${s.id}">${ICONS.view}<span>Ver</span></button>`}
         ${canDelete()?`<button class="btn danger small" data-delete-entity="supplier:${s.id}">Apagar</button>`:''}
       </div>
-    </article>`).join('')}</div>`;
+    </article>`).join('')}</div></div>`;
 }
 function stock(){
   return entityPage('Stock / Catálogo','stockForm',[
@@ -1648,11 +1702,10 @@ function configsUser(){
     ['large','Grande','Texto e botões maiores']
   ];
   const colorOptions = [
-    ['az','AZ Azul','Azul profissional com laranja'],
-    ['ocean','Ocean','Azul/ciano limpo'],
-    ['graphite','Graphite','Cinza premium'],
-    ['emerald','Emerald','Verde empresarial'],
-    ['sunset','Sunset','Laranja quente']
+    ['az','AZ Premium','Azul escuro, ciano e laranja'],
+    ['graphite','Graphite','Cinza escuro com verde premium'],
+    ['ice','Ice Blue','Claro, clean e azul gelo'],
+    ['night','Night Drive','Dark mode automóvel']
   ];
   return `<div class="user-configs-page">
     <div class="user-configs-card card">
@@ -2407,6 +2460,7 @@ function bindEntities(){
   const map = { client:[state.clients,'clients'], supplier:[state.suppliers,'suppliers'], stock:[state.stock,'stock'], user:[state.users,'users'], follow:[state.followups,'followups'] };
   qsa('[data-delete-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.deleteEntity.split(':'); if(!canDelete()) return toast('Sem permissão para apagar.'); if(type==='user' && !isAdminMaster()) return toast('Só o Admin Master pode alterar utilizadores.'); const target=map[type]; state[target[1]] = target[0].filter(x=>x.id!==id); saveState(); renderPage(currentPage); toast('Registo apagado.'); }));
   qsa('[data-edit-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.editEntity.split(':'); if(type==='user' && !isAdminMaster()) return toast('Só o Admin Master pode alterar utilizadores.'); openEntityModal(type,id); }));
+  qsa('[data-view-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.viewEntity.split(':'); openEntityReadModal(type,id); }));
   const forms = [{id:'clientForm',key:'clients',prefix:'CLI'},{id:'supplierForm',key:'suppliers',prefix:'FOR'},{id:'stockForm',key:'stock',prefix:'STK'},{id:'userForm',key:'users',prefix:'USR'}];
   forms.forEach(f=>{ const form=qs('#'+f.id); if(form) form.addEventListener('submit',e=>{ e.preventDefault(); if(f.key==='users' && !hasPermission('manageUsers')) return toast('Sem permissão para gerir utilizadores.'); if(f.key!=='users' && !canEditOperational()) return toast('Sem permissão para guardar.'); state[f.key].push({id:uid(f.prefix),...Object.fromEntries(new FormData(e.target).entries())}); if(f.key==='suppliers') sortSuppliersState(); saveState(); renderPage(currentPage); toast('Registo guardado.'); }); });
 }
@@ -2416,6 +2470,14 @@ function openEntityModal(type,id){
   const fields = Object.keys(item).filter(k=>k!=='id' && !(type==='user' && k==='pageAccess'));
   openModal('Editar registo', `<form id="entityEditForm" class="form-grid">${fields.map(k=>`<input class="field" name="${k}" placeholder="${k}" value="${esc(item[k])}">`).join('')}<div class="span3"><button class="btn primary">Guardar</button></div></form>`);
   qs('#entityEditForm').addEventListener('submit',e=>{e.preventDefault(); Object.assign(item,Object.fromEntries(new FormData(e.target).entries())); if(key==='suppliers') sortSuppliersState(); saveState(); closeModal(); renderPage(currentPage); toast('Registo atualizado.');});
+}
+function openEntityReadModal(type,id){
+  const map = { client:['clients'], supplier:['suppliers'], stock:['stock'], user:['users'], follow:['followups'] };
+  const [key] = map[type] || [];
+  const item = key ? state[key].find(x=>x.id===id) : null;
+  if(!item) return;
+  const fields = Object.entries(item).filter(([k])=>!['id','pageAccess','actionAccess'].includes(k));
+  openModal('Detalhe do registo', `<div class="detail-grid">${fields.map(([k,v])=>`<div><small>${esc(k)}</small><strong>${esc(v || '-')}</strong></div>`).join('')}</div>`);
 }
 function bindFollowForm(){
   qs('#followForm').addEventListener('submit',e=>{ e.preventDefault(); state.followups.push({id:uid('AGE'),...Object.fromEntries(new FormData(e.target).entries())}); saveState(); renderPage('agenda'); toast('Follow-up guardado.'); });
@@ -2586,6 +2648,17 @@ function ensureGlobalSearchBox(){
   if(copy) copy.insertAdjacentHTML('afterend', html);
   updateGlobalSearchVisibility(currentPage);
 }
+function ensureBrandFavicon(){
+  const href = '../assets/bragalis-callcenter-icon.png';
+  let link = document.querySelector('link[rel="icon"]');
+  if(!link){
+    link = document.createElement('link');
+    link.rel = 'icon';
+    document.head.appendChild(link);
+  }
+  link.href = href;
+}
+
 function ensureCompanyMiniBadge(){
   const brand = qs('.header-brand');
   if(!brand) return;

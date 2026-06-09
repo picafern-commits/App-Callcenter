@@ -1,7 +1,7 @@
 {
   "name": "autoparts-callcenter",
-  "version": "2.0.0",
-  "description": "Launcher Electron para GitHub Pages da app callcenter de peças automóveis",
+  "version": "2.2.0",
+  "description": "App Callcenter Bragalis com visual premium e Electron com ícone e fundo de marca",
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
@@ -40,7 +40,8 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "icon": "assets/bragalis-callcenter.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -48,7 +49,10 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "AutoParts CallCenter",
-      "artifactName": "AutoParts-CallCenter-Setup-${version}.${ext}"
+      "artifactName": "AutoParts-CallCenter-Setup-${version}.${ext}",
+      "installerIcon": "assets/bragalis-callcenter.ico",
+      "uninstallerIcon": "assets/bragalis-callcenter.ico",
+      "installerHeaderIcon": "assets/bragalis-callcenter.ico"
     },
     "asar": true,
     "compression": "maximum"
