@@ -1,4 +1,4 @@
-const APP_VERSION = '1.5.5';
+const APP_VERSION = '1.5.7';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
@@ -640,6 +640,7 @@ function renderPage(id){
     id = 'dashboard';
   }
   currentPage = id;
+  qs('#appShell')?.classList.toggle('dashboard-mode', id === 'dashboard');
   const meta = pages.find(p=>p.id===id) || pages[0];
   qs('#pageTitle').textContent = meta.title;
   qs('#pageSubtitle').textContent = meta.subtitle;
@@ -696,52 +697,22 @@ function personalStat(label, value, note){
   return `<div class="personal-stat"><span>${esc(label)}</span><strong>${value}</strong><small>${esc(note || '')}</small></div>`;
 }
 function dashboard(){
-  const userName = currentDisplayName();
-  const appUser = currentAppUser();
-  const data = personalDashboardData();
-  const recentMine = data.myCalls.slice().sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))).slice(0,5);
-  const role = appUser?.role || 'Utilizador';
-  const status = appUser?.status || 'Ativo';
-
+  const visiblePages = pages.filter(p => p.id !== 'dashboard' && canOpenPage(p.id));
   return `
-    <div class="dashboard-clean">
-      <section class="welcome-card">
-        <div>
-          <span class="welcome-eyebrow">Painel pessoal</span>
-          <h1>Olá, ${esc(userName)} 👋</h1>
-          <p>Estas são as tuas estatísticas dentro da operação. A navegação fica apenas na barra superior para manter o dashboard limpo.</p>
+    <div class="dashboard-apps-only">
+      <div class="apps-center">
+        <div class="apps-title">
+          <span>Menu principal</span>
+          <h1>Escolhe uma página</h1>
         </div>
-        <div class="welcome-user-box">
-          <span>Conta</span>
-          <strong>${esc(appUser?.nome || state.currentUser?.email || 'Utilizador')}</strong>
-          <small>${esc(role)} · ${esc(status)}</small>
+        <div class="apps-button-grid">
+          ${visiblePages.map(p => `
+            <button class="big-page-button" data-page-card="${p.id}">
+              <span class="big-page-icon">${p.icon}</span>
+              <strong>${esc(p.title)}</strong>
+            </button>`).join('')}
         </div>
-      </section>
-
-      <section class="personal-stats-grid">
-        ${personalStat('Pedidos meus', data.myCalls.length, 'Registados por ti')}
-        ${personalStat('Em aberto', data.open, 'Ainda por fechar')}
-        ${personalStat('Urgentes', data.urgent, 'Prioridade alta')}
-        ${personalStat('Concluídos', data.done, 'Fechados com sucesso')}
-        ${personalStat('Orçamentos', data.quoted, 'Ligados aos teus pedidos')}
-        ${personalStat('Valor previsto', money(data.sale), 'Venda associada')}
-        ${personalStat('Margem prevista', money(data.margin), 'Venda menos compra')}
-      </section>
-
-      <section class="card personal-activity-card">
-        <div class="card-head">
-          <h3>Atividade recente</h3>
-          <span class="muted">Só os registos associados ao teu utilizador</span>
-        </div>
-        ${recentMine.length ? `<div class="personal-activity-list">${recentMine.map(c=>`
-          <div class="activity-row">
-            <div>
-              <strong>${esc(c.cliente || '-')}</strong>
-              <span>${esc(c.peca || 'Sem peça')} · ${esc(c.marca || '')} ${esc(c.modelo || '')}</span>
-            </div>
-            ${badge(c.estado)}
-          </div>`).join('')}</div>` : `<div class="empty compact">Ainda não existem pedidos associados ao teu utilizador. Quando registares pedidos com o teu nome no campo Operador, aparecem aqui.</div>`}
-      </section>
+      </div>
     </div>`;
 }
 function metric(label,value,note){ return `<div class="card metric"><div class="label">${label}</div><div class="value">${value}</div><div class="note">${note}</div></div>`; }
