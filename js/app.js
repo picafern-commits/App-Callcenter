@@ -1,5 +1,6 @@
-const APP_VERSION = '1.5.1';
+const APP_VERSION = '1.5.2';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
+const SESSION_KEY = 'autoparts_callcenter_session';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
 const FIREBASE_LEGACY_STATE_DOC = 'main';
 const FIREBASE_META_COLLECTION = 'meta';
@@ -133,6 +134,40 @@ function loadState() {
   } catch {
     return seedData();
   }
+}
+function getStoredSession(){
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+function setStoredSession(user){
+  if(!user?.email) return;
+  localStorage.setItem(SESSION_KEY, JSON.stringify({
+    email: user.email,
+    name: user.name || user.nome || String(user.email).split('@')[0],
+    savedAt: new Date().toISOString()
+  }));
+}
+function clearStoredSession(){
+  localStorage.removeItem(SESSION_KEY);
+}
+function restoreStoredSession(){
+  const stored = getStoredSession();
+  if(stored?.email) {
+    state.currentUser = { email: stored.email, name: stored.name || String(stored.email).split('@')[0] };
+    saveLocalOnly();
+    showApp();
+    return true;
+  }
+  if(state.currentUser?.email) {
+    setStoredSession(state.currentUser);
+    showApp();
+    return true;
+  }
+  return false;
 }
 function saveState(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -339,7 +374,10 @@ async function init(){
   buildNav();
   bindShell();
   restoreLogin();
+
+  const hasLocalSession = restoreStoredSession();
   await initFirebase();
+
   if (firebaseReady) {
     firebaseAuth.onAuthStateChanged(async user => {
       if (user) {
@@ -350,14 +388,23 @@ async function init(){
           saveLocalOnly();
         }
         if(!userIsActive()) {
+          clearStoredSession();
           toast('Conta pendente de aprovação pelo Admin Master.');
           qs('#appShell').classList.add('hidden');
           qs('#loginScreen').classList.remove('hidden');
           return;
         }
+        setStoredSession(state.currentUser || { email:user.email, name:(user.email || 'Admin').split('@')[0] });
         showApp();
         toast('Firebase ligado.');
       } else {
+        const stored = getStoredSession();
+        if(stored?.email) {
+          state.currentUser = { email: stored.email, name: stored.name || String(stored.email).split('@')[0] };
+          saveLocalOnly();
+          if(!appIsVisible()) showApp();
+          return;
+        }
         state.currentUser = null;
         saveLocalOnly();
         qs('#appShell').classList.add('hidden');
@@ -366,7 +413,8 @@ async function init(){
     });
     return;
   }
-  if(state.currentUser) showApp();
+
+  if(state.currentUser || hasLocalSession) showApp();
 }
 
 function restoreLogin(){
@@ -425,6 +473,7 @@ async function login(){
     }
   }
   state.currentUser = { email, name: email.split('@')[0] };
+  setStoredSession(state.currentUser);
   saveState();
   showApp();
 }
@@ -465,9 +514,15 @@ function buildNav(){
 }
 
 function bindShell(){
-  qs('#homeBtn').addEventListener('click',()=>goPage('dashboard'));
-  qs('#logoutBtn').addEventListener('click',async ()=>{
+  const home = qs('#homeBtn');
+  const logout = qs('#logoutBtn');
+  if(!home || !logout || home.dataset.bound === '1') return;
+  home.dataset.bound = '1';
+  logout.dataset.bound = '1';
+  home.addEventListener('click',()=>goPage('dashboard'));
+  logout.addEventListener('click',async ()=>{
     stopFirebaseListeners();
+    clearStoredSession();
     if (firebaseReady && firebaseAuth?.currentUser) await firebaseAuth.signOut();
     state.currentUser = null; saveLocalOnly();
     qs('#appShell').classList.add('hidden');
