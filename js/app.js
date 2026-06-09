@@ -1,4 +1,4 @@
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.5.1';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
 const FIREBASE_LEGACY_STATE_DOC = 'main';
@@ -31,14 +31,13 @@ let firebaseUnsubscribers = [];
 let pendingSignupUser = null;
 
 const pages = [
-  { id: 'dashboard', icon: 'DB', title: 'Dashboard', subtitle: 'Painel principal da operação' },
-  { id: 'clientes', icon: 'CL', title: 'Clientes', subtitle: 'Fichas, histórico e contactos' },
-  { id: 'contactos', icon: 'DT', title: 'Diretório de contactos', subtitle: 'Telefones da organização' },
-  { id: 'fornecedores', icon: 'FR', title: 'Fornecedores', subtitle: 'Lista de fornecedores e referências' },
-  { id: 'orcamentos', icon: 'OR', title: 'Orçamentos', subtitle: 'Criar, enviar e acompanhar propostas' },
-  { id: 'auditoria', icon: 'AU', title: 'Auditoria', subtitle: 'Registos criados e alterados' },
-  { id: 'users', icon: 'US', title: 'Utilizadores', subtitle: 'Equipa, cargos e permissões' },
-  { id: 'config', icon: 'CF', title: 'Configurações', subtitle: 'GitHub, Electron, Firebase e backups' }
+  { id: 'dashboard', icon: '🏁', title: 'Dashboard', subtitle: 'Painel principal da operação' },
+  { id: 'clientes', icon: '👤', title: 'Clientes', subtitle: 'Fichas, histórico e contactos' },
+  { id: 'contactos', icon: '☎️', title: 'Diretório de contactos', subtitle: 'Pesquisa rápida de clientes e fornecedores' },
+  { id: 'fornecedores', icon: '🏭', title: 'Fornecedores', subtitle: 'Lista de fornecedores e referências' },
+  { id: 'orcamentos', icon: '🧾', title: 'Orçamentos', subtitle: 'Criar, enviar e acompanhar propostas' },
+  { id: 'users', icon: '🛡️', title: 'Utilizadores', subtitle: 'Equipa, cargos e permissões' },
+  { id: 'config', icon: '⚙️', title: 'Configurações', subtitle: 'GitHub, Electron, Firebase e backups' }
 ];
 
 const pageFiles = {
@@ -47,7 +46,6 @@ const pageFiles = {
   contactos: 'contactos.html',
   fornecedores: 'fornecedores.html',
   orcamentos: 'orcamentos.html',
-  auditoria: 'auditoria.html',
   'nova-chamada': 'nova-chamada.html',
   pedidos: 'pedidos.html',
   agenda: 'agenda.html',
@@ -111,8 +109,8 @@ function seedData() {
         nome:'Callcenter Lisboa',
         aberto:true,
         contactos:[
-          { id: uid('CNT'), nome:'Ricardo', extensao:'51 037', telemovel:'912345678', telefone:'213000000', email:'pica.fern@gmail.com', local:'Autozitânia' },
-          { id: uid('CNT'), nome:'Operador Lisboa', extensao:'51 038', telemovel:'913000000', telefone:'213000001', email:'lisboa@empresa.pt', local:'Lisboa' }
+          { id: uid('CNT'), nome:'Ricardo', telemovel:'912345678', telefone:'213000000', email:'pica.fern@gmail.com' },
+          { id: uid('CNT'), nome:'Operador Lisboa', telemovel:'913000000', telefone:'213000001', email:'lisboa@empresa.pt' }
         ]
       },
       {
@@ -120,7 +118,7 @@ function seedData() {
         nome:'Callcenter Porto',
         aberto:false,
         contactos:[
-          { id: uid('CNT'), nome:'Apoio Porto', extensao:'52 107', telemovel:'914000000', telefone:'223000000', email:'porto@empresa.pt', local:'Porto' }
+          { id: uid('CNT'), nome:'Apoio Porto', telemovel:'914000000', telefone:'223000000', email:'porto@empresa.pt' }
         ]
       }
     ]
@@ -236,8 +234,8 @@ async function loadCloudState(){
   }
 }
 function cleanFirebaseDoc(doc){
-  const normalizeDate = value => value?.toDate ? value.toDate().toISOString().slice(0,10) : value;
-  return { ...doc, updatedAt:normalizeDate(doc.updatedAt), createdAt:normalizeDate(doc.createdAt) };
+  const { updatedAt, updatedBy, createdBy, ...data } = doc;
+  return data;
 }
 async function migrateLegacyCloudState(base){
   const legacy = await firebaseDb.collection(FIREBASE_LEGACY_STATE_COLLECTION).doc(FIREBASE_LEGACY_STATE_DOC).get();
@@ -314,25 +312,10 @@ function toast(msg){ const el = qs('#toast'); el.textContent = msg; el.classList
 function qs(s){ return document.querySelector(s); }
 function qsa(s){ return [...document.querySelectorAll(s)]; }
 function companyName(){ return state.settings?.companyName || 'AutoParts CallCenter'; }
-function activeUserEmail(){ return state.currentUser?.email || firebaseAuth?.currentUser?.email || 'local'; }
-function auditCreate(row){
-  return { ...row, createdAt: row.createdAt || today(), createdBy: row.createdBy || activeUserEmail(), updatedAtLocal: today(), updatedByLocal: activeUserEmail() };
-}
-function auditUpdate(row, action='Atualizado'){
-  row.updatedAtLocal = today();
-  row.updatedByLocal = activeUserEmail();
-  row.history = row.history || [];
-  row.history.push({ date:today(), action, by:activeUserEmail() });
-  return row;
-}
-function emptyAction(message, page, label){
-  return `<div class="empty empty-action"><strong>${esc(message)}</strong>${page ? `<button class="btn primary small" data-go="${page}">${esc(label || 'Criar registo')}</button>` : ''}</div>`;
-}
 function pageUrl(id){ return pageFiles[id] || 'index.html'; }
 function goPage(id){ window.location.href = pageUrl(id); }
 function canOpenPage(id){
   if(['dashboard','clientes','contactos','fornecedores','orcamentos'].includes(id)) return true;
-  if(id === 'auditoria') return hasPermission('viewReports') || hasPermission('manageSettings');
   if(id === 'users') return hasPermission('manageUsers') || hasPermission('approveUsers');
   if(id === 'config') return hasPermission('manageSettings');
   return true;
@@ -356,7 +339,6 @@ async function init(){
   buildNav();
   bindShell();
   restoreLogin();
-  if(state.currentUser) showApp();
   await initFirebase();
   if (firebaseReady) {
     firebaseAuth.onAuthStateChanged(async user => {
@@ -376,10 +358,8 @@ async function init(){
         showApp();
         toast('Firebase ligado.');
       } else {
-        if(state.currentUser) {
-          showApp();
-          return;
-        }
+        state.currentUser = null;
+        saveLocalOnly();
         qs('#appShell').classList.add('hidden');
         qs('#loginScreen').classList.remove('hidden');
       }
@@ -485,8 +465,6 @@ function buildNav(){
 }
 
 function bindShell(){
-  if(qs('#homeBtn')?.dataset.boundShell) return;
-  qs('#homeBtn').dataset.boundShell = '1';
   qs('#homeBtn').addEventListener('click',()=>goPage('dashboard'));
   qs('#logoutBtn').addEventListener('click',async ()=>{
     stopFirebaseListeners();
@@ -507,49 +485,102 @@ function renderPage(id){
   qs('#pageTitle').textContent = meta.title;
   qs('#pageSubtitle').textContent = meta.subtitle;
   qsa('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.page===id));
-  const renderers = { dashboard, 'nova-chamada': novaChamada, pedidos, clientes, contactos, fornecedores, orcamentos, auditoria, agenda, stock, relatorios, users, config };
+  const renderers = { dashboard, 'nova-chamada': novaChamada, pedidos, clientes, contactos, fornecedores, orcamentos, agenda, stock, relatorios, users, config };
   qs('#pageContent').innerHTML = renderers[id]();
   bindPage(id);
 }
 
+function currentAppUser(){
+  const email = (state.currentUser?.email || firebaseAuth?.currentUser?.email || '').toLowerCase();
+  return (state.users || []).find(u => (u.email || '').toLowerCase() === email) || null;
+}
+function currentDisplayName(){
+  const appUser = currentAppUser();
+  const raw = appUser?.nome || state.currentUser?.name || state.currentUser?.email || firebaseAuth?.currentUser?.email || 'Utilizador';
+  const first = String(raw).split('@')[0].split(' ')[0].trim();
+  return first || 'Utilizador';
+}
+function normalizeText(v){
+  return String(v || '').trim().toLowerCase();
+}
+function isMineByOperator(row){
+  const appUser = currentAppUser();
+  const names = [
+    appUser?.nome,
+    appUser?.email,
+    state.currentUser?.name,
+    state.currentUser?.email,
+    firebaseAuth?.currentUser?.email
+  ].filter(Boolean).map(normalizeText);
+  const operator = normalizeText(row?.operador || row?.createdBy || row?.updatedBy || row?.email || '');
+  if(!operator) return false;
+  return names.some(n => n && (operator === n || operator.includes(n) || n.includes(operator)));
+}
+function personalDashboardData(){
+  const allCalls = state.calls || [];
+  let myCalls = allCalls.filter(isMineByOperator);
+  const hasOperatorData = allCalls.some(c => c.operador || c.createdBy || c.updatedBy);
+  if(!myCalls.length && !hasOperatorData) myCalls = [];
+  const myCallIds = new Set(myCalls.map(c => c.id));
+  const myQuotes = (state.quotes || []).filter(q => myCallIds.has(q.callId) || isMineByOperator(q));
+  const open = myCalls.filter(c => !['Concluído','Perdido'].includes(c.estado)).length;
+  const urgent = myCalls.filter(c => ['Urgente','Muito urgente'].includes(c.urgencia) && !['Concluído','Perdido'].includes(c.estado)).length;
+  const done = myCalls.filter(c => c.estado === 'Concluído').length;
+  const quoted = myQuotes.length;
+  const sale = myCalls.reduce((sum,c)=>sum+Number(c.precoVenda||0),0) + myQuotes.reduce((sum,q)=>sum+(!myCallIds.has(q.callId) ? Number(q.total||0) : 0),0);
+  const cost = myCalls.reduce((sum,c)=>sum+Number(c.precoCompra||0),0);
+  return { myCalls, myQuotes, open, urgent, done, quoted, sale, margin: sale - cost };
+}
+function personalStat(label, value, note){
+  return `<div class="personal-stat"><span>${esc(label)}</span><strong>${value}</strong><small>${esc(note || '')}</small></div>`;
+}
 function dashboard(){
-  const clientesCount = state.clients.length;
-  const urgentes = state.calls.filter(c=>['Urgente','Muito urgente'].includes(c.urgencia) && !['Concluído','Perdido'].includes(c.estado)).length;
-  const followHoje = state.followups.filter(f=>f.date===today() && f.status!=='Feito').length;
-  const vendaPrevista = state.quotes.reduce((sum,q)=>sum+Number(q.total||0),0);
-  const appCards = pages.filter(p => p.id !== 'dashboard' && canOpenPage(p.id)).map(p => `
-    <button class="portal-card" data-page-card="${p.id}">
-      <div class="portal-icon">${p.icon}</div>
-      <strong>${esc(p.title)}</strong>
-      <span>${esc(p.subtitle)}</span>
-    </button>`).join('');
+  const userName = currentDisplayName();
+  const appUser = currentAppUser();
+  const data = personalDashboardData();
+  const recentMine = data.myCalls.slice().sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))).slice(0,5);
+  const role = appUser?.role || 'Utilizador';
+  const status = appUser?.status || 'Ativo';
 
   return `
-    <div class="portal-page app-panel-page">
-      <div class="portal-top">
-        <div class="portal-logo">
-          <div class="portal-logo-mark">az</div>
-          <div>
-            <h1>${esc(companyName())}</h1>
-            <small>Callcenter de peças automóveis</small>
-          </div>
+    <div class="dashboard-clean">
+      <section class="welcome-card">
+        <div>
+          <span class="welcome-eyebrow">Painel pessoal</span>
+          <h1>Olá, ${esc(userName)} 👋</h1>
+          <p>Estas são as tuas estatísticas dentro da operação. A navegação fica apenas na barra superior para manter o dashboard limpo.</p>
         </div>
-        <div class="portal-title">
-          <h2>Painel de Controlo</h2>
-          <p>Resumo da operação, tarefas e acessos principais</p>
+        <div class="welcome-user-box">
+          <span>Conta</span>
+          <strong>${esc(appUser?.nome || state.currentUser?.email || 'Utilizador')}</strong>
+          <small>${esc(role)} · ${esc(status)}</small>
         </div>
-      </div>
+      </section>
 
-      <div class="portal-kpis">
-        <div><b>${clientesCount}</b><span>Clientes</span></div>
-        <div><b>${urgentes}</b><span>Pedidos urgentes</span></div>
-        <div><b>${followHoje}</b><span>Follow-ups hoje</span></div>
-        <div><b>${money(vendaPrevista)}</b><span>Venda prevista</span></div>
-      </div>
+      <section class="personal-stats-grid">
+        ${personalStat('Pedidos meus', data.myCalls.length, 'Registados por ti')}
+        ${personalStat('Em aberto', data.open, 'Ainda por fechar')}
+        ${personalStat('Urgentes', data.urgent, 'Prioridade alta')}
+        ${personalStat('Concluídos', data.done, 'Fechados com sucesso')}
+        ${personalStat('Orçamentos', data.quoted, 'Ligados aos teus pedidos')}
+        ${personalStat('Valor previsto', money(data.sale), 'Venda associada')}
+        ${personalStat('Margem prevista', money(data.margin), 'Venda menos compra')}
+      </section>
 
-      <div class="portal-grid app-panel-grid">
-        ${appCards}
-      </div>
+      <section class="card personal-activity-card">
+        <div class="card-head">
+          <h3>Atividade recente</h3>
+          <span class="muted">Só os registos associados ao teu utilizador</span>
+        </div>
+        ${recentMine.length ? `<div class="personal-activity-list">${recentMine.map(c=>`
+          <div class="activity-row">
+            <div>
+              <strong>${esc(c.cliente || '-')}</strong>
+              <span>${esc(c.peca || 'Sem peça')} · ${esc(c.marca || '')} ${esc(c.modelo || '')}</span>
+            </div>
+            ${badge(c.estado)}
+          </div>`).join('')}</div>` : `<div class="empty compact">Ainda não existem pedidos associados ao teu utilizador. Quando registares pedidos com o teu nome no campo Operador, aparecem aqui.</div>`}
+      </section>
     </div>`;
 }
 function metric(label,value,note){ return `<div class="card metric"><div class="label">${label}</div><div class="value">${value}</div><div class="note">${note}</div></div>`; }
@@ -603,7 +634,7 @@ function filterCalls(){
   return state.calls.filter(c => (!e || c.estado===e) && JSON.stringify(c).toLowerCase().includes(s));
 }
 function callsTable(rows, actions=true){
-  if(!rows.length) return emptyAction('Ainda não existem pedidos.', 'nova-chamada', 'Novo pedido');
+  if(!rows.length) return '<div class="empty">Ainda não existem registos.</div>';
   return `<div class="table-wrap"><table><thead><tr><th>ID</th><th>Cliente</th><th>Viatura</th><th>Peça</th><th>Urgência</th><th>Estado</th><th>Venda</th>${actions?'<th>Ações</th>':''}</tr></thead><tbody>${rows.map(c=>`
     <tr><td>${esc(c.id)}</td><td><strong>${esc(c.cliente)}</strong><br><span class="muted">${esc(c.telefone)}</span></td><td>${esc(c.marca)} ${esc(c.modelo)}<br><span class="muted">${esc(c.matricula||'Sem matrícula')}</span></td><td>${esc(c.peca)}<br><span class="muted">${esc(c.referencia||'Sem referência')}</span></td><td>${badge(c.urgencia)}</td><td>${badge(c.estado)}</td><td>${money(c.precoVenda)}</td>${actions?`<td><div class="actions"><button class="btn small" data-edit-call="${c.id}">Editar</button><button class="btn success small" data-quote="${c.id}">Orçamento</button>${canDelete()?`<button class="btn danger small" data-delete-call="${c.id}">Apagar</button>`:''}</div></td>`:''}</tr>`).join('')}</tbody></table></div>`;
 }
@@ -650,105 +681,58 @@ function fornecedores(){
   </div>`;
 }
 function contactos(){
-  const groups = state.contactGroups || [];
-  const sectionOptions = groups.map(group => `<option value="${esc(group.id)}">${esc(group.nome)}</option>`).join('');
-  const localOptions = contactLocals().map(local => `<option value="${esc(local)}">${esc(local)}</option>`).join('');
-  return `<div class="directory-page">
-    <div class="directory-head">
-      <div class="portal-logo">
-        <div class="portal-logo-mark">az</div>
-        <div>
-          <h1>${esc(companyName())}</h1>
-          <small>Um mundo de pecas ao seu dispor</small>
-        </div>
-      </div>
-      <div class="portal-title">
-        <h2>Telefone Diretorio de Contactos</h2>
-        <p>${contactCount()} contactos organizados por seccao</p>
-      </div>
-      <button class="btn primary" data-go="dashboard">Voltar</button>
+  return `<div class="grid two contacts-page">
+    <div class="card">
+      <div class="card-head"><h3>Novo grupo</h3><span class="muted">Ex: Callcenter Lisboa</span></div>
+      <form id="contactGroupForm" class="form-grid">
+        <input class="field span3" name="nome" placeholder="Nome do grupo" required>
+        <div class="span3"><button class="btn primary" type="submit">Criar grupo</button></div>
+      </form>
     </div>
-
-    <div class="directory-actions">
-      <button class="btn primary" data-directory-action="search">Pesquisar</button>
-      <button class="btn primary" data-directory-action="insert">Inserir</button>
-      <button class="btn" data-directory-action="expand">Expandir</button>
-      <button class="btn danger ghost" data-directory-action="collapse">Colapsar</button>
-      <button class="btn success ghost" data-directory-action="export">Exportar</button>
-      <button class="btn" data-directory-action="refresh">Atualizar</button>
+    <div class="card">
+      <div class="card-head"><h3>Diretório de contactos</h3><span class="muted">${contactCount()} contactos</span></div>
+      <div class="toolbar one"><input id="contactSearch" class="field" placeholder="Pesquisar nome, telemóvel, telefone, email ou grupo"></div>
+      <div id="contactsTable">${contactGroupsView(filterContactGroups())}</div>
     </div>
-
-    <div class="directory-filters">
-      <label><span>Pesquisa geral</span><input id="contactSearch" class="field" placeholder="Nome, email, telefone, seccao ou local..."></label>
-      <label><span>Seccao</span><select id="contactSectionFilter" class="select"><option value="">Todas</option>${sectionOptions}</select></label>
-      <label><span>Local / Empresa</span><select id="contactLocalFilter" class="select"><option value="">Todos</option>${localOptions}</select></label>
-      <button class="btn" data-directory-action="clear">Limpar filtros</button>
-    </div>
-
-    <div id="directoryInsertPanel" class="card directory-insert hidden">
-      <div class="card-head"><h3>Gestão do diretório</h3><span class="muted">Adicionar grupos e contactos num só local.</span></div>
-      <div class="directory-manage">
-        <form id="contactGroupForm" class="form-grid">
-          <input class="field span2" name="nome" placeholder="Novo grupo / secção" required>
-          <div><button class="btn primary" type="submit">Criar grupo</button></div>
-        </form>
-        <form id="contactForm" class="form-grid">
-          <select class="select" name="groupId" required><option value="">Escolher secção</option>${sectionOptions}</select>
-          <input class="field" name="nome" placeholder="Nome" required>
-          <input class="field" name="extensao" placeholder="Extensão">
-          <input class="field" name="telefone" placeholder="Telefone">
-          <input class="field" name="telemovel" placeholder="Telemóvel">
-          <input class="field" name="email" type="email" placeholder="Email">
-          <input class="field" name="local" placeholder="Local / Empresa">
-          <div><button class="btn primary" type="submit">Adicionar contacto</button></div>
-        </form>
-      </div>
-    </div>
-
-    <div id="contactsTable">${contactGroupsView(filterContactGroups())}</div>
   </div>`;
 }
 function contactCount(){
   return (state.contactGroups || []).reduce((sum, group)=>sum + (group.contactos || []).length, 0);
 }
-function contactLocals(){
-  return [...new Set((state.contactGroups || []).flatMap(group => (group.contactos || []).map(c => c.local).filter(Boolean)))].sort((a,b)=>a.localeCompare(b));
-}
 function filterContactGroups(){
   const q = (qs('#contactSearch')?.value || '').toLowerCase();
-  const section = qs('#contactSectionFilter')?.value || '';
-  const local = qs('#contactLocalFilter')?.value || '';
   const groups = state.contactGroups || [];
-  if(!q && !section && !local) return groups;
+  if(!q) return groups;
   return groups.map(group => {
-    if(section && group.id !== section) return null;
-    const groupMatch = !q || (group.nome || '').toLowerCase().includes(q);
-    const contactos = (group.contactos || []).filter(c => {
-      const text = `${group.nome || ''} ${c.nome || ''} ${c.extensao || ''} ${c.telemovel || ''} ${c.telefone || ''} ${c.email || ''} ${c.local || ''}`.toLowerCase();
-      const matchesText = !q || text.includes(q);
-      const matchesLocal = !local || c.local === local;
-      return matchesText && matchesLocal;
-    });
-    return groupMatch && !local ? { ...group, aberto:true } : { ...group, aberto:true, contactos };
-  }).filter(Boolean).filter(group => (group.contactos || []).length || ((group.nome || '').toLowerCase().includes(q) && !local));
+    const groupMatch = (group.nome || '').toLowerCase().includes(q);
+    const contactos = (group.contactos || []).filter(c => `${group.nome || ''} ${c.nome || ''} ${c.telemovel || ''} ${c.telefone || ''} ${c.email || ''}`.toLowerCase().includes(q));
+    return groupMatch ? { ...group, aberto:true } : { ...group, aberto:true, contactos };
+  }).filter(group => (group.contactos || []).length || (group.nome || '').toLowerCase().includes(q));
 }
 function contactGroupsView(groups){
   if(!groups.length) return '<div class="empty">Sem grupos ou contactos encontrados.</div>';
   return `<div class="directory-list">${groups.map(group => `
     <div class="directory-group">
       <button class="directory-toggle" data-toggle-contact-group="${group.id}">
-        <strong>${esc(group.nome)} <em>${(group.contactos || []).length}</em></strong>
-        <span>${group.aberto ? 'v' : '>'}</span>
+        <strong>${esc(group.nome)}</strong>
+        <span>${(group.contactos || []).length} contactos</span>
       </button>
       <div class="directory-body ${group.aberto ? '' : 'hidden'}">
         ${contactsTable(group)}
+        <form class="form-grid contact-inline-form" data-contact-form="${group.id}">
+          <input class="field" name="nome" placeholder="Nome" required>
+          <input class="field" name="telemovel" placeholder="Telemóvel">
+          <input class="field" name="telefone" placeholder="Telefone">
+          <input class="field span2" name="email" type="email" placeholder="Email">
+          <div class="actions"><button class="btn primary small" type="submit">Adicionar</button><button class="btn danger small" type="button" data-delete-contact-group="${group.id}">Apagar grupo</button></div>
+        </form>
       </div>
     </div>`).join('')}</div>`;
 }
 function contactsTable(group){
   const rows = group.contactos || [];
   if(!rows.length) return '<div class="empty">Sem contactos neste grupo.</div>';
-  return `<div class="table-wrap directory-table"><table><thead><tr><th>Nome</th><th>Extensao</th><th>Telefone</th><th>Telemovel</th><th>Email</th><th>Local</th><th>Acoes</th></tr></thead><tbody>${rows.map(c=>`<tr><td><strong>${esc(c.nome || '-')}</strong></td><td>${esc(c.extensao || '-')}</td><td>${esc(c.telefone || '-')}</td><td>${esc(c.telemovel || '-')}</td><td>${esc(c.email || '-')}</td><td>${esc(c.local || '-')}</td><td><div class="actions">${c.telemovel ? `<a class="btn small" href="tel:${esc(c.telemovel)}">Telm.</a>` : ''}${c.telefone ? `<a class="btn small" href="tel:${esc(c.telefone)}">Tel.</a>` : ''}${c.email ? `<a class="btn small" href="mailto:${esc(c.email)}">Email</a>` : ''}<button class="btn small" data-edit-contact="${group.id}:${c.id}">Editar</button><button class="btn danger small" data-delete-contact="${group.id}:${c.id}">Apagar</button></div></td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Telemóvel</th><th>Telefone</th><th>Email</th><th>Ações</th></tr></thead><tbody>${rows.map(c=>`<tr><td><strong>${esc(c.nome || '-')}</strong></td><td>${esc(c.telemovel || '-')}</td><td>${esc(c.telefone || '-')}</td><td>${esc(c.email || '-')}</td><td><div class="actions">${c.telemovel ? `<a class="btn small" href="tel:${esc(c.telemovel)}">Telemóvel</a>` : ''}${c.telefone ? `<a class="btn small" href="tel:${esc(c.telefone)}">Telefone</a>` : ''}${c.email ? `<a class="btn small" href="mailto:${esc(c.email)}">Email</a>` : ''}<button class="btn danger small" data-delete-contact="${group.id}:${c.id}">Apagar</button></div></td></tr>`).join('')}</tbody></table></div>`;
 }
 function clientCode(c){ return c.codigoCliente || c.codigo || c.tipo || ''; }
 function filterClients(){
@@ -756,7 +740,7 @@ function filterClients(){
   return state.clients.filter(c => `${clientCode(c)} ${c.nome || ''} ${c.telefone || ''} ${c.email || ''}`.toLowerCase().includes(q));
 }
 function clientsTable(rows){
-  if(!rows.length) return emptyAction('Sem clientes registados.', null);
+  if(!rows.length) return '<div class="empty">Sem clientes registados.</div>';
   return `<div class="table-wrap"><table><thead><tr><th>Código cliente</th><th>Nome</th><th>Telefone</th><th>Email</th><th>Ações</th></tr></thead><tbody>${rows.map(c=>`<tr><td><span class="supplier-ref">${esc(clientCode(c) || '-')}</span></td><td><strong>${esc(c.nome || '')}</strong></td><td>${esc(c.telefone || '-')}</td><td>${esc(c.email || '-')}</td><td><div class="actions"><button class="btn small" data-client-detail="${c.id}">Ficha</button><button class="btn small" data-edit-entity="client:${c.id}">Editar</button>${canDelete()?`<button class="btn danger small" data-delete-entity="client:${c.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`;
 }
 function openClientDetail(id){
@@ -786,7 +770,7 @@ function filterSuppliers(){
   return state.suppliers.filter(s => `${supplierName(s)} ${supplierRef(s)}`.toLowerCase().includes(q));
 }
 function suppliersTable(rows){
-  if(!rows.length) return emptyAction('Sem fornecedores registados.', null);
+  if(!rows.length) return '<div class="empty">Sem fornecedores registados.</div>';
   return `<div class="table-wrap"><table class="suppliers-table"><thead><tr><th>Nome da marca</th><th>Código de ficha</th><th>Ações</th></tr></thead><tbody>${rows.map(s=>`<tr><td><strong>${esc(supplierName(s))}</strong></td><td><span class="supplier-ref">${esc(supplierRef(s) || '-')}</span></td><td><div class="actions"><button class="btn small" data-edit-entity="supplier:${s.id}">Editar</button>${canDelete()?`<button class="btn danger small" data-delete-entity="supplier:${s.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`;
 }
 function stock(){
@@ -852,7 +836,7 @@ function entityPage(title, formId, fields, rows, cols, type){
   return `<div class="grid two"><div class="card"><div class="card-head"><h3>Adicionar ${title}</h3></div><form id="${formId}" class="form-grid">${fields.map(f=>`<input class="field ${f[0]==='notas'?'span3':''}" name="${f[0]}" placeholder="${f[1]}">`).join('')}<div class="span3"><button class="btn primary" type="submit">Guardar</button></div></form></div><div class="card"><div class="card-head"><h3>Lista</h3><span class="muted">${rows.length} registos</span></div>${entityTable(rows, cols, type)}</div></div>`;
 }
 function entityTable(rows, cols, type){
-  if(!rows.length) return emptyAction('Sem registos.', null);
+  if(!rows.length) return '<div class="empty">Sem registos.</div>';
   return `<div class="table-wrap"><table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}<th>Ações</th></tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c])}</td>`).join('')}<td><div class="actions"><button class="btn small" data-edit-entity="${type}:${r.id}">Editar</button>${canDelete()?`<button class="btn danger small" data-delete-entity="${type}:${r.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`;
 }
 
@@ -887,7 +871,7 @@ function orcamentos(){
     </div>
   </div>`;
 }
-function quotesTable(){ return `<div class="table-wrap"><table><thead><tr><th>ID</th><th>Cliente</th><th>Peça</th><th>Total</th><th>Estado</th><th>Ações</th></tr></thead><tbody>${state.quotes.map(q=>`<tr><td>${esc(q.id)}</td><td><strong>${esc(q.cliente)}</strong><br><span class="muted">${esc(q.email || '')}</span></td><td>${esc(q.peca)}<br><span class="muted">${esc(q.referencia || '')}</span></td><td>${money(q.total)}</td><td>${badge(q.estado)}</td><td><div class="actions"><button class="btn small" data-print-quote="${q.id}">PDF</button><button class="btn small" data-copy-quote="${q.id}">Copiar email</button><button class="btn success small" data-email-quote="${q.id}">Email</button><button class="btn success small" data-quote-status="${q.id}:Aceite">Aceite</button><button class="btn warn small" data-quote-status="${q.id}:Recusado">Recusado</button>${canDelete()?`<button class="btn danger small" data-delete-quote="${q.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`; }
+function quotesTable(){ return `<div class="table-wrap"><table><thead><tr><th>ID</th><th>Cliente</th><th>Peça</th><th>Total</th><th>Estado</th><th>Ações</th></tr></thead><tbody>${state.quotes.map(q=>`<tr><td>${esc(q.id)}</td><td><strong>${esc(q.cliente)}</strong><br><span class="muted">${esc(q.email || '')}</span></td><td>${esc(q.peca)}<br><span class="muted">${esc(q.referencia || '')}</span></td><td>${money(q.total)}</td><td>${badge(q.estado)}</td><td><div class="actions"><button class="btn small" data-print-quote="${q.id}">PDF</button><button class="btn success small" data-email-quote="${q.id}">Email</button><button class="btn success small" data-quote-status="${q.id}:Aceite">Aceite</button><button class="btn warn small" data-quote-status="${q.id}:Recusado">Recusado</button>${canDelete()?`<button class="btn danger small" data-delete-quote="${q.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`; }
 
 function agenda(){
   return `<div class="grid two"><div class="card"><div class="card-head"><h3>Novo follow-up</h3></div><form id="followForm" class="form-grid"><input class="field" type="date" name="date" value="${today()}"><input class="field" type="time" name="time"><input class="field" name="title" placeholder="Título"><input class="field span2" name="related" placeholder="Relacionado com"><select class="select" name="status"><option>Pendente</option><option>Feito</option></select><textarea class="span3" name="notes" placeholder="Notas"></textarea><div class="span3"><button class="btn primary">Guardar</button></div></form></div><div class="card"><div class="card-head"><h3>Agenda</h3></div>${entityTable(state.followups, ['date','time','title','related','status'], 'follow')}</div></div>`;
@@ -899,40 +883,6 @@ function relatorios(){
   const won = state.calls.filter(c=>c.estado==='Concluído').length;
   const lost = state.calls.filter(c=>c.estado==='Perdido').length;
   return `<div class="grid metrics">${metric('Total venda',money(totalVenda),'Todos os pedidos')}${metric('Total compra',money(totalCompra),'Custos registados')}${metric('Margem prevista',money(margem),'Venda - compra')}${metric('Ganhos / Perdidos',`${won} / ${lost}`,'Resultado comercial')}</div><div class="card" style="margin-top:18px"><div class="card-head"><h3>Peças mais procuradas</h3></div>${topParts()}</div>`;
-}
-function auditoria(){
-  const rows = auditRows();
-  return `<div class="card audit-page">
-    <div class="card-head"><h3>Auditoria</h3><span class="muted">${rows.length} movimentos</span></div>
-    <div class="toolbar one"><input id="auditSearch" class="field" placeholder="Pesquisar por página, registo, utilizador ou ação"></div>
-    <div id="auditTable">${auditTable(rows)}</div>
-  </div>`;
-}
-function auditRows(){
-  const sources = [
-    ['Pedidos', state.calls || [], 'cliente'],
-    ['Clientes', state.clients || [], 'nome'],
-    ['Fornecedores', state.suppliers || [], 'nomeMarca'],
-    ['Orçamentos', state.quotes || [], 'cliente'],
-    ['Agenda', state.followups || [], 'title'],
-    ['Stock', state.stock || [], 'nome'],
-    ['Utilizadores', state.users || [], 'email'],
-    ['Diretório', state.contactGroups || [], 'nome']
-  ];
-  return sources.flatMap(([page, rows, labelKey]) => rows.flatMap(row => {
-    const label = row[labelKey] || row.nome || row.id || '-';
-    const base = [];
-    if(row.createdAt || row.createdBy) base.push({ page, label, action:'Criado', date:row.createdAt || '-', by:row.createdBy || '-' });
-    if(row.updatedAtLocal || row.updatedByLocal) base.push({ page, label, action:'Atualizado', date:row.updatedAtLocal || row.updatedAt || '-', by:row.updatedByLocal || row.updatedBy || '-' });
-    (row.history || []).forEach(h => base.push({ page, label, action:h.action || 'Histórico', date:h.date || '-', by:h.by || '-' }));
-    return base;
-  })).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-}
-function auditTable(rows){
-  const q = (qs('#auditSearch')?.value || '').toLowerCase();
-  const filtered = rows.filter(r => `${r.page} ${r.label} ${r.action} ${r.date} ${r.by}`.toLowerCase().includes(q)).slice(0,250);
-  if(!filtered.length) return '<div class="empty">Sem movimentos encontrados.</div>';
-  return `<div class="table-wrap"><table><thead><tr><th>Data</th><th>Página</th><th>Registo</th><th>Ação</th><th>Utilizador</th></tr></thead><tbody>${filtered.map(r=>`<tr><td>${esc(r.date)}</td><td>${esc(r.page)}</td><td><strong>${esc(r.label)}</strong></td><td>${esc(r.action)}</td><td>${esc(r.by)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function topParts(){
   const count = {};
@@ -954,17 +904,12 @@ function bindPage(id){
   const clientSearch = qs('#clientSearch');
   if(clientSearch) clientSearch.addEventListener('input',()=>{ qs('#clientsTable').innerHTML = clientsTable(filterClients()); bindEntities(); });
   const contactSearch = qs('#contactSearch');
-  if(contactSearch) contactSearch.addEventListener('input',refreshContactDirectory);
-  ['contactSectionFilter','contactLocalFilter'].forEach(filterId=>{
-    const el = qs('#'+filterId);
-    if(el) el.addEventListener('change',refreshContactDirectory);
-  });
+  if(contactSearch) contactSearch.addEventListener('input',()=>{ qs('#contactsTable').innerHTML = contactGroupsView(filterContactGroups()); bindContactDirectory(); });
   const supplierSearch = qs('#supplierSearch');
   if(supplierSearch) supplierSearch.addEventListener('input',()=>{ qs('#suppliersTable').innerHTML = suppliersTable(filterSuppliers()); bindEntities(); });
   if(id==='nova-chamada') bindCallForm();
   if(id==='pedidos') bindPedidos();
   if(id==='orcamentos') bindQuotes();
-  if(id==='auditoria') bindAudit();
   if(id==='contactos') bindContactDirectory();
   if(id==='users') bindUsersPage();
   bindEntities();
@@ -979,7 +924,7 @@ function bindCallForm(){
     e.preventDefault();
     if(!canEditOperational()) return toast('Sem permissão para guardar pedidos.');
     const data = Object.fromEntries(new FormData(e.target).entries());
-    const call = auditCreate({ id: uid('PED'), ...data, precoCompra:Number(data.precoCompra||0), precoVenda:Number(data.precoVenda||0) });
+    const call = { id: uid('PED'), createdAt: today(), ...data, precoCompra:Number(data.precoCompra||0), precoVenda:Number(data.precoVenda||0) };
     state.calls.push(call);
     upsertClient(data.cliente, data.telefone, data.email);
     saveState(); toast('Chamada guardada com sucesso.'); setTimeout(()=>goPage('pedidos'), 250);
@@ -997,14 +942,14 @@ function bindPedidosActions(){
 function openCallModal(id){
   const c = state.calls.find(x=>x.id===id); if(!c) return;
   openModal('Editar pedido', `<form id="editCallForm" class="form-grid">${['cliente','telefone','email','matricula','marca','modelo','ano','motor','vin','peca','referencia','operador','fornecedor','precoCompra','precoVenda'].map(k=>`<input class="field" name="${k}" placeholder="${k}" value="${esc(c[k]||'')}">`).join('')}<select name="urgencia" class="select">${urgencies.map(u=>`<option ${c.urgencia===u?'selected':''}>${u}</option>`).join('')}</select><select name="estado" class="select">${states.map(s=>`<option ${c.estado===s?'selected':''}>${s}</option>`).join('')}</select><textarea class="span3" name="observacoes">${esc(c.observacoes||'')}</textarea><div class="span3"><button class="btn primary">Guardar alterações</button></div></form>`);
-  qs('#editCallForm').addEventListener('submit', e=>{ e.preventDefault(); Object.assign(c,Object.fromEntries(new FormData(e.target).entries())); c.precoCompra=Number(c.precoCompra||0); c.precoVenda=Number(c.precoVenda||0); auditUpdate(c,'Pedido editado'); saveState(); closeModal(); renderPage('pedidos'); toast('Pedido atualizado.'); });
+  qs('#editCallForm').addEventListener('submit', e=>{ e.preventDefault(); Object.assign(c,Object.fromEntries(new FormData(e.target).entries())); c.precoCompra=Number(c.precoCompra||0); c.precoVenda=Number(c.precoVenda||0); saveState(); closeModal(); renderPage('pedidos'); toast('Pedido atualizado.'); });
 }
 function createQuoteFromCall(id){
   if(!canEditOperational()) return toast('Sem permissão para criar orçamento.');
   const c = state.calls.find(x=>x.id===id); if(!c) return;
   const client = state.clients.find(x => x.nome?.toLowerCase() === c.cliente?.toLowerCase() || (c.telefone && x.telefone === c.telefone)) || {};
-  const q = auditCreate({ id: uid('ORC'), callId:id, cliente:c.cliente, codigoCliente:clientCode(client), telefone:c.telefone, email:c.email, viatura:`${c.marca || ''} ${c.modelo || ''} ${c.matricula ? '- ' + c.matricula : ''}`.trim(), peca:c.peca, referencia:c.referencia, quantidade:1, precoUnitario:Number(c.precoVenda||0), total:Number(c.precoVenda||0), validade:today(), prazoEntrega:'A confirmar', condicoes:'Preços sujeitos a disponibilidade da peça no momento da confirmação.', observacoes:c.observacoes || '', estado:'Rascunho', history:[{ date:today(), action:'Criado a partir de pedido', by:activeUserEmail() }] });
-  state.quotes.push(q); c.estado='Orçamento enviado'; auditUpdate(c,'Orçamento criado'); saveState(); toast('Orçamento criado.'); setTimeout(()=>goPage('orcamentos'), 250);
+  const q = { id: uid('ORC'), callId:id, cliente:c.cliente, codigoCliente:clientCode(client), telefone:c.telefone, email:c.email, viatura:`${c.marca || ''} ${c.modelo || ''} ${c.matricula ? '- ' + c.matricula : ''}`.trim(), peca:c.peca, referencia:c.referencia, quantidade:1, precoUnitario:Number(c.precoVenda||0), total:Number(c.precoVenda||0), validade:today(), prazoEntrega:'A confirmar', condicoes:'Preços sujeitos a disponibilidade da peça no momento da confirmação.', observacoes:c.observacoes || '', estado:'Rascunho', createdAt:today(), history:[{ date:today(), action:'Criado a partir de pedido', by:state.currentUser?.email || '' }] };
+  state.quotes.push(q); c.estado='Orçamento enviado'; saveState(); toast('Orçamento criado.'); setTimeout(()=>goPage('orcamentos'), 250);
 }
 function bindQuotes(){
   const clientSelect = qs('#quoteClientSelect');
@@ -1021,20 +966,15 @@ function bindQuotes(){
     const data = Object.fromEntries(new FormData(e.target).entries());
     const quantidade = Number(data.quantidade || 1);
     const precoUnitario = Number(data.precoUnitario || 0);
-    state.quotes.push(auditCreate({ id:uid('ORC'), estado:data.estado || 'Rascunho', ...data, quantidade, precoUnitario, total: quantidade * precoUnitario, history:[{ date:today(), action:'Criado', by:activeUserEmail() }] }));
+    state.quotes.push({ id:uid('ORC'), createdAt:today(), estado:data.estado || 'Rascunho', ...data, quantidade, precoUnitario, total: quantidade * precoUnitario, history:[{ date:today(), action:'Criado', by:state.currentUser?.email || '' }] });
     saveState(); renderPage('orcamentos'); toast('Orçamento criado.');
   });
   qsa('[data-print-quote]').forEach(b=>b.addEventListener('click',()=>printQuote(b.dataset.printQuote)));
-  qsa('[data-copy-quote]').forEach(b=>b.addEventListener('click',()=>copyQuoteEmail(b.dataset.copyQuote)));
   qsa('[data-email-quote]').forEach(b=>b.addEventListener('click',()=>emailQuote(b.dataset.emailQuote)));
-  qsa('[data-quote-status]').forEach(b=>b.addEventListener('click',()=>{ if(!canEditOperational()) return toast('Sem permissão para alterar orçamento.'); const [id,status]=b.dataset.quoteStatus.split(':'); const q=quoteById(id); if(!q) return; q.estado=status; auditUpdate(q,`Marcado como ${status}`); saveState(); renderPage('orcamentos'); toast('Estado atualizado.'); }));
+  qsa('[data-quote-status]').forEach(b=>b.addEventListener('click',()=>{ if(!canEditOperational()) return toast('Sem permissão para alterar orçamento.'); const [id,status]=b.dataset.quoteStatus.split(':'); const q=quoteById(id); if(!q) return; q.estado=status; q.history=q.history||[]; q.history.push({date:today(), action:`Marcado como ${status}`, by:state.currentUser?.email || ''}); saveState(); renderPage('orcamentos'); toast('Estado atualizado.'); }));
   qsa('[data-delete-quote]').forEach(b=>b.addEventListener('click',()=>{ if(!canDelete()) return toast('Sem permissão para apagar.'); state.quotes = state.quotes.filter(q=>q.id!==b.dataset.deleteQuote); saveState(); renderPage('orcamentos'); toast('Orçamento apagado.'); }));
 }
 function quoteById(id){ return state.quotes.find(q=>q.id===id); }
-function bindAudit(){
-  const search = qs('#auditSearch');
-  if(search) search.addEventListener('input',()=>{ qs('#auditTable').innerHTML = auditTable(auditRows()); });
-}
 function printQuote(id){
   const q = quoteById(id); if(!q) return;
   const win = window.open('', '_blank', 'width=900,height=900');
@@ -1046,30 +986,13 @@ function printQuote(id){
 function emailQuote(id){
   const q = quoteById(id); if(!q) return;
   q.estado = 'Enviado';
-  auditUpdate(q,'Email preparado');
+  q.history = q.history || [];
+  q.history.push({ date:today(), action:'Email preparado', by:state.currentUser?.email || '' });
   saveState();
-  const { subject, body } = quoteEmailContent(q);
+  const subject = `Orçamento ${q.id} - ${q.peca}`;
+  const body = `Olá ${q.cliente},\n\nEnviamos em anexo o orçamento ${q.id}.\n\nResumo:\n- Peça/serviço: ${q.peca}\n- Referência: ${q.referencia || '-'}\n- Total: ${money(q.total)}\n- Prazo de entrega: ${q.prazoEntrega || 'A confirmar'}\n\nQualquer questão estamos disponíveis.\n\nObrigado,\n${companyName()}`;
   window.location.href = `mailto:${encodeURIComponent(q.email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   renderPage('orcamentos');
-}
-async function copyQuoteEmail(id){
-  const q = quoteById(id); if(!q) return;
-  const { subject, body } = quoteEmailContent(q);
-  const text = `Assunto: ${subject}\n\n${body}`;
-  try {
-    await navigator.clipboard.writeText(text);
-    auditUpdate(q,'Email copiado');
-    saveState();
-    toast('Email copiado.');
-  } catch {
-    openModal('Email do orçamento', `<textarea class="span3" style="width:100%;min-height:260px">${esc(text)}</textarea>`);
-  }
-}
-function quoteEmailContent(q){
-  return {
-    subject: `Orçamento ${q.id} - ${q.peca}`,
-    body: `Olá ${q.cliente},\n\nEnviamos em anexo o orçamento ${q.id}.\n\nResumo:\n- Peça/serviço: ${q.peca}\n- Referência: ${q.referencia || '-'}\n- Total: ${money(q.total)}\n- Prazo de entrega: ${q.prazoEntrega || 'A confirmar'}\n\nQualquer questão estamos disponíveis.\n\nObrigado,\n${companyName()}`
-  };
 }
 function quotePdfHtml(q){
   const iva = Number(q.total || 0) * 0.23;
@@ -1091,64 +1014,35 @@ function quotePdfHtml(q){
 function upsertClient(nome, telefone, email){
   if(!nome) return;
   const exists = state.clients.find(c=>c.nome.toLowerCase()===nome.toLowerCase() || (telefone && c.telefone===telefone));
-  if(!exists) state.clients.push(auditCreate({id:uid('CLI'), codigoCliente:`CLI-${String(state.clients.length + 1).padStart(3,'0')}`, nome, telefone, email, notas:''}));
+  if(!exists) state.clients.push({id:uid('CLI'), codigoCliente:`CLI-${String(state.clients.length + 1).padStart(3,'0')}`, nome, telefone, email, notas:''});
 }
 function bindContactDirectory(){
-  qsa('[data-directory-action]').forEach(btn=>{
-    if(btn.dataset.boundDirAction) return;
-    btn.dataset.boundDirAction = '1';
-    btn.addEventListener('click',()=>{
-    const action = btn.dataset.directoryAction;
-    if(action === 'search') return qs('#contactSearch')?.focus();
-    if(action === 'insert') return qs('#directoryInsertPanel')?.classList.toggle('hidden');
-    if(action === 'expand' || action === 'collapse'){
-      (state.contactGroups || []).forEach(group=>{ group.aberto = action === 'expand'; });
-      saveState(); renderPage('contactos'); return;
-    }
-    if(action === 'export') return exportContactsCsv();
-    if(action === 'refresh') return renderPage('contactos');
-    if(action === 'clear'){
-      ['contactSearch','contactSectionFilter','contactLocalFilter'].forEach(id=>{ const el = qs('#'+id); if(el) el.value=''; });
-      refreshContactDirectory();
-    }
-    });
-  });
   const groupForm = qs('#contactGroupForm');
-  if(groupForm && !groupForm.dataset.boundContactGroup) {
-  groupForm.dataset.boundContactGroup = '1';
-  groupForm.addEventListener('submit',e=>{
+  if(groupForm) groupForm.addEventListener('submit',e=>{
     e.preventDefault();
     if(!canEditOperational()) return toast('Sem permissão para alterar contactos.');
     const data = Object.fromEntries(new FormData(e.target).entries());
     state.contactGroups = state.contactGroups || [];
-    state.contactGroups.push(auditCreate({ id:uid('DIR'), nome:data.nome, aberto:true, contactos:[] }));
+    state.contactGroups.push({ id:uid('DIR'), nome:data.nome, aberto:true, contactos:[] });
     saveState(); renderPage('contactos'); toast('Grupo criado.');
   });
-  }
-  const contactForm = qs('#contactForm');
-  if(contactForm && !contactForm.dataset.boundContact) {
-    contactForm.dataset.boundContact = '1';
-    contactForm.addEventListener('submit', e=>{
-      e.preventDefault();
-      if(!canEditOperational()) return toast('Sem permissão para alterar contactos.');
-      const data = Object.fromEntries(new FormData(e.target).entries());
-      const group = (state.contactGroups || []).find(g=>g.id===data.groupId);
-      if(!group) return toast('Escolhe a secção do contacto.');
-      delete data.groupId;
-      group.contactos = group.contactos || [];
-      group.contactos.push(auditCreate({ id:uid('CNT'), ...data }));
-      group.aberto = true;
-      auditUpdate(group,'Contacto adicionado');
-      saveState(); renderPage('contactos'); toast('Contacto adicionado.');
-    });
-  }
   qsa('[data-toggle-contact-group]').forEach(btn=>btn.addEventListener('click',()=>{
     const group = (state.contactGroups || []).find(g=>g.id===btn.dataset.toggleContactGroup);
     if(!group) return;
     group.aberto = !group.aberto;
     saveState(); renderPage('contactos');
   }));
-  qsa('[data-edit-contact]').forEach(btn=>btn.addEventListener('click',()=>openContactModal(btn.dataset.editContact)));
+  qsa('[data-contact-form]').forEach(form=>form.addEventListener('submit',e=>{
+    e.preventDefault();
+    if(!canEditOperational()) return toast('Sem permissão para alterar contactos.');
+    const group = (state.contactGroups || []).find(g=>g.id===form.dataset.contactForm);
+    if(!group) return;
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    group.contactos = group.contactos || [];
+    group.contactos.push({ id:uid('CNT'), ...data });
+    group.aberto = true;
+    saveState(); renderPage('contactos'); toast('Contacto adicionado.');
+  }));
   qsa('[data-delete-contact]').forEach(btn=>btn.addEventListener('click',()=>{
     if(!canDelete()) return toast('Sem permissão para apagar.');
     const [groupId, contactId] = btn.dataset.deleteContact.split(':');
@@ -1163,55 +1057,12 @@ function bindContactDirectory(){
     saveState(); renderPage('contactos'); toast('Grupo apagado.');
   }));
 }
-function refreshContactDirectory(){
-  const table = qs('#contactsTable');
-  if(!table) return;
-  table.innerHTML = contactGroupsView(filterContactGroups());
-  bindContactDirectory();
-}
-function openContactModal(ref){
-  if(!canEditOperational()) return toast('Sem permissão para alterar contactos.');
-  const [groupId, contactId] = ref.split(':');
-  const group = (state.contactGroups || []).find(g=>g.id===groupId);
-  const contact = group?.contactos?.find(c=>c.id===contactId);
-  if(!group || !contact) return;
-  openModal('Editar contacto', `<form id="editContactForm" class="form-grid">
-    <input class="field" name="nome" placeholder="Nome" value="${esc(contact.nome || '')}" required>
-    <input class="field" name="extensao" placeholder="Extensão" value="${esc(contact.extensao || '')}">
-    <input class="field" name="telefone" placeholder="Telefone" value="${esc(contact.telefone || '')}">
-    <input class="field" name="telemovel" placeholder="Telemóvel" value="${esc(contact.telemovel || '')}">
-    <input class="field" name="email" type="email" placeholder="Email" value="${esc(contact.email || '')}">
-    <input class="field" name="local" placeholder="Local / Empresa" value="${esc(contact.local || '')}">
-    <div class="span3"><button class="btn primary">Guardar contacto</button></div>
-  </form>`);
-  qs('#editContactForm').addEventListener('submit', e=>{
-    e.preventDefault();
-    Object.assign(contact, Object.fromEntries(new FormData(e.target).entries()));
-    auditUpdate(contact,'Contacto editado');
-    auditUpdate(group,'Contacto editado');
-    saveState(); closeModal(); renderPage('contactos'); toast('Contacto atualizado.');
-  });
-}
-function exportContactsCsv(){
-  const rows = [['Secao','Nome','Extensao','Telefone','Telemovel','Email','Local']];
-  (state.contactGroups || []).forEach(group => (group.contactos || []).forEach(c => rows.push([
-    group.nome || '', c.nome || '', c.extensao || '', c.telefone || '', c.telemovel || '', c.email || '', c.local || ''
-  ])));
-  const csv = rows.map(row => row.map(value => `"${String(value).replaceAll('"','""')}"`).join(';')).join('\n');
-  const blob = new Blob([csv], { type:'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = `diretorio-contactos-${today()}.csv`; a.click();
-  URL.revokeObjectURL(url);
-  toast('Diretorio exportado.');
-}
 function bindUsersPage(){
   qsa('[data-approve-user]').forEach(btn=>btn.addEventListener('click',()=>{
     if(!hasPermission('approveUsers')) return toast('Sem permissão para aprovar contas.');
     const user = (state.users || []).find(u=>u.id===btn.dataset.approveUser);
     if(!user) return;
     user.status = 'Ativo';
-    auditUpdate(user,'Conta aprovada');
     saveState(); renderPage('users'); toast('Conta aprovada.');
   }));
   const form = qs('#createUserForm');
@@ -1220,7 +1071,7 @@ function bindUsersPage(){
     e.preventDefault();
     if(!isAdminMaster()) return toast('Só o Admin Master pode criar contas.');
     const data = Object.fromEntries(new FormData(e.target).entries());
-    const user = auditCreate({ id: uid('USR'), nome:data.nome, email:data.email, role:data.role, status:data.status || 'Ativo' });
+    const user = { id: uid('USR'), nome:data.nome, email:data.email, role:data.role, status:data.status || 'Ativo' };
     try {
       const created = await createFirebaseUserAsAdmin(data.email, data.password);
       if(created?.uid) user.id = created.uid;
@@ -1253,7 +1104,7 @@ function upsertAppUser(user){
   state.users = state.users || [];
   delete user.password;
   const index = state.users.findIndex(u => (u.email || '').toLowerCase() === (user.email || '').toLowerCase() || u.id === user.id);
-  if(index >= 0) state.users[index] = auditUpdate({ ...state.users[index], ...user }, 'Utilizador atualizado');
+  if(index >= 0) state.users[index] = { ...state.users[index], ...user };
   else state.users.push(user);
 }
 function bindEntities(){
@@ -1261,17 +1112,17 @@ function bindEntities(){
   qsa('[data-delete-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.deleteEntity.split(':'); if(!canDelete()) return toast('Sem permissão para apagar.'); if(type==='user' && !isAdminMaster()) return toast('Só o Admin Master pode alterar utilizadores.'); const target=map[type]; state[target[1]] = target[0].filter(x=>x.id!==id); saveState(); renderPage(currentPage); toast('Registo apagado.'); }));
   qsa('[data-edit-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.editEntity.split(':'); if(type==='user' && !isAdminMaster()) return toast('Só o Admin Master pode alterar utilizadores.'); openEntityModal(type,id); }));
   const forms = [{id:'clientForm',key:'clients',prefix:'CLI'},{id:'supplierForm',key:'suppliers',prefix:'FOR'},{id:'stockForm',key:'stock',prefix:'STK'},{id:'userForm',key:'users',prefix:'USR'}];
-  forms.forEach(f=>{ const form=qs('#'+f.id); if(form) form.addEventListener('submit',e=>{ e.preventDefault(); if(f.key==='users' && !hasPermission('manageUsers')) return toast('Sem permissão para gerir utilizadores.'); if(f.key!=='users' && !canEditOperational()) return toast('Sem permissão para guardar.'); state[f.key].push(auditCreate({id:uid(f.prefix),...Object.fromEntries(new FormData(e.target).entries())})); saveState(); renderPage(currentPage); toast('Registo guardado.'); }); });
+  forms.forEach(f=>{ const form=qs('#'+f.id); if(form) form.addEventListener('submit',e=>{ e.preventDefault(); if(f.key==='users' && !hasPermission('manageUsers')) return toast('Sem permissão para gerir utilizadores.'); if(f.key!=='users' && !canEditOperational()) return toast('Sem permissão para guardar.'); state[f.key].push({id:uid(f.prefix),...Object.fromEntries(new FormData(e.target).entries())}); saveState(); renderPage(currentPage); toast('Registo guardado.'); }); });
 }
 function openEntityModal(type,id){
   const map = { client:['clients','CLI'], supplier:['suppliers','FOR'], stock:['stock','STK'], user:['users','USR'], follow:['followups','AGE'] };
   const [key] = map[type]; const item = state[key].find(x=>x.id===id); if(!item) return;
-  const fields = Object.keys(item).filter(k=>!['id','history','createdAt','createdBy','updatedAt','updatedBy','updatedAtLocal','updatedByLocal'].includes(k) && typeof item[k] !== 'object');
+  const fields = Object.keys(item).filter(k=>k!=='id');
   openModal('Editar registo', `<form id="entityEditForm" class="form-grid">${fields.map(k=>`<input class="field" name="${k}" placeholder="${k}" value="${esc(item[k])}">`).join('')}<div class="span3"><button class="btn primary">Guardar</button></div></form>`);
-  qs('#entityEditForm').addEventListener('submit',e=>{e.preventDefault(); Object.assign(item,Object.fromEntries(new FormData(e.target).entries())); auditUpdate(item,'Registo editado'); saveState(); closeModal(); renderPage(currentPage); toast('Registo atualizado.');});
+  qs('#entityEditForm').addEventListener('submit',e=>{e.preventDefault(); Object.assign(item,Object.fromEntries(new FormData(e.target).entries())); saveState(); closeModal(); renderPage(currentPage); toast('Registo atualizado.');});
 }
 function bindFollowForm(){
-  qs('#followForm').addEventListener('submit',e=>{ e.preventDefault(); state.followups.push(auditCreate({id:uid('AGE'),...Object.fromEntries(new FormData(e.target).entries())})); saveState(); renderPage('agenda'); toast('Follow-up guardado.'); });
+  qs('#followForm').addEventListener('submit',e=>{ e.preventDefault(); state.followups.push({id:uid('AGE'),...Object.fromEntries(new FormData(e.target).entries())}); saveState(); renderPage('agenda'); toast('Follow-up guardado.'); });
 }
 function bindConfig(){
   qs('#settingsForm').addEventListener('submit',e=>{ e.preventDefault(); const fd=new FormData(e.target); state.settings={ companyName:fd.get('companyName'), companyNif:fd.get('companyNif'), companyAddress:fd.get('companyAddress'), companyPhone:fd.get('companyPhone'), companyEmail:fd.get('companyEmail'), dailyBackupHour:fd.get('dailyBackupHour'), githubUrl:fd.get('githubUrl'), firebaseEnabled:firebaseReady}; saveState(); toast('Configurações guardadas.'); renderPage('config'); });

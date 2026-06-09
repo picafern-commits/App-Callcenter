@@ -1,8 +1,7 @@
 const { app, BrowserWindow, shell } = require('electron');
 const path = require('path');
 
-const GITHUB_APP_URL = process.env.APP_URL || 'https://picafern-commits.github.io/App-Callcenter/';
-const LOCAL_APP_PATH = path.join(__dirname, '..', 'html', 'index.html');
+const GITHUB_APP_URL = process.env.APP_URL || '';
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -10,7 +9,7 @@ function createWindow() {
     height: 920,
     minWidth: 1180,
     minHeight: 760,
-    backgroundColor: '#eef5fa',
+    backgroundColor: '#070b16',
     title: 'AutoParts CallCenter',
     autoHideMenuBar: true,
     webPreferences: {
@@ -20,10 +19,11 @@ function createWindow() {
     }
   });
 
-  win.loadURL(GITHUB_APP_URL).catch(() => win.loadFile(LOCAL_APP_PATH));
-  win.webContents.on('did-fail-load', (_event, _errorCode, _errorDescription, _validatedURL, isMainFrame) => {
-    if (isMainFrame) win.loadFile(LOCAL_APP_PATH);
-  });
+  if (GITHUB_APP_URL) {
+    win.loadURL(GITHUB_APP_URL);
+  } else {
+    win.loadFile(path.join(__dirname, '..', 'html', 'index.html'));
+  }
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
