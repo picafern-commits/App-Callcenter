@@ -1,4 +1,4 @@
-const APP_VERSION = '1.5.3';
+const APP_VERSION = '1.5.4';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
@@ -62,7 +62,7 @@ const rolePermissions = {
   'Admin Master': ['manageUsers','approveUsers','editAll','deleteAll','viewReports','manageSettings'],
   'Admin': ['editAll','deleteAll','viewReports','manageSettings'],
   'Supervisor': ['editAll','viewReports'],
-  'Operador': ['createOperational']
+  'Operador': []
 };
 let currentPage = getDefaultPage();
 let state = loadState();
@@ -78,7 +78,8 @@ function seedData() {
       companyEmail: '',
       githubUrl: '',
       firebaseEnabled: false,
-      dailyBackupHour: '19:30'
+      dailyBackupHour: '19:30',
+      theme: 'normal'
     },
     currentUser: null,
     calls: [
@@ -351,6 +352,19 @@ function toast(msg){ const el = qs('#toast'); el.textContent = msg; el.classList
 function qs(s){ return document.querySelector(s); }
 function qsa(s){ return [...document.querySelectorAll(s)]; }
 function companyName(){ return state.settings?.companyName || 'AutoParts CallCenter'; }
+function currentTheme(){ return state.settings?.theme === 'dark' ? 'dark' : 'normal'; }
+function applyTheme(){
+  document.body.classList.toggle('theme-dark', currentTheme() === 'dark');
+  const btn = qs('#themeToggleBtn');
+  if(btn) btn.textContent = currentTheme() === 'dark' ? 'Modo Normal' : 'Darkmode';
+}
+function toggleTheme(){
+  state.settings = state.settings || {};
+  state.settings.theme = currentTheme() === 'dark' ? 'normal' : 'dark';
+  saveState();
+  applyTheme();
+  toast(state.settings.theme === 'dark' ? 'Darkmode ativo.' : 'Modo normal ativo.');
+}
 function pageUrl(id){ return pageFiles[id] || 'index.html'; }
 function goPage(id){ window.location.href = pageUrl(id); }
 function canOpenPage(id){
@@ -366,6 +380,7 @@ function getDefaultPage(){
   return found ? found[0] : 'dashboard';
 }
 function showApp(){
+  applyTheme();
   qs('#loginScreen').classList.add('hidden');
   qs('#appShell').classList.remove('hidden');
   buildNav();
@@ -375,6 +390,7 @@ function showApp(){
 }
 
 async function init(){
+  applyTheme();
   buildNav();
   bindShell();
   restoreLogin();
@@ -520,6 +536,16 @@ function buildNav(){
 function bindShell(){
   const home = qs('#homeBtn');
   const logout = qs('#logoutBtn');
+  const topActions = qs('.top-actions');
+  if(topActions && !qs('#themeToggleBtn')) {
+    const themeBtn = document.createElement('button');
+    themeBtn.id = 'themeToggleBtn';
+    themeBtn.className = 'btn ghost';
+    themeBtn.type = 'button';
+    topActions.insertBefore(themeBtn, qs('#userBadge'));
+    themeBtn.addEventListener('click', toggleTheme);
+    applyTheme();
+  }
   if(!home || !logout || home.dataset.bound === '1') return;
   home.dataset.bound = '1';
   logout.dataset.bound = '1';
@@ -703,8 +729,8 @@ function badge(v){
 }
 
 function clientes(){
-  return `<div class="grid two clients-page">
-    <div class="card">
+  const canEdit = canEditOperational();
+  const addCard = canEdit ? `<div class="card compact-form-card">
       <div class="card-head"><h3>Adicionar cliente</h3><span class="muted">O código fica antes do nome na ficha.</span></div>
       <form id="clientForm" class="form-grid">
         <input class="field" name="codigoCliente" placeholder="Código cliente" required>
@@ -714,26 +740,32 @@ function clientes(){
         <textarea class="span3" name="notas" placeholder="Notas"></textarea>
         <div class="span3"><button class="btn primary" type="submit">Guardar cliente</button></div>
       </form>
-    </div>
+    </div>` : '';
+  return `<div class="grid ${canEdit ? 'two split-form-list' : 'single-list'} clients-page">
+    ${addCard}
     <div class="card">
       <div class="card-head"><h3>Lista de clientes</h3><span class="muted">${state.clients.length} registos</span></div>
+      ${!canEdit ? '<div class="readonly-note">Modo leitura: podes consultar dados e enviar emails, mas não podes adicionar nem editar clientes.</div>' : ''}
       <div class="toolbar one"><input id="clientSearch" class="field" placeholder="Pesquisar por código, nome, telefone ou email"></div>
       <div id="clientsTable">${clientsTable(state.clients)}</div>
     </div>
   </div>`;
 }
 function fornecedores(){
-  return `<div class="grid two suppliers-page">
-    <div class="card">
+  const canEdit = canEditOperational();
+  const addCard = canEdit ? `<div class="card compact-form-card">
       <div class="card-head"><h3>Adicionar fornecedor</h3><span class="muted">Apenas marca e código de ficha.</span></div>
       <form id="supplierForm" class="form-grid">
         <input class="field span2" name="nomeMarca" placeholder="Nome da marca" required>
         <input class="field" name="codigoFicha" placeholder="Código de ficha" required>
         <div class="span3"><button class="btn primary" type="submit">Guardar fornecedor</button></div>
       </form>
-    </div>
+    </div>` : '';
+  return `<div class="grid ${canEdit ? 'two split-form-list' : 'single-list'} suppliers-page">
+    ${addCard}
     <div class="card supplier-list-card">
       <div class="card-head"><h3>Lista de fornecedores</h3><span class="muted">${state.suppliers.length} registos</span></div>
+      ${!canEdit ? '<div class="readonly-note">Modo leitura: podes consultar os fornecedores, sem adicionar nem editar.</div>' : ''}
       <div class="toolbar one"><input id="supplierSearch" class="field" placeholder="Pesquisar por marca ou código de ficha"></div>
       <div id="suppliersTable">${suppliersTable(state.suppliers)}</div>
     </div>
@@ -742,8 +774,8 @@ function fornecedores(){
 function contactos(){
   const warehouses = uniqueWarehouses();
   const sections = uniqueSections();
-  return `<div class="grid two contacts-page directory-clean-page">
-    <div class="card directory-add-card">
+  const canEdit = canEditOperational();
+  const addCard = canEdit ? `<div class="card directory-add-card compact-form-card">
       <div class="card-head">
         <h3>Adicionar contacto</h3>
         <span class="muted">Escolhe o armazém e a secção</span>
@@ -755,7 +787,7 @@ function contactos(){
 
         <label>Secção</label>
         <input class="field" name="seccao" list="sectionList" placeholder="Ex: Peças, Vendas, Administração" required>
-        <datalist id="sectionList">${sections.map(w=>`<option value="${esc(w)}"></option>`).join('')}</datalist>
+        <datalist id="sectionList">${sections.map(sec=>`<option value="${esc(sec)}"></option>`).join('')}</datalist>
 
         <label>Nome</label>
         <input class="field" name="nome" placeholder="Nome do contacto" required>
@@ -776,13 +808,15 @@ function contactos(){
 
         <button class="btn primary full" type="submit">Guardar contacto</button>
       </form>
-    </div>
-
+    </div>` : '';
+  return `<div class="grid ${canEdit ? 'two split-form-list' : 'single-list'} contacts-page directory-clean-page">
+    ${addCard}
     <div class="card directory-main-card">
       <div class="card-head">
         <h3>Diretório</h3>
         <span class="muted">${contactCount()} contactos</span>
       </div>
+      ${!canEdit ? '<div class="readonly-note">Modo leitura: podes consultar contactos, ligar ou enviar email, mas não podes adicionar nem editar.</div>' : ''}
       <div class="directory-searchbar">
         <input id="contactSearch" class="field" placeholder="Pesquisar por armazém, secção, nome, telefone ou email">
       </div>
@@ -860,7 +894,7 @@ function contactSectionView(group){
     </button>
     <div class="section-body ${group.aberto ? '' : 'hidden'}">
       <div class="section-actions">
-        <button class="btn small" data-edit-contact-section="${group.id}">Editar secção</button>
+        ${canEditOperational()?`<button class="btn small" data-edit-contact-section="${group.id}">Editar secção</button>`:''}
         ${canDelete()?`<button class="btn danger small" data-delete-contact-group="${group.id}">Apagar secção</button>`:''}
       </div>
       ${contactsCards(group)}
@@ -882,7 +916,7 @@ function contactsCards(group){
       </div>
       <div class="contact-actions">
         ${c.email ? `<a class="btn small" href="mailto:${esc(c.email)}">Email</a>` : ''}
-        <button class="btn danger small" data-delete-contact="${group.id}:${c.id}">Apagar</button>
+        ${canDelete()?`<button class="btn danger small" data-delete-contact="${group.id}:${c.id}">Apagar</button>`:''}
       </div>
     </article>`).join('')}</div>`;
 }
@@ -893,7 +927,7 @@ function filterClients(){
 }
 function clientsTable(rows){
   if(!rows.length) return '<div class="empty">Sem clientes registados.</div>';
-  return `<div class="table-wrap"><table><thead><tr><th>Código cliente</th><th>Nome</th><th>Telefone</th><th>Email</th><th>Ações</th></tr></thead><tbody>${rows.map(c=>`<tr><td><span class="supplier-ref">${esc(clientCode(c) || '-')}</span></td><td><strong>${esc(c.nome || '')}</strong></td><td>${esc(c.telefone || '-')}</td><td>${esc(c.email || '-')}</td><td><div class="actions"><button class="btn small" data-client-detail="${c.id}">Ficha</button><button class="btn small" data-edit-entity="client:${c.id}">Editar</button>${canDelete()?`<button class="btn danger small" data-delete-entity="client:${c.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="table-wrap"><table><thead><tr><th>Código cliente</th><th>Nome</th><th>Telefone</th><th>Email</th><th>Ações</th></tr></thead><tbody>${rows.map(c=>`<tr><td><span class="supplier-ref">${esc(clientCode(c) || '-')}</span></td><td><strong>${esc(c.nome || '')}</strong></td><td>${esc(c.telefone || '-')}</td><td>${esc(c.email || '-')}</td><td><div class="actions"><button class="btn small" data-client-detail="${c.id}">Ficha</button>${c.email ? `<button class="btn success small" data-client-email="${c.id}">Email</button>` : ''}${canEditOperational()?`<button class="btn small" data-edit-entity="client:${c.id}">Editar</button>`:''}${canDelete()?`<button class="btn danger small" data-delete-entity="client:${c.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`;
 }
 function openClientDetail(id){
   const c = state.clients.find(x=>x.id===id); if(!c) return;
@@ -907,6 +941,7 @@ function openClientDetail(id){
         <div><span>Email</span><strong>${esc(c.email || '-')}</strong></div>
         <div><span>Pedidos</span><strong>${calls.length}</strong></div>
       </div>
+      <div class="actions">${c.email ? `<button class="btn success" data-client-email="${c.id}">Enviar email ao cliente</button>` : '<span class="muted">Cliente sem email registado.</span>'}</div>
       <h4>Histórico de pedidos</h4>
       ${callsTable(calls, false)}
       <h4>Orçamentos</h4>
@@ -914,6 +949,30 @@ function openClientDetail(id){
       <h4>Notas</h4>
       <p class="muted">${esc(c.notas || 'Sem notas registadas.')}</p>
     </div>`);
+}
+function emailClient(id){
+  const c = state.clients.find(x=>x.id===id); if(!c) return;
+  if(!c.email) return toast('Este cliente não tem email registado.');
+  openModal(`Enviar email · ${esc(c.nome || '')}`, `
+    <form id="clientEmailForm" class="form-grid">
+      <input class="field span3" name="to" value="${esc(c.email)}" readonly>
+      <input class="field span3" name="subject" placeholder="Assunto" value="Contacto ${esc(companyName())}">
+      <textarea class="span3" name="body" placeholder="Mensagem">Olá ${esc(c.nome || '')},\n\n</textarea>
+      <div class="span3 actions">
+        <button class="btn primary" type="submit">Abrir email</button>
+        <button class="btn ghost" type="button" id="copyClientEmailBtn">Copiar email</button>
+      </div>
+    </form>`);
+  qs('#clientEmailForm').addEventListener('submit', e=>{
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    window.location.href = `mailto:${encodeURIComponent(data.to)}?subject=${encodeURIComponent(data.subject || '')}&body=${encodeURIComponent(data.body || '')}`;
+    closeModal();
+  });
+  qs('#copyClientEmailBtn')?.addEventListener('click', async()=>{
+    try { await navigator.clipboard.writeText(c.email); toast('Email copiado.'); }
+    catch { toast(c.email); }
+  });
 }
 function supplierName(s){ return s.nomeMarca || s.nomeFornecedor || s.nome || ''; }
 function supplierRef(s){ return s.codigoFicha || s.numeroReferencia || s.referenciaFornecedor || s.referencia || ''; }
@@ -923,7 +982,7 @@ function filterSuppliers(){
 }
 function suppliersTable(rows){
   if(!rows.length) return '<div class="empty">Sem fornecedores registados.</div>';
-  return `<div class="table-wrap"><table class="suppliers-table"><thead><tr><th>Nome da marca</th><th>Código de ficha</th><th>Ações</th></tr></thead><tbody>${rows.map(s=>`<tr><td><strong>${esc(supplierName(s))}</strong></td><td><span class="supplier-ref">${esc(supplierRef(s) || '-')}</span></td><td><div class="actions"><button class="btn small" data-edit-entity="supplier:${s.id}">Editar</button>${canDelete()?`<button class="btn danger small" data-delete-entity="supplier:${s.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="table-wrap"><table class="suppliers-table"><thead><tr><th>Nome da marca</th><th>Código de ficha</th><th>Ações</th></tr></thead><tbody>${rows.map(s=>`<tr><td><strong>${esc(supplierName(s))}</strong></td><td><span class="supplier-ref">${esc(supplierRef(s) || '-')}</span></td><td><div class="actions">${canEditOperational()?`<button class="btn small" data-edit-entity="supplier:${s.id}">Editar</button>`:'<span class="muted">Consulta</span>'}${canDelete()?`<button class="btn danger small" data-delete-entity="supplier:${s.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`;
 }
 function stock(){
   return entityPage('Stock / Catálogo','stockForm',[
@@ -989,13 +1048,13 @@ function entityPage(title, formId, fields, rows, cols, type){
 }
 function entityTable(rows, cols, type){
   if(!rows.length) return '<div class="empty">Sem registos.</div>';
-  return `<div class="table-wrap"><table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}<th>Ações</th></tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c])}</td>`).join('')}<td><div class="actions"><button class="btn small" data-edit-entity="${type}:${r.id}">Editar</button>${canDelete()?`<button class="btn danger small" data-delete-entity="${type}:${r.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="table-wrap"><table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}<th>Ações</th></tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c])}</td>`).join('')}<td><div class="actions">${canEditOperational()?`<button class="btn small" data-edit-entity="${type}:${r.id}">Editar</button>`:'<span class="muted">Consulta</span>'}${canDelete()?`<button class="btn danger small" data-delete-entity="${type}:${r.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`;
 }
 
 function orcamentos(){
   const clientOptions = state.clients.map(c=>`<option value="${esc(c.nome)}" data-email="${esc(c.email || '')}" data-phone="${esc(c.telefone || '')}" data-code="${esc(clientCode(c))}">${esc(clientCode(c) ? `${clientCode(c)} - ${c.nome}` : c.nome)}</option>`).join('');
-  return `<div class="grid two quotes-page">
-    <div class="card">
+  const canEdit = canEditOperational();
+  const addCard = canEdit ? `<div class="card compact-form-card">
       <div class="card-head"><h3>Criar orçamento</h3><span class="muted">Depois podes gerar PDF e email.</span></div>
       <form id="quoteForm" class="form-grid">
         <select class="select span2" name="cliente" id="quoteClientSelect" required>
@@ -1016,14 +1075,17 @@ function orcamentos(){
         <textarea class="span3" name="observacoes" placeholder="Notas para o orçamento"></textarea>
         <div class="span3"><button class="btn primary" type="submit">Criar orçamento</button></div>
       </form>
-    </div>
+    </div>` : '';
+  return `<div class="grid ${canEdit ? 'two split-form-list' : 'single-list'} quotes-page">
+    ${addCard}
     <div class="card">
       <div class="card-head"><h3>Orçamentos</h3><span class="muted">${state.quotes.length} registos</span></div>
+      ${!canEdit ? '<div class="readonly-note">Modo leitura: podes consultar e enviar orçamento por email, mas não podes criar nem alterar estados.</div>' : ''}
       ${state.quotes.length ? quotesTable() : '<div class="empty">Ainda não existem orçamentos.</div>'}
     </div>
   </div>`;
 }
-function quotesTable(){ return `<div class="table-wrap"><table><thead><tr><th>ID</th><th>Cliente</th><th>Peça</th><th>Total</th><th>Estado</th><th>Ações</th></tr></thead><tbody>${state.quotes.map(q=>`<tr><td>${esc(q.id)}</td><td><strong>${esc(q.cliente)}</strong><br><span class="muted">${esc(q.email || '')}</span></td><td>${esc(q.peca)}<br><span class="muted">${esc(q.referencia || '')}</span></td><td>${money(q.total)}</td><td>${badge(q.estado)}</td><td><div class="actions"><button class="btn small" data-print-quote="${q.id}">PDF</button><button class="btn success small" data-email-quote="${q.id}">Email</button><button class="btn success small" data-quote-status="${q.id}:Aceite">Aceite</button><button class="btn warn small" data-quote-status="${q.id}:Recusado">Recusado</button>${canDelete()?`<button class="btn danger small" data-delete-quote="${q.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`; }
+function quotesTable(){ return `<div class="table-wrap"><table><thead><tr><th>ID</th><th>Cliente</th><th>Peça</th><th>Total</th><th>Estado</th><th>Ações</th></tr></thead><tbody>${state.quotes.map(q=>`<tr><td>${esc(q.id)}</td><td><strong>${esc(q.cliente)}</strong><br><span class="muted">${esc(q.email || '')}</span></td><td>${esc(q.peca)}<br><span class="muted">${esc(q.referencia || '')}</span></td><td>${money(q.total)}</td><td>${badge(q.estado)}</td><td><div class="actions"><button class="btn small" data-print-quote="${q.id}">PDF</button><button class="btn success small" data-email-quote="${q.id}">Email</button>${canEditOperational()?`<button class="btn success small" data-quote-status="${q.id}:Aceite">Aceite</button><button class="btn warn small" data-quote-status="${q.id}:Recusado">Recusado</button>`:''}${canDelete()?`<button class="btn danger small" data-delete-quote="${q.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`; }
 
 function agenda(){
   return `<div class="grid two"><div class="card"><div class="card-head"><h3>Novo follow-up</h3></div><form id="followForm" class="form-grid"><input class="field" type="date" name="date" value="${today()}"><input class="field" type="time" name="time"><input class="field" name="title" placeholder="Título"><input class="field span2" name="related" placeholder="Relacionado com"><select class="select" name="status"><option>Pendente</option><option>Feito</option></select><textarea class="span3" name="notes" placeholder="Notas"></textarea><div class="span3"><button class="btn primary">Guardar</button></div></form></div><div class="card"><div class="card-head"><h3>Agenda</h3></div>${entityTable(state.followups, ['date','time','title','related','status'], 'follow')}</div></div>`;
@@ -1044,13 +1106,14 @@ function topParts(){
   return `<div class="table-wrap"><table><thead><tr><th>Peça</th><th>Pedidos</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r[0])}</td><td>${r[1]}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function config(){
-  return `<div class="grid two"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="companyNif" placeholder="NIF" value="${esc(state.settings.companyNif || '')}"><input class="field span3" name="companyAddress" placeholder="Morada" value="${esc(state.settings.companyAddress || '')}"><input class="field" name="companyPhone" placeholder="Telefone empresa" value="${esc(state.settings.companyPhone || '')}"><input class="field" name="companyEmail" placeholder="Email empresa" value="${esc(state.settings.companyEmail || '')}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>Firebase</h3><span class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">Dados separados no Firestore por página: clientes, fornecedores, orçamentos, pedidos, agenda, stock, utilizadores, diretório de contactos e configurações.</p><div class="actions"><button class="btn" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div></div>`;
+  return `<div class="grid two"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="companyNif" placeholder="NIF" value="${esc(state.settings.companyNif || '')}"><input class="field span3" name="companyAddress" placeholder="Morada" value="${esc(state.settings.companyAddress || '')}"><input class="field" name="companyPhone" placeholder="Telefone empresa" value="${esc(state.settings.companyPhone || '')}"><input class="field" name="companyEmail" placeholder="Email empresa" value="${esc(state.settings.companyEmail || '')}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><select class="select" name="theme"><option value="normal" ${currentTheme()==='normal'?'selected':''}>Tema normal</option><option value="dark" ${currentTheme()==='dark'?'selected':''}>Darkmode</option></select><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>Firebase</h3><span class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">Dados separados no Firestore por página: clientes, fornecedores, orçamentos, pedidos, agenda, stock, utilizadores, diretório de contactos e configurações.</p><div class="actions"><button class="btn" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div></div>`;
 }
 
 function bindPage(id){
   qsa('[data-go]').forEach(b=>b.addEventListener('click',()=>goPage(b.dataset.go)));
   qsa('[data-page-card]').forEach(b=>b.addEventListener('click',()=>goPage(b.dataset.pageCard)));
   qsa('[data-client-detail]').forEach(b=>b.addEventListener('click',()=>openClientDetail(b.dataset.clientDetail)));
+  qsa('[data-client-email]').forEach(b=>b.addEventListener('click',()=>emailClient(b.dataset.clientEmail)));
   const globalSearch = qs('#globalSearch');
   if(globalSearch) globalSearch.addEventListener('input',()=>{ qs('#globalSearchResults').innerHTML = globalSearchResults(globalSearch.value); bindGlobalResults(); });
   const clientSearch = qs('#clientSearch');
@@ -1301,12 +1364,12 @@ function bindFollowForm(){
   qs('#followForm').addEventListener('submit',e=>{ e.preventDefault(); state.followups.push({id:uid('AGE'),...Object.fromEntries(new FormData(e.target).entries())}); saveState(); renderPage('agenda'); toast('Follow-up guardado.'); });
 }
 function bindConfig(){
-  qs('#settingsForm').addEventListener('submit',e=>{ e.preventDefault(); const fd=new FormData(e.target); state.settings={ companyName:fd.get('companyName'), companyNif:fd.get('companyNif'), companyAddress:fd.get('companyAddress'), companyPhone:fd.get('companyPhone'), companyEmail:fd.get('companyEmail'), dailyBackupHour:fd.get('dailyBackupHour'), githubUrl:fd.get('githubUrl'), firebaseEnabled:firebaseReady}; saveState(); toast('Configurações guardadas.'); renderPage('config'); });
+  qs('#settingsForm').addEventListener('submit',e=>{ e.preventDefault(); const fd=new FormData(e.target); state.settings={ companyName:fd.get('companyName'), companyNif:fd.get('companyNif'), companyAddress:fd.get('companyAddress'), companyPhone:fd.get('companyPhone'), companyEmail:fd.get('companyEmail'), dailyBackupHour:fd.get('dailyBackupHour'), theme:fd.get('theme') || 'normal', githubUrl:fd.get('githubUrl'), firebaseEnabled:firebaseReady}; saveState(); applyTheme(); toast('Configurações guardadas.'); renderPage('config'); });
   qs('#syncFirebaseBtn').addEventListener('click',async()=>{ await pushCloudState(); toast(firebaseReady ? 'Sincronizado com Firebase.' : 'Firebase indisponível.'); renderPage('config'); });
   qs('#exportJsonBtn').addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='autoparts-callcenter-export.json'; a.click(); URL.revokeObjectURL(a.href); });
   qs('#resetDemoBtn').addEventListener('click',()=>{ const currentUser = state.currentUser; localStorage.removeItem(STORAGE_KEY); state=seedData(); state.currentUser=currentUser; saveState(); toast('Demo reposta.'); setTimeout(()=>goPage('dashboard'), 250); });
 }
-function openModal(title, html){ qs('#modalRoot').innerHTML = `<div class="modal"><div class="modal-head"><h3>${title}</h3><button class="btn danger-soft small" id="closeModalBtn">Fechar</button></div>${html}</div>`; qs('#modalRoot').classList.remove('hidden'); qs('#closeModalBtn').addEventListener('click',closeModal); }
+function openModal(title, html){ qs('#modalRoot').innerHTML = `<div class="modal"><div class="modal-head"><h3>${title}</h3><button class="btn danger-soft small" id="closeModalBtn">Fechar</button></div>${html}</div>`; qs('#modalRoot').classList.remove('hidden'); qs('#closeModalBtn').addEventListener('click',closeModal); qsa('#modalRoot [data-client-email]').forEach(b=>b.addEventListener('click',()=>emailClient(b.dataset.clientEmail))); }
 function closeModal(){ qs('#modalRoot').classList.add('hidden'); qs('#modalRoot').innerHTML=''; }
 
 document.addEventListener('DOMContentLoaded', init);
