@@ -1,4 +1,4 @@
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.7.0';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
@@ -992,7 +992,7 @@ function contactSectionView(group){
     </button>
     <div class="section-body ${group.aberto ? '' : 'hidden'}">
       <div class="section-actions">
-        ${canEditOperational()?`<button class="btn small" data-edit-contact-section="${group.id}">Editar secção</button>`:''}
+        ${canEditOperational()?`<button class="btn primary small" data-add-contact-section="${group.id}">+ Contacto</button><button class="btn small" data-edit-contact-section="${group.id}">Editar secção</button>`:''}
         ${canDelete()?`<button class="btn danger small" data-delete-contact-group="${group.id}">Apagar secção</button>`:''}
       </div>
       ${contactsCards(group)}
@@ -1660,6 +1660,52 @@ function upsertClient(nome, telefone, email){
   const exists = state.clients.find(c=>c.nome.toLowerCase()===nome.toLowerCase() || (telefone && c.telefone===telefone));
   if(!exists) state.clients.push({id:uid('CLI'), codigoCliente:`CLI-${String(state.clients.length + 1).padStart(3,'0')}`, nome, telefone, email, notas:''});
 }
+
+function openQuickContactModal(groupId){
+  if(!canEditOperational()) return toast('Sem permissão para alterar contactos.');
+  normalizeContactDirectory();
+  const group = (state.contactGroups || []).find(g=>g.id===groupId);
+  if(!group) return toast('Secção não encontrada.');
+  openModal(`Adicionar contacto · ${esc(contactWarehouse(group))} / ${esc(contactSection(group))}`, `
+    <form id="sectionQuickContactForm" class="form-grid quick-contact-modal">
+      <input class="field span3" name="nome" placeholder="Nome do contacto" required autofocus>
+      <input class="field" name="telemovel" placeholder="Telemóvel">
+      <input class="field" name="telefone" placeholder="Telefone fixo">
+      <input class="field" name="email" type="email" placeholder="Email">
+      <div class="span3 actions quick-modal-actions">
+        <button class="btn primary" type="submit">Guardar e adicionar outro</button>
+        <button class="btn success" type="button" id="saveContactCloseBtn">Guardar e fechar</button>
+      </div>
+    </form>
+  `);
+  const form = qs('#sectionQuickContactForm');
+  const addContact = (closeAfter=false) => {
+    const data = Object.fromEntries(new FormData(form).entries());
+    if(!data.nome?.trim()) return toast('Mete o nome do contacto.');
+    group.contactos = group.contactos || [];
+    group.contactos.push({
+      id:uid('CNT'),
+      nome:(data.nome || '').trim(),
+      telemovel:(data.telemovel || '').trim(),
+      telefone:(data.telefone || '').trim(),
+      email:(data.email || '').trim()
+    });
+    group.aberto = true;
+    saveState();
+    if(closeAfter){
+      closeModal();
+      renderPage('contactos');
+      toast('Contacto adicionado.');
+      return;
+    }
+    form.reset();
+    form.querySelector('[name="nome"]')?.focus();
+    toast('Contacto adicionado. Podes adicionar outro.');
+  };
+  form.addEventListener('submit', e=>{ e.preventDefault(); addContact(false); });
+  qs('#saveContactCloseBtn')?.addEventListener('click',()=>addContact(true));
+}
+
 function bindContactDirectory(){
   const quickForm = qs('#quickContactForm');
   if(quickForm) quickForm.addEventListener('submit',e=>{
@@ -1694,6 +1740,8 @@ function bindContactDirectory(){
     group.aberto = !group.aberto;
     saveState(); renderPage('contactos');
   }));
+
+  qsa('[data-add-contact-section]').forEach(btn=>btn.addEventListener('click',()=>openQuickContactModal(btn.dataset.addContactSection)));
 
   qsa('[data-edit-contact-section]').forEach(btn=>btn.addEventListener('click',()=>{
     if(!canEditOperational()) return toast('Sem permissão para alterar contactos.');

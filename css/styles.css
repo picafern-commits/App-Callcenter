@@ -1077,3 +1077,351 @@ body.theme-dark .excel-toolbar-copy strong{color:var(--text)}
   .excel-toolbar{align-items:flex-start;flex-direction:column}
   .excel-toolbar-actions{justify-content:flex-start}
 }
+
+/* v1.6.1 - Diretório: adicionar contactos mais rápido */
+.section-actions{
+  justify-content:space-between;
+}
+.section-actions .btn.primary.small{
+  padding-inline:14px;
+}
+.quick-contact-modal{
+  grid-template-columns:1fr 1fr 1fr !important;
+}
+.quick-contact-modal .span3{
+  grid-column:1 / -1 !important;
+}
+.quick-modal-actions{
+  justify-content:flex-end;
+}
+@media(max-width:760px){
+  .quick-contact-modal{
+    grid-template-columns:1fr !important;
+  }
+}
+
+
+/* v1.7.0 - Refresh visual profissional */
+:root{
+  --page:#edf4fb;
+  --page2:#dbe8f5;
+  --page3:#cfe0f1;
+  --brand:#0b426f;
+  --brand2:#145c97;
+  --brand3:#183b5d;
+  --accent:#ee7f22;
+  --accent2:#ffb067;
+  --text:#163854;
+  --muted:#64809c;
+  --card:rgba(255,255,255,.82);
+  --card2:rgba(244,249,254,.90);
+  --line:#d3e0ec;
+  --shadow:0 18px 42px rgba(17,55,91,.12);
+  --radius:20px;
+}
+body{
+  background:
+    radial-gradient(circle at 12% 14%, rgba(20,92,151,.12), transparent 26%),
+    radial-gradient(circle at 88% 6%, rgba(238,127,34,.14), transparent 20%),
+    linear-gradient(180deg, var(--page), var(--page2) 55%, var(--page3));
+  color:var(--text);
+}
+body::-webkit-scrollbar,
+.content::-webkit-scrollbar,
+.nav-strip::-webkit-scrollbar{width:0;height:0}
+.app-shell{
+  background:transparent;
+  position:relative;
+  isolation:isolate;
+}
+.app-shell::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 0% 100%, rgba(20,92,151,.10), transparent 28%),
+    radial-gradient(circle at 100% 0%, rgba(238,127,34,.10), transparent 24%);
+  z-index:-1;
+}
+.shell-header,
+.nav-strip-wrap,
+.content{width:min(1360px,calc(100% - 40px));}
+.shell-header{
+  margin:18px auto 0;
+  padding:18px 22px;
+  border:1px solid rgba(255,255,255,.72);
+  border-radius:24px;
+  background:linear-gradient(180deg, rgba(255,255,255,.88), rgba(248,252,255,.74));
+  box-shadow:var(--shadow);
+  backdrop-filter:blur(14px);
+}
+.header-brand strong{font-size:24px}
+.header-copy h2{font-size:28px;color:var(--brand3)}
+.header-copy span{color:var(--muted);font-weight:800}
+.nav-strip-wrap{margin:14px auto 0}
+.nav-strip{gap:12px;padding:2px 2px 12px}
+.nav-btn{
+  border-radius:14px;
+  padding:12px 16px;
+  border:1px solid rgba(15,71,118,.08);
+  color:var(--brand3);
+  background:linear-gradient(180deg, rgba(255,255,255,.92), rgba(245,249,253,.84));
+  box-shadow:0 8px 20px rgba(18,61,98,.08);
+}
+.nav-btn.active{
+  color:#fff;
+  border-color:rgba(20,92,151,.16);
+  background:linear-gradient(135deg, var(--brand2), var(--brand));
+  box-shadow:0 14px 30px rgba(20,92,151,.20);
+}
+.nav-icon{font-size:18px}
+.brand-mark{
+  border-radius:24px;
+  border-width:0;
+  background:linear-gradient(135deg, var(--brand), var(--brand2));
+  box-shadow:0 16px 30px rgba(11,66,111,.22);
+}
+.brand-mark.small{border-radius:16px}
+.content{padding:10px 0 28px}
+.card,
+.login-card,
+.glass,
+.modal,
+.toolbar,
+.permission-block,
+.permission-user-row,
+.excel-toolbar,
+.permission-check,
+.directory-toggle,
+.section-toggle,
+.warehouse-block,
+.directory-section,
+.contact-card,
+.mini-metric,
+.search-result,
+.portal-kpis div{
+  border:1px solid rgba(255,255,255,.78);
+  background:linear-gradient(180deg, rgba(255,255,255,.88), rgba(247,250,253,.78));
+  box-shadow:var(--shadow);
+  backdrop-filter:blur(12px);
+}
+.card{
+  border-radius:20px;
+  padding:20px;
+}
+.card-head{margin-bottom:18px}
+.card h3{font-size:21px;letter-spacing:-.02em}
+.two{grid-template-columns:.78fr 1.22fr}
+.toolbar{
+  grid-template-columns:1fr 260px auto;
+  border-radius:16px;
+  padding:14px;
+}
+.field,.select,textarea,.login-card input{
+  border:1px solid #d8e3ed;
+  border-radius:12px;
+  background:rgba(255,255,255,.98);
+  min-height:46px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+}
+textarea{min-height:102px}
+.field:focus,.select:focus,textarea:focus,.login-card input:focus{
+  border-color:rgba(20,92,151,.45);
+  box-shadow:0 0 0 4px rgba(20,92,151,.12), inset 0 1px 0 rgba(255,255,255,.8);
+}
+.table-wrap{border-radius:16px;border-color:#dce6ef;box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}
+th{
+  background:linear-gradient(180deg, #1d659f, #0e4f82);
+  font-weight:900;
+  letter-spacing:.02em;
+}
+tr:nth-child(even) td{background:rgba(237,244,251,.62)}
+.btn{
+  min-height:44px;
+  border-radius:12px;
+  border:1px solid rgba(18,74,116,.10);
+  background:linear-gradient(180deg, rgba(255,255,255,.98), rgba(244,248,252,.92));
+  color:var(--brand3);
+  box-shadow:0 8px 18px rgba(17,55,91,.08);
+}
+.btn.primary{
+  color:#fff;
+  border-color:rgba(20,92,151,.32);
+  background:linear-gradient(135deg, var(--brand2), var(--brand));
+  box-shadow:0 14px 24px rgba(20,92,151,.22);
+}
+.btn.primary:hover{filter:brightness(1.04)}
+.btn.success{background:linear-gradient(180deg,#f3fff8,#e9fbf2);border-color:#b8e6cb}
+.btn.warn{background:linear-gradient(180deg,#fff8f0,#fff1e3);border-color:#ffd3a3}
+.btn.danger,.btn.danger-soft{background:linear-gradient(180deg,#fff6f4,#ffefed);border-color:#f8cfc8}
+.user-badge{
+  background:linear-gradient(180deg, rgba(255,255,255,.95), rgba(245,249,253,.84));
+  box-shadow:0 8px 18px rgba(17,55,91,.08);
+}
+/* Login */
+.login-screen{
+  background:
+    radial-gradient(circle at 15% 20%, rgba(20,92,151,.18), transparent 28%),
+    radial-gradient(circle at 86% 8%, rgba(238,127,34,.16), transparent 22%),
+    linear-gradient(180deg, #eef4fa, #dce8f4);
+}
+.login-card{
+  border-radius:28px;
+  background:linear-gradient(180deg, rgba(255,255,255,.90), rgba(248,252,255,.82));
+}
+.login-switch{display:flex;gap:8px;justify-content:center;margin-top:16px}
+.signup-panel{display:grid;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.signup-panel h3{margin:0;color:var(--brand3)}
+/* Dashboard */
+.dashboard-apps-only{
+  position:relative;
+  min-height:100%;
+  padding:36px 20px 24px;
+}
+.apps-center{
+  width:min(1040px,100%);
+  gap:28px;
+}
+.apps-title span{
+  padding:9px 16px;
+  border:none;
+  background:rgba(255,255,255,.78);
+  color:var(--brand2);
+  box-shadow:0 10px 20px rgba(17,55,91,.06);
+}
+.apps-title h1{
+  margin-top:14px;
+  color:var(--brand3);
+  font-size:42px;
+  letter-spacing:-.06em;
+}
+.apps-button-grid{gap:20px}
+.big-page-button{
+  min-height:168px;
+  border:1px solid rgba(255,255,255,.82);
+  border-radius:24px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.92), rgba(246,250,253,.84));
+  color:var(--brand3);
+  gap:14px;
+  box-shadow:0 18px 34px rgba(17,55,91,.12);
+}
+.big-page-button::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:radial-gradient(circle at top right, rgba(238,127,34,.10), transparent 28%);
+  opacity:1;
+}
+.big-page-button>*{position:relative}
+.big-page-button:hover{
+  transform:translateY(-4px);
+  box-shadow:0 24px 40px rgba(17,55,91,.16);
+  border-color:rgba(20,92,151,.18);
+}
+.big-page-icon{
+  width:64px;
+  height:64px;
+  border-radius:20px;
+  font-size:31px;
+  background:linear-gradient(135deg, rgba(20,92,151,.14), rgba(238,127,34,.12));
+  border:1px solid rgba(20,92,151,.10);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7);
+}
+.big-page-button strong{font-size:20px}
+.dashboard-user-corner{
+  top:12px;
+  right:6px;
+}
+.dashboard-user-chip{
+  border-radius:16px;
+  padding:8px 12px;
+  background:linear-gradient(180deg, rgba(255,255,255,.96), rgba(247,250,253,.88));
+  box-shadow:0 12px 24px rgba(17,55,91,.10);
+}
+.dashboard-user-avatar{
+  background:linear-gradient(135deg, var(--brand2), var(--brand));
+  box-shadow:0 10px 18px rgba(20,92,151,.18);
+}
+/* Diretório e secções */
+.contact-card,
+.contact-inline-form,
+.contact-quick-form,
+.directory-section,
+.warehouse-block{
+  border-radius:18px;
+}
+.contact-card-grid{gap:14px}
+.contact-card{
+  padding:16px;
+}
+/* Darkmode refinado */
+body.theme-dark{
+  --page:#091726;
+  --page2:#0d2033;
+  --page3:#10263d;
+  --brand:#7ec0ff;
+  --brand2:#43a1ff;
+  --brand3:#dbe9f5;
+  --text:#e8f3fb;
+  --muted:#9db5cb;
+  --line:#22364a;
+  --shadow:0 20px 40px rgba(0,0,0,.32);
+  background:
+    radial-gradient(circle at 10% 10%, rgba(67,161,255,.16), transparent 26%),
+    radial-gradient(circle at 90% 0%, rgba(238,127,34,.14), transparent 18%),
+    linear-gradient(180deg, var(--page), var(--page2) 58%, var(--page3));
+}
+body.theme-dark .shell-header,
+body.theme-dark .card,
+body.theme-dark .login-card,
+body.theme-dark .glass,
+body.theme-dark .modal,
+body.theme-dark .toolbar,
+body.theme-dark .permission-block,
+body.theme-dark .permission-user-row,
+body.theme-dark .excel-toolbar,
+body.theme-dark .permission-check,
+body.theme-dark .directory-toggle,
+body.theme-dark .section-toggle,
+body.theme-dark .warehouse-block,
+body.theme-dark .directory-section,
+body.theme-dark .contact-card,
+body.theme-dark .mini-metric,
+body.theme-dark .search-result,
+body.theme-dark .portal-kpis div,
+body.theme-dark .dashboard-user-chip,
+body.theme-dark .nav-btn,
+body.theme-dark .big-page-button{
+  border-color:rgba(255,255,255,.08);
+  background:linear-gradient(180deg, rgba(15,30,48,.90), rgba(11,24,38,.82));
+  color:var(--text);
+}
+body.theme-dark .field,
+body.theme-dark .select,
+body.theme-dark textarea,
+body.theme-dark .login-card input{
+  background:#0f2236;
+  border-color:#23384e;
+  color:var(--text);
+}
+body.theme-dark .user-badge,
+body.theme-dark .apps-title span{background:linear-gradient(180deg, rgba(15,30,48,.92), rgba(11,24,38,.82)); color:var(--text)}
+body.theme-dark th{background:linear-gradient(180deg,#145c97,#0a3d68)}
+body.theme-dark tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+body.theme-dark .btn{background:linear-gradient(180deg, rgba(19,39,62,.96), rgba(13,27,44,.88)); color:var(--text); border-color:#20374d; box-shadow:0 10px 20px rgba(0,0,0,.18)}
+body.theme-dark .btn.primary{background:linear-gradient(135deg, #145c97, #0b426f);}
+body.theme-dark .big-page-button::before{background:radial-gradient(circle at top right, rgba(238,127,34,.13), transparent 28%)}
+@media(max-width:1180px){
+  .shell-header,.nav-strip-wrap,.content{width:calc(100% - 28px)}
+  .two{grid-template-columns:1fr}
+}
+@media(max-width:760px){
+  .shell-header{padding:16px}
+  .toolbar{grid-template-columns:1fr}
+  .apps-title h1{font-size:32px}
+  .big-page-button{min-height:138px}
+}
+.big-page-button{position:relative;overflow:hidden}
+body.theme-dark .nav-btn.active{background:linear-gradient(135deg,#145c97,#0b426f);color:#fff}
