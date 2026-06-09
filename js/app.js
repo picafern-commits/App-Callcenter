@@ -1,4 +1,4 @@
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.8.1';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
@@ -1367,8 +1367,75 @@ function warehouseOrderSettingsCard(){
       </div>`).join('')}</div>` : '<div class="empty compact">Ainda não existem armazéns no Diretório.</div>'}
   </div>`;
 }
+
+function backupSummary(){
+  const latest = (state.backups || [])[0];
+  if(!latest) return 'Sem backups';
+  try { return new Date(latest.date).toLocaleString('pt-PT'); }
+  catch { return latest.date || 'Sem backups'; }
+}
+function appReadinessChecks(){
+  const users = state.users || [];
+  const adminMasters = users.filter(u => (u.role || '').toLowerCase() === 'admin master');
+  const hasCompany = !!(state.settings?.companyName && state.settings?.companyEmail && state.settings?.companyPhone);
+  const hasGithub = !!(state.settings?.githubUrl || '').trim();
+  const hasBackup = Array.isArray(state.backups) && state.backups.length > 0;
+  const hasContacts = contactCount() > 0;
+  const hasSuppliers = (state.suppliers || []).length > 0;
+  const hasClients = (state.clients || []).length > 0;
+  return [
+    { key:'company', label:'Dados da empresa preenchidos', ok:hasCompany, note: hasCompany ? 'Nome, email e telefone definidos.' : 'Preenche nome, email e telefone da empresa.' },
+    { key:'github', label:'GitHub Pages configurado', ok:hasGithub, note: hasGithub ? (state.settings.githubUrl || '') : 'Falta definir o URL GitHub Pages.' },
+    { key:'firebase', label:'Ligação Firebase pronta', ok:firebaseReady, note: firebaseReady ? 'Firebase disponível.' : 'Firebase indisponível neste momento.' },
+    { key:'admins', label:'Existe Admin Master ativo', ok:adminMasters.length > 0, note: adminMasters.length ? `${adminMasters.length} utilizador(es) Admin Master.` : 'Cria pelo menos um Admin Master.' },
+    { key:'backup', label:'Existe pelo menos um backup', ok:hasBackup, note: hasBackup ? `Último backup: ${backupSummary()}` : 'Cria um backup antes de ir para produção.' },
+    { key:'data', label:'Base mínima preenchida', ok:hasClients || hasSuppliers || hasContacts, note: `Clientes: ${(state.clients||[]).length} · Fornecedores: ${(state.suppliers||[]).length} · Contactos: ${contactCount()}` }
+  ];
+}
+function readinessScore(){
+  const checks = appReadinessChecks();
+  const ok = checks.filter(c=>c.ok).length;
+  return { ok, total: checks.length, percent: Math.round((ok / checks.length) * 100) };
+}
+function productionReadyCard(){
+  if(!isAdminMaster()) return '';
+  const score = readinessScore();
+  const productionMode = state.settings?.productionMode === true;
+  const checks = appReadinessChecks();
+  return `<div class="card span-all production-card">
+    <div class="card-head">
+      <div>
+        <h3>Deploy final / Produção</h3>
+        <span class="muted">Checklist final para publicar no GitHub/Electron e entregar aos utilizadores.</span>
+      </div>
+      <span class="badge ${productionMode ? 'green' : 'orange'}">${productionMode ? 'Modo produção ativo' : 'Modo produção inativo'}</span>
+    </div>
+    <div class="production-summary">
+      <div class="production-score">
+        <strong>${score.percent}%</strong>
+        <span>Pronto para deploy</span>
+      </div>
+      <div class="production-mini-grid">
+        <div><b>${(state.clients || []).length}</b><span>Clientes</span></div>
+        <div><b>${(state.suppliers || []).length}</b><span>Fornecedores</span></div>
+        <div><b>${contactCount()}</b><span>Contactos</span></div>
+        <div><b>${(state.quotes || []).length}</b><span>Orçamentos</span></div>
+      </div>
+    </div>
+    <div class="readiness-list">
+      ${checks.map(item=>`<div class="readiness-item ${item.ok ? 'ok' : 'warn'}"><div><strong>${item.ok ? '✓' : '•'} ${esc(item.label)}</strong><span>${esc(item.note)}</span></div><em>${item.ok ? 'OK' : 'A rever'}</em></div>`).join('')}
+    </div>
+    <div class="actions production-actions">
+      <button class="btn primary" id="validateProductionBtn" type="button">Atualizar checklist</button>
+      <button class="btn ${productionMode ? 'warn' : 'success'}" id="toggleProductionModeBtn" type="button">${productionMode ? 'Desativar modo produção' : 'Ativar modo produção'}</button>
+      <button class="btn" id="exportProductionReportBtn" type="button">Exportar relatório</button>
+      <button class="btn danger" id="cleanDemoDataBtn" type="button">Limpar dados demo</button>
+    </div>
+  </div>`;
+}
+
 function config(){
-  return `<div class="grid two config-page"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="companyNif" placeholder="NIF" value="${esc(state.settings.companyNif || '')}"><input class="field span3" name="companyAddress" placeholder="Morada" value="${esc(state.settings.companyAddress || '')}"><input class="field" name="companyPhone" placeholder="Telefone empresa" value="${esc(state.settings.companyPhone || '')}"><input class="field" name="companyEmail" placeholder="Email empresa" value="${esc(state.settings.companyEmail || '')}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><select class="select" name="theme"><option value="normal" ${currentTheme()==='normal'?'selected':''}>Tema normal</option><option value="dark" ${currentTheme()==='dark'?'selected':''}>Darkmode</option></select><label class="checkline span2 spellcheck-toggle"><input type="checkbox" name="spellcheckEnabled" ${spellcheckEnabled()?'checked':''}> Correção ortográfica ativa</label><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>Firebase</h3><span class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">Dados separados no Firestore por página: clientes, fornecedores, orçamentos, utilizadores, diretório de contactos e configurações.</p><div class="actions"><button class="btn" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div>${warehouseOrderSettingsCard()}${permissionsSettingsCard()}${actionPermissionsCard()}${auditCard()}${backupCard()}${presentationCard()}</div>`;
+  return `<div class="grid two config-page"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="companyNif" placeholder="NIF" value="${esc(state.settings.companyNif || '')}"><input class="field span3" name="companyAddress" placeholder="Morada" value="${esc(state.settings.companyAddress || '')}"><input class="field" name="companyPhone" placeholder="Telefone empresa" value="${esc(state.settings.companyPhone || '')}"><input class="field" name="companyEmail" placeholder="Email empresa" value="${esc(state.settings.companyEmail || '')}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><select class="select" name="theme"><option value="normal" ${currentTheme()==='normal'?'selected':''}>Tema normal</option><option value="dark" ${currentTheme()==='dark'?'selected':''}>Darkmode</option></select><label class="checkline span2 spellcheck-toggle"><input type="checkbox" name="spellcheckEnabled" ${spellcheckEnabled()?'checked':''}> Correção ortográfica ativa</label><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>Firebase</h3><span class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">Dados separados no Firestore por página: clientes, fornecedores, orçamentos, utilizadores, diretório de contactos e configurações.</p><div class="actions"><button class="btn" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div>${warehouseOrderSettingsCard()}${permissionsSettingsCard()}${actionPermissionsCard()}${auditCard()}${backupCard()}${productionReadyCard()}${presentationCard()}</div>`;
 }
 
 
@@ -2036,6 +2103,7 @@ function bindConfig(){
   bindActionPermissions();
   bindAuditControls();
   bindBackupControls();
+  bindProductionControls();
   bindPresentationControls();
   const syncBtn = qs('#syncFirebaseBtn');
   if(syncBtn) syncBtn.addEventListener('click',async()=>{ await pushCloudState(); toast(firebaseReady ? 'Sincronizado com Firebase.' : 'Firebase indisponível.'); renderPage('config'); });
@@ -2043,6 +2111,68 @@ function bindConfig(){
   if(exportBtn) exportBtn.addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='autoparts-callcenter-export.json'; a.click(); URL.revokeObjectURL(a.href); });
   const resetBtn = qs('#resetDemoBtn');
   if(resetBtn) resetBtn.addEventListener('click',()=>{ const currentUser = state.currentUser; localStorage.removeItem(STORAGE_KEY); state=seedData(); state.currentUser=currentUser; saveState(); toast('Demo reposta.'); setTimeout(()=>goPage('dashboard'), 250); });
+}
+
+
+function cleanDemoData(){
+  const keepUser = state.currentUser;
+  const keepSettings = { ...(state.settings || {}), productionMode:true };
+  const keepUsers = (state.users || []).map(u => ({ ...u }));
+  const keepBackups = Array.isArray(state.backups) ? [...state.backups] : [];
+  state = ensureStateShape({
+    ...seedData(),
+    currentUser: keepUser,
+    settings: { ...seedData().settings, ...keepSettings },
+    users: keepUsers.length ? keepUsers : seedData().users,
+    backups: keepBackups,
+    calls: [],
+    clients: [],
+    suppliers: [],
+    quotes: [],
+    followups: [],
+    stock: [],
+    contactGroups: []
+  });
+  saveState();
+}
+function exportProductionReport(){
+  const score = readinessScore();
+  const lines = [
+    `AutoParts CallCenter - Relatório de produção`,
+    `Versão: ${APP_VERSION}`,
+    `Data: ${new Date().toLocaleString('pt-PT')}`,
+    `Empresa: ${state.settings?.companyName || '-'}`,
+    `Produção ativa: ${state.settings?.productionMode === true ? 'Sim' : 'Não'}`,
+    `Pronto para deploy: ${score.percent}% (${score.ok}/${score.total})`,
+    '',
+    'Checklist:'
+  ];
+  appReadinessChecks().forEach(item => lines.push(`- [${item.ok ? 'OK' : 'A rever'}] ${item.label} — ${item.note}`));
+  lines.push('', 'Resumo de dados:');
+  lines.push(`- Clientes: ${(state.clients || []).length}`);
+  lines.push(`- Fornecedores: ${(state.suppliers || []).length}`);
+  lines.push(`- Contactos: ${contactCount()}`);
+  lines.push(`- Orçamentos: ${(state.quotes || []).length}`);
+  const blob = new Blob([lines.join('\n')], {type:'text/plain;charset=utf-8'});
+  downloadBlob(blob, `relatorio-producao-${today()}.txt`);
+}
+function bindProductionControls(){
+  qs('#validateProductionBtn')?.addEventListener('click',()=>{ renderPage('config'); toast('Checklist atualizada.'); });
+  qs('#toggleProductionModeBtn')?.addEventListener('click',()=>{
+    if(!isAdminMaster()) return toast('Só o Admin Master pode alterar isto.');
+    state.settings = { ...(state.settings || {}), productionMode: !(state.settings?.productionMode === true) };
+    saveState();
+    toast(state.settings.productionMode ? 'Modo produção ativado.' : 'Modo produção desativado.');
+    renderPage('config');
+  });
+  qs('#exportProductionReportBtn')?.addEventListener('click',()=>exportProductionReport());
+  qs('#cleanDemoDataBtn')?.addEventListener('click',()=>{
+    if(!isAdminMaster()) return toast('Só o Admin Master pode limpar dados demo.');
+    if(!confirm('Limpar os dados demo/operacionais atuais? Esta ação mantém utilizadores, configurações e backups.')) return;
+    cleanDemoData();
+    toast('Dados demo limpos.');
+    renderPage('config');
+  });
 }
 
 function openModal(title, html){ qs('#modalRoot').innerHTML = `<div class="modal"><div class="modal-head"><h3>${title}</h3><button class="btn danger-soft small" id="closeModalBtn">Fechar</button></div>${html}</div>`; qs('#modalRoot').classList.remove('hidden'); qs('#closeModalBtn').addEventListener('click',closeModal); qsa('#modalRoot [data-client-email]').forEach(b=>b.addEventListener('click',()=>emailClient(b.dataset.clientEmail))); applySpellcheckEnhancements(qs('#modalRoot')); }

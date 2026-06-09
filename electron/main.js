@@ -1,12 +1,14 @@
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, Menu } = require('electron');
 const path = require('path');
 
 const GITHUB_APP_URL = process.env.APP_URL || '';
+const startMaximized = process.env.START_MAXIMIZED !== '0';
+let mainWindow = null;
 
 function createWindow() {
-  const win = new BrowserWindow({
-    width: 1440,
-    height: 920,
+  mainWindow = new BrowserWindow({
+    width: 1480,
+    height: 940,
     minWidth: 1180,
     minHeight: 760,
     backgroundColor: '#edf4fb',
@@ -17,34 +19,53 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      spellcheck: true
+      spellcheck: true,
+      zoomFactor: 1.0
     }
   });
 
-  win.once('ready-to-show', () => {
-    win.show();
-    if (process.env.START_MAXIMIZED === '1') win.maximize();
+  Menu.setApplicationMenu(null);
+
+  mainWindow.once('ready-to-show', () => {
+    if (startMaximized) mainWindow.maximize();
+    mainWindow.show();
   });
 
   if (GITHUB_APP_URL) {
-    win.loadURL(GITHUB_APP_URL);
+    mainWindow.loadURL(GITHUB_APP_URL);
   } else {
-    win.loadFile(path.join(__dirname, '..', 'html', 'index.html'));
+    mainWindow.loadFile(path.join(__dirname, '..', 'html', 'index.html'));
   }
 
-  win.webContents.setWindowOpenHandler(({ url }) => {
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
   });
 }
 
 app.setName('AutoParts CallCenter');
-app.whenReady().then(() => {
-  createWindow();
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
   });
-});
+
+  app.whenReady().then(() => {
+    createWindow();
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
+  });
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
