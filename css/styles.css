@@ -1055,3 +1055,25 @@ body.theme-dark .dashboard-user-chip strong{
 .user-specific-grid{grid-template-columns:repeat(4,minmax(0,1fr));margin-top:0}
 @media(max-width:1180px){.permission-grid,.user-specific-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.permission-user-row{grid-template-columns:1fr}}
 @media(max-width:760px){.permission-grid,.user-specific-grid{grid-template-columns:1fr}}
+
+
+/* v1.6.0 - Importação / exportação Excel por página */
+.excel-toolbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  margin-bottom:14px;
+  padding:12px 14px;
+  border-left:4px solid var(--accent);
+}
+.excel-toolbar:before{display:none}
+.excel-toolbar-copy{display:grid;gap:3px;min-width:0}
+.excel-toolbar-copy strong{color:var(--brand3);font-size:15px}
+.excel-toolbar-copy span{color:var(--muted);font-weight:800;font-size:12px}
+.excel-toolbar-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+body.theme-dark .excel-toolbar-copy strong{color:var(--text)}
+@media(max-width:760px){
+  .excel-toolbar{align-items:flex-start;flex-direction:column}
+  .excel-toolbar-actions{justify-content:flex-start}
+}

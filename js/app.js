@@ -1,4 +1,4 @@
-const APP_VERSION = '1.5.9';
+const APP_VERSION = '1.6.0';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
@@ -685,7 +685,8 @@ function renderPage(id){
   qs('#pageSubtitle').textContent = meta.subtitle;
   qsa('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.page===id));
   const renderers = { dashboard, 'nova-chamada': novaChamada, pedidos, clientes, contactos, fornecedores, orcamentos, agenda, stock, relatorios, users, config };
-  qs('#pageContent').innerHTML = renderers[id]();
+  const pageBody = renderers[id]();
+  qs('#pageContent').innerHTML = `${excelToolbar(id)}${pageBody}`;
   bindPage(id);
   applySpellcheckEnhancements(qs('#pageContent'));
 }
@@ -1243,7 +1244,299 @@ function config(){
   return `<div class="grid two config-page"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="companyNif" placeholder="NIF" value="${esc(state.settings.companyNif || '')}"><input class="field span3" name="companyAddress" placeholder="Morada" value="${esc(state.settings.companyAddress || '')}"><input class="field" name="companyPhone" placeholder="Telefone empresa" value="${esc(state.settings.companyPhone || '')}"><input class="field" name="companyEmail" placeholder="Email empresa" value="${esc(state.settings.companyEmail || '')}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><select class="select" name="theme"><option value="normal" ${currentTheme()==='normal'?'selected':''}>Tema normal</option><option value="dark" ${currentTheme()==='dark'?'selected':''}>Darkmode</option></select><label class="checkline span2 spellcheck-toggle"><input type="checkbox" name="spellcheckEnabled" ${spellcheckEnabled()?'checked':''}> Correção ortográfica ativa</label><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>Firebase</h3><span class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">Dados separados no Firestore por página: clientes, fornecedores, orçamentos, utilizadores, diretório de contactos e configurações.</p><div class="actions"><button class="btn" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div>${permissionsSettingsCard()}</div>`;
 }
 
+
+/* Sistema Excel por página ------------------------------------------------- */
+function excelPageRegistry(){
+  return {
+    clientes: {
+      key:'clients', title:'Clientes', file:'clientes', prefix:'CLI', edit:()=>canEditOperational(),
+      fields:[
+        ['id','ID'], ['codigoCliente','Código Cliente'], ['nome','Nome'], ['telefone','Telefone'], ['email','Email'], ['notas','Notas']
+      ]
+    },
+    contactos: {
+      key:'contactGroups', title:'Diretório de Contactos', file:'diretorio-contactos', prefix:'DIR', edit:()=>canEditOperational(), flattened:true,
+      fields:[
+        ['groupId','ID Secção'], ['contactId','ID Contacto'], ['armazem','Armazém'], ['seccao','Secção'], ['nome','Nome'], ['telemovel','Telemóvel'], ['telefone','Telefone'], ['email','Email']
+      ]
+    },
+    fornecedores: {
+      key:'suppliers', title:'Fornecedores', file:'fornecedores', prefix:'FOR', edit:()=>canEditOperational(),
+      fields:[
+        ['id','ID'], ['nomeMarca','Nome Fornecedor'], ['codigoFicha','Número Referência']
+      ]
+    },
+    orcamentos: {
+      key:'quotes', title:'Orçamentos', file:'orcamentos', prefix:'ORC', edit:()=>canEditOperational(),
+      fields:[
+        ['id','ID'], ['createdAt','Data'], ['estado','Estado'], ['cliente','Cliente'], ['codigoCliente','Código Cliente'], ['telefone','Telefone'], ['email','Email'], ['viatura','Viatura'], ['peca','Peça'], ['referencia','Referência'], ['quantidade','Quantidade'], ['precoUnitario','Preço Unitário'], ['total','Total'], ['validade','Validade'], ['prazoEntrega','Prazo Entrega'], ['condicoes','Condições'], ['observacoes','Observações']
+      ]
+    },
+    users: {
+      key:'users', title:'Utilizadores', file:'utilizadores', prefix:'USR', edit:()=>isAdminMaster(),
+      fields:[
+        ['id','ID'], ['nome','Nome'], ['email','Email'], ['role','Role'], ['status','Estado']
+      ]
+    },
+    config: {
+      key:'settings', title:'Configurações', file:'configuracoes', prefix:'CFG', edit:()=>isAdminMaster(), single:true,
+      fields:[
+        ['companyName','Nome Empresa'], ['companyNif','NIF'], ['companyAddress','Morada'], ['companyPhone','Telefone Empresa'], ['companyEmail','Email Empresa'], ['githubUrl','URL GitHub Pages'], ['dailyBackupHour','Hora Backup'], ['theme','Tema'], ['spellcheckEnabled','Correção Ortográfica']
+      ]
+    }
+  };
+}
+function excelConfigForPage(pageId=currentPage){
+  return excelPageRegistry()[pageId] || null;
+}
+function excelToolbar(pageId){
+  const cfg = excelConfigForPage(pageId);
+  if(!cfg || pageId === 'dashboard') return '';
+  const canImport = Boolean(cfg.edit && cfg.edit());
+  return `<div class="excel-toolbar card">
+    <div class="excel-toolbar-copy">
+      <strong>Excel · ${esc(cfg.title)}</strong>
+      <span>Exporta os dados desta página ou importa uma folha Excel no mesmo formato.</span>
+    </div>
+    <div class="excel-toolbar-actions">
+      <button class="btn small" type="button" data-excel-template="${pageId}">Modelo Excel</button>
+      <button class="btn primary small" type="button" data-excel-export="${pageId}">Exportar Excel</button>
+      ${canImport ? `<button class="btn success small" type="button" data-excel-import="${pageId}">Importar Excel</button>` : ''}
+    </div>
+    <input class="hidden" type="file" id="excelImportInput" accept=".xlsx,.xls,.csv,.tsv,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+  </div>`;
+}
+function bindExcelTools(){
+  qsa('[data-excel-template]').forEach(b=>b.addEventListener('click',()=>exportPageExcel(b.dataset.excelTemplate, true)));
+  qsa('[data-excel-export]').forEach(b=>b.addEventListener('click',()=>exportPageExcel(b.dataset.excelExport, false)));
+  qsa('[data-excel-import]').forEach(b=>b.addEventListener('click',()=>{
+    const pageId = b.dataset.excelImport;
+    const input = qs('#excelImportInput');
+    if(!input) return;
+    input.value = '';
+    input.onchange = () => input.files?.[0] && importPageExcel(pageId, input.files[0]);
+    input.click();
+  }));
+}
+function normalizeExcelValue(v){
+  if(v === null || v === undefined) return '';
+  if(v instanceof Date) return v.toISOString().slice(0,10);
+  return String(v).trim();
+}
+function normalizeExcelHeader(v){
+  return normalizeExcelValue(v)
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,'')
+    .trim();
+}
+function excelHeaderMap(cfg){
+  const map = {};
+  cfg.fields.forEach(([key,label])=>{
+    map[normalizeExcelHeader(key)] = key;
+    map[normalizeExcelHeader(label)] = key;
+  });
+  return map;
+}
+function rowToExcelObject(row, cfg){
+  const obj = {};
+  cfg.fields.forEach(([key,label])=>{ obj[label] = row?.[key] ?? ''; });
+  return obj;
+}
+function excelRowsForPage(pageId, template=false){
+  const cfg = excelConfigForPage(pageId);
+  if(!cfg) return [];
+  if(template) return [rowToExcelObject(excelTemplateRow(cfg, pageId), cfg)];
+  if(cfg.single) return [rowToExcelObject(state[cfg.key] || {}, cfg)];
+  if(cfg.flattened && pageId === 'contactos') return flattenContactGroups().map(r=>rowToExcelObject(r,cfg));
+  return (state[cfg.key] || []).map(r=>rowToExcelObject(r,cfg));
+}
+function excelTemplateRow(cfg, pageId){
+  const samples = {
+    clientes:{ id:'', codigoCliente:'CLI-001', nome:'Nome do Cliente', telefone:'912345678', email:'cliente@email.pt', notas:'Notas do cliente' },
+    contactos:{ groupId:'', contactId:'', armazem:'Armazém Lisboa', seccao:'Peças', nome:'Nome Contacto', telemovel:'912345678', telefone:'213000000', email:'contacto@email.pt' },
+    fornecedores:{ id:'', nomeMarca:'Nome Fornecedor', codigoFicha:'FOR-001' },
+    orcamentos:{ id:'', createdAt:today(), estado:'Rascunho', cliente:'Nome Cliente', codigoCliente:'CLI-001', telefone:'912345678', email:'cliente@email.pt', viatura:'BMW 320d', peca:'Alternador', referencia:'REF-001', quantidade:'1', precoUnitario:'100', total:'100', validade:today(), prazoEntrega:'A confirmar', condicoes:'Condições', observacoes:'Observações' },
+    users:{ id:'', nome:'Nome Utilizador', email:'user@email.pt', role:'Operador', status:'Ativo' },
+    config:{ ...(state.settings || {}) }
+  };
+  return samples[pageId] || {};
+}
+function flattenContactGroups(){
+  return (state.contactGroups || []).flatMap(g => (g.contactos || []).map(c => ({
+    groupId:g.id || '',
+    contactId:c.id || '',
+    armazem:g.armazem || g.local || '',
+    seccao:g.seccao || g.nome || '',
+    nome:c.nome || '',
+    telemovel:c.telemovel || '',
+    telefone:c.telefone || '',
+    email:c.email || ''
+  })));
+}
+function safeSheetName(name){
+  return String(name || 'Dados').replace(/[\\/?*\[\]:]/g,'').slice(0,31) || 'Dados';
+}
+function downloadBlob(blob, filename){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1200);
+}
+function exportPageExcel(pageId=currentPage, template=false){
+  const cfg = excelConfigForPage(pageId);
+  if(!cfg) return toast('Esta página não tem exportação Excel.');
+  const rows = excelRowsForPage(pageId, template);
+  const filename = `${cfg.file}-${template ? 'modelo' : 'export'}-${today()}.xlsx`;
+  try {
+    if(window.XLSX){
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(rows, { header: cfg.fields.map(f=>f[1]) });
+      ws['!cols'] = cfg.fields.map(([key,label]) => ({ wch: Math.min(Math.max(label.length + 4, 14), 32) }));
+      XLSX.utils.book_append_sheet(wb, ws, safeSheetName(cfg.title));
+      XLSX.writeFile(wb, filename);
+    } else {
+      exportPageExcelFallback(cfg, rows, filename.replace(/\.xlsx$/i,'.xls'));
+    }
+    toast(template ? 'Modelo Excel exportado.' : 'Excel exportado.');
+  } catch(err){
+    console.error(err);
+    exportPageExcelFallback(cfg, rows, filename.replace(/\.xlsx$/i,'.xls'));
+    toast('Exportado em formato Excel compatível.');
+  }
+}
+function exportPageExcelFallback(cfg, rows, filename){
+  const headers = cfg.fields.map(f=>f[1]);
+  const html = `<!doctype html><html><head><meta charset="utf-8"></head><body><table><thead><tr>${headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${headers.map(h=>`<td>${esc(row[h] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`;
+  downloadBlob(new Blob([html], { type:'application/vnd.ms-excel;charset=utf-8' }), filename);
+}
+async function importPageExcel(pageId, file){
+  const cfg = excelConfigForPage(pageId);
+  if(!cfg) return toast('Esta página não tem importação Excel.');
+  if(!cfg.edit || !cfg.edit()) return toast('Sem permissão para importar nesta página.');
+  try {
+    const rows = await readExcelRows(file);
+    if(!rows.length) return toast('O ficheiro não tem linhas para importar.');
+    const normalized = normalizeImportedRows(rows, cfg);
+    const count = applyImportedRows(pageId, cfg, normalized);
+    saveState();
+    renderPage(pageId);
+    toast(`${count} linha(s) importada(s) do Excel.`);
+  } catch(err){
+    console.error(err);
+    toast(err?.message || 'Não consegui importar esse ficheiro Excel.');
+  }
+}
+async function readExcelRows(file){
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if(window.XLSX){
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type:'array', cellDates:true });
+    const first = wb.SheetNames[0];
+    if(!first) return [];
+    return XLSX.utils.sheet_to_json(wb.Sheets[first], { defval:'', raw:false });
+  }
+  if(['csv','tsv','txt'].includes(ext)){
+    const text = await file.text();
+    return parseDelimitedText(text, ext === 'tsv' ? '\t' : guessDelimiter(text));
+  }
+  throw new Error('Para importar .xlsx/.xls, a biblioteca Excel precisa de estar carregada. Em GitHub Pages com internet isto funciona automaticamente. Podes também importar CSV.');
+}
+function guessDelimiter(text){
+  const first = text.split(/\r?\n/)[0] || '';
+  return (first.match(/;/g)||[]).length >= (first.match(/,/g)||[]).length ? ';' : ',';
+}
+function parseDelimitedText(text, delimiter=','){
+  const lines = text.split(/\r?\n/).filter(l=>l.trim());
+  if(!lines.length) return [];
+  const headers = splitCsvLine(lines.shift(), delimiter);
+  return lines.map(line=>{
+    const values = splitCsvLine(line, delimiter);
+    const obj = {};
+    headers.forEach((h,i)=>obj[h]=values[i] ?? '');
+    return obj;
+  });
+}
+function splitCsvLine(line, delimiter){
+  const out = [];
+  let cur = '', quoted = false;
+  for(let i=0;i<line.length;i++){
+    const ch = line[i];
+    if(ch === '"'){
+      if(quoted && line[i+1] === '"'){ cur += '"'; i++; }
+      else quoted = !quoted;
+    } else if(ch === delimiter && !quoted){
+      out.push(cur); cur = '';
+    } else cur += ch;
+  }
+  out.push(cur);
+  return out.map(v=>v.trim());
+}
+function normalizeImportedRows(rows, cfg){
+  const map = excelHeaderMap(cfg);
+  return rows.map(row=>{
+    const obj = {};
+    Object.entries(row).forEach(([header,value])=>{
+      const key = map[normalizeExcelHeader(header)];
+      if(key) obj[key] = normalizeExcelValue(value);
+    });
+    return obj;
+  }).filter(row => Object.values(row).some(v => normalizeExcelValue(v) !== ''));
+}
+function applyImportedRows(pageId, cfg, rows){
+  if(pageId === 'contactos') return importContactRows(rows);
+  if(cfg.single){
+    state[cfg.key] = { ...(state[cfg.key] || {}), ...(rows[0] || {}) };
+    return rows.length ? 1 : 0;
+  }
+  const target = state[cfg.key] = state[cfg.key] || [];
+  rows.forEach(row=>{
+    if(!row.id) row.id = uid(cfg.prefix || 'ROW');
+    if(pageId === 'orcamentos'){
+      row.quantidade = Number(row.quantidade || 0);
+      row.precoUnitario = Number(String(row.precoUnitario || '0').replace(',','.'));
+      row.total = Number(String(row.total || (row.quantidade * row.precoUnitario) || '0').replace(',','.'));
+    }
+    if(pageId === 'users') row.pageAccess = target.find(u=>u.id===row.id || (u.email && u.email === row.email))?.pageAccess || row.pageAccess || {};
+    const index = target.findIndex(existing => (row.id && existing.id === row.id) || uniqueExcelMatch(pageId, existing, row));
+    if(index >= 0) target[index] = { ...target[index], ...row };
+    else target.push(row);
+  });
+  return rows.length;
+}
+function uniqueExcelMatch(pageId, existing, row){
+  if(pageId === 'clientes') return row.email && existing.email === row.email || row.telefone && existing.telefone === row.telefone || row.codigoCliente && existing.codigoCliente === row.codigoCliente;
+  if(pageId === 'fornecedores') return row.codigoFicha && existing.codigoFicha === row.codigoFicha;
+  if(pageId === 'users') return row.email && existing.email === row.email;
+  if(pageId === 'orcamentos') return false;
+  return false;
+}
+function importContactRows(rows){
+  state.contactGroups = state.contactGroups || [];
+  rows.forEach(row=>{
+    const armazem = row.armazem || 'Sem armazém';
+    const seccao = row.seccao || 'Geral';
+    let group = state.contactGroups.find(g => (row.groupId && g.id === row.groupId) || (normalizeText(g.armazem) === normalizeText(armazem) && normalizeText(g.seccao || g.nome) === normalizeText(seccao)));
+    if(!group){
+      group = { id: row.groupId || uid('DIR'), armazem, seccao, nome:seccao, aberto:true, contactos:[] };
+      state.contactGroups.push(group);
+    }
+    group.armazem = armazem;
+    group.seccao = seccao;
+    group.nome = seccao;
+    group.contactos = group.contactos || [];
+    const contact = { id: row.contactId || uid('CNT'), nome: row.nome || '', telemovel: row.telemovel || '', telefone: row.telefone || '', email: row.email || '' };
+    const index = group.contactos.findIndex(c => (row.contactId && c.id === row.contactId) || (contact.email && c.email === contact.email) || (contact.nome && normalizeText(c.nome) === normalizeText(contact.nome)));
+    if(index >= 0) group.contactos[index] = { ...group.contactos[index], ...contact };
+    else group.contactos.push(contact);
+  });
+  return rows.length;
+}
+
 function bindPage(id){
+  bindExcelTools();
   qsa('[data-go]').forEach(b=>b.addEventListener('click',()=>goPage(b.dataset.go)));
   qsa('[data-page-card]').forEach(b=>b.addEventListener('click',()=>goPage(b.dataset.pageCard)));
   const dashboardLogout = qs('#dashboardLogoutBtn');
