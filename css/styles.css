@@ -2536,3 +2536,111 @@ body.res-auto .big-page-button{
   body.res-auto .btn{min-height:38px!important;padding-block:8px!important;}
   body.res-auto .field, body.res-auto .select{min-height:38px!important;padding-block:8px!important;}
 }
+
+
+/* v1.9.6 - Electron mais compacto */
+html.electron-mode,
+body.electron-mode{
+  font-size:13px!important;
+}
+body.electron-mode .shell-header,
+body.electron-mode.res-compact .shell-header,
+body.electron-mode.res-wide .shell-header,
+body.electron-mode.res-large .shell-header{
+  min-height:52px!important;
+  padding:8px 12px!important;
+  margin-top:6px!important;
+  border-radius:16px!important;
+}
+body.electron-mode .header-brand .brand-mark.small{
+  width:36px!important;
+  height:36px!important;
+  border-radius:12px!important;
+  font-size:13px!important;
+}
+body.electron-mode .header-brand strong{font-size:17px!important;}
+body.electron-mode .header-brand span{font-size:9px!important;}
+body.electron-mode .header-copy h2{font-size:18px!important;}
+body.electron-mode .header-copy span{font-size:11px!important;}
+body.electron-mode .top-actions .btn,
+body.electron-mode .user-badge{
+  min-height:34px!important;
+  padding:7px 10px!important;
+  font-size:12px!important;
+}
+body.electron-mode .nav-strip-wrap{
+  margin-top:6px!important;
+}
+body.electron-mode .nav-strip{
+  gap:6px!important;
+  padding-bottom:6px!important;
+}
+body.electron-mode .nav-btn,
+body.electron-mode.res-compact .nav-btn,
+body.electron-mode.res-wide .nav-btn,
+body.electron-mode.res-large .nav-btn{
+  padding:7px 9px!important;
+  font-size:12px!important;
+  border-radius:10px!important;
+}
+body.electron-mode .nav-icon{font-size:14px!important;}
+body.electron-mode .content{
+  height:calc(100dvh - 112px)!important;
+  padding-top:4px!important;
+  padding-bottom:8px!important;
+}
+body.electron-mode .card,
+body.electron-mode.res-compact .card,
+body.electron-mode.res-wide .card,
+body.electron-mode.res-large .card{
+  padding:12px!important;
+  border-radius:14px!important;
+}
+body.electron-mode .card-head{margin-bottom:10px!important;}
+body.electron-mode .card h3{font-size:16px!important;}
+body.electron-mode .field,
+body.electron-mode .select,
+body.electron-mode textarea,
+body.electron-mode.res-compact .field,
+body.electron-mode.res-compact .select,
+body.electron-mode.res-compact textarea{
+  min-height:34px!important;
+  padding:7px 9px!important;
+  font-size:12px!important;
+  border-radius:9px!important;
+}
+body.electron-mode textarea{min-height:70px!important;}
+body.electron-mode .btn,
+body.electron-mode.res-compact .btn,
+body.electron-mode.res-wide .btn,
+body.electron-mode.res-large .btn{
+  min-height:34px!important;
+  padding:7px 9px!important;
+  font-size:12px!important;
+  border-radius:9px!important;
+}
+body.electron-mode .table-wrap th,
+body.electron-mode .table-wrap td{
+  padding:8px 9px!important;
+  font-size:12px!important;
+}
+body.electron-mode .grid{gap:10px!important;}
+body.electron-mode .toolbar{padding:10px!important;gap:8px!important;}
+body.electron-mode .apps-title h1{font-size:28px!important;}
+body.electron-mode .apps-center{width:min(980px,calc(100vw - 32px))!important;gap:16px!important;}
+body.electron-mode .apps-button-grid{gap:12px!important;}
+body.electron-mode .big-page-button{
+  min-height:122px!important;
+  border-radius:18px!important;
+  gap:9px!important;
+}
+body.electron-mode .big-page-icon{
+  width:48px!important;
+  height:48px!important;
+  border-radius:15px!important;
+  font-size:24px!important;
+}
+body.electron-mode .big-page-button strong{font-size:15px!important;}
+@media(max-width:1180px){
+  body.electron-mode .content{height:calc(100dvh - 126px)!important;}
+}

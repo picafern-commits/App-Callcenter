@@ -1,4 +1,4 @@
-const APP_VERSION = '1.9.5';
+const APP_VERSION = '1.9.7';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -432,12 +432,24 @@ function currentTheme(){
   if(localTheme) return localTheme;
   return state.settings?.theme === 'dark' ? 'dark' : 'normal';
 }
+function isElectronMode(){
+  try {
+    return /Electron/i.test(navigator.userAgent || '') || new URLSearchParams(window.location.search || '').get('electron') === '1';
+  } catch {
+    return /Electron/i.test(navigator.userAgent || '');
+  }
+}
 function getLocalResolution(){
   const value = localStorage.getItem(RESOLUTION_KEY);
   return ['auto','compact','standard','wide','large'].includes(value) ? value : '';
 }
 function currentResolution(){
-  return getLocalResolution() || state.settings?.resolution || 'auto';
+  const local = getLocalResolution();
+  if(local) return local;
+  // No Electron a app estava a ficar demasiado grande.
+  // Sem preferência guardada, usamos Compacto por defeito no Electron.
+  if(isElectronMode()) return 'compact';
+  return state.settings?.resolution || 'auto';
 }
 function effectiveResolution(){
   const selected = currentResolution();
@@ -486,6 +498,8 @@ function applyTheme(){
   document.documentElement.classList.toggle('theme-dark', dark);
   document.body.classList.toggle('theme-dark', dark);
   document.body.classList.toggle('admin-master', isAdminMaster());
+  document.documentElement.classList.toggle('electron-mode', isElectronMode());
+  document.body.classList.toggle('electron-mode', isElectronMode());
   document.documentElement.classList.toggle('res-auto', resolution === 'auto');
   document.body.classList.toggle('res-auto', resolution === 'auto');
   ['compact','standard','wide','large'].forEach(v=>{ document.documentElement.classList.toggle(`res-${v}`, resolvedResolution===v); document.body.classList.toggle(`res-${v}`, resolvedResolution===v); });
