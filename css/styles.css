@@ -1425,3 +1425,51 @@ body.theme-dark .big-page-button::before{background:radial-gradient(circle at to
 }
 .big-page-button{position:relative;overflow:hidden}
 body.theme-dark .nav-btn.active{background:linear-gradient(135deg,#145c97,#0b426f);color:#fff}
+
+
+/* v1.7.1 - Ordem dos armazéns e fornecedores A-Z */
+.config-page .span-all{grid-column:1 / -1;}
+.warehouse-order-card .card-head{align-items:flex-start;}
+.warehouse-order-list{display:grid;gap:10px;}
+.warehouse-order-row{
+  display:grid;
+  grid-template-columns:46px 1fr auto;
+  align-items:center;
+  gap:12px;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:rgba(255,255,255,.72);
+}
+.warehouse-order-rank{
+  width:36px;height:36px;border-radius:12px;
+  display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--brand2),var(--brand));
+  color:#fff;font-weight:1000;
+}
+.warehouse-order-row strong{color:var(--brand3);font-size:15px;}
+.warehouse-order-row .btn:disabled{opacity:.38;cursor:not-allowed;transform:none;filter:none;}
+body.theme-dark .warehouse-order-row{
+  border-color:rgba(255,255,255,.08);
+  background:rgba(255,255,255,.04);
+}
+body.theme-dark .warehouse-order-row strong{color:var(--text);}
+@media(max-width:760px){
+  .warehouse-order-row{grid-template-columns:40px 1fr;}
+  .warehouse-order-row .actions{grid-column:1 / -1;justify-content:flex-end;}
+}
+
+
+/* v1.8.0 - Sistemas avançados */
+.global-search-wrap{position:relative;min-width:min(360px,32vw);}
+.global-search-input{width:100%;min-height:42px;padding-left:14px;}
+.global-search-results{position:absolute;left:0;right:0;top:calc(100% + 8px);z-index:35;display:grid;gap:8px;max-height:360px;overflow:auto;}
+.global-search-results:empty{display:none;}
+.global-search-results .search-result{width:100%;text-align:left;border-radius:14px;border:1px solid var(--line);padding:12px;background:rgba(255,255,255,.96);box-shadow:var(--shadow);}
+.global-search-results .search-result strong{display:block;color:var(--brand3)}
+.global-search-results .search-result span{display:block;color:var(--muted);font-size:12px;margin-top:4px}
+.audit-card .table-wrap table{min-width:760px}.audit-actions{margin-bottom:14px}.span-all{grid-column:1/-1}.backup-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}.backup-panel{border:1px solid var(--line);border-radius:16px;padding:16px;background:rgba(255,255,255,.52)}.backup-panel h4{margin:0 0 8px;color:var(--brand3)}.backup-list{display:grid;gap:10px}.backup-row{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.62);padding:12px}.backup-row strong{display:block;color:var(--brand3)}.backup-row span{display:block;color:var(--muted);font-size:12px;margin-top:3px}.tv-mode-panel{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.tv-mode-panel div{border-radius:22px;padding:24px;text-align:center;background:linear-gradient(135deg,var(--brand2),var(--brand));color:white;box-shadow:var(--shadow)}.tv-mode-panel strong{display:block;font-size:42px}.tv-mode-panel span{display:block;margin-top:8px;font-weight:900}.tv-note{text-align:center;margin-top:16px}.contact-actions .btn{min-height:36px}.contact-card .copy-actions{margin-top:10px}
+body.theme-dark .backup-panel,body.theme-dark .backup-row,body.theme-dark .global-search-results .search-result{background:linear-gradient(180deg, rgba(15,30,48,.90), rgba(11,24,38,.82));border-color:rgba(255,255,255,.10)}
+body.theme-dark .backup-panel h4,body.theme-dark .backup-row strong,body.theme-dark .global-search-results .search-result strong{color:var(--text)}
+@media(max-width:1100px){.global-search-wrap{min-width:100%;grid-column:1/-1}.shell-header{grid-template-columns:1fr auto}.header-copy{grid-column:1/-1}.backup-grid,.tv-mode-panel{grid-template-columns:1fr 1fr}}
+@media(max-width:760px){.backup-grid,.tv-mode-panel{grid-template-columns:1fr}.backup-row{align-items:flex-start;flex-direction:column}.global-search-wrap{min-width:100%}}

@@ -1,4 +1,4 @@
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.8.0';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
@@ -13,7 +13,9 @@ const FIREBASE_COLLECTIONS = {
   followups: 'agenda',
   stock: 'stock',
   users: 'utilizadores',
-  contactGroups: 'diretorioContactos'
+  contactGroups: 'diretorioContactos',
+  auditLogs: 'auditoria',
+  backups: 'backups'
 };
 const firebaseConfig = {
   apiKey: "AIzaSyDlSqa8bPMGmYMgla-vn7j73eJyp0_eVJI",
@@ -86,7 +88,12 @@ function seedData() {
         contactos: true,
         fornecedores: true,
         orcamentos: true
-      }
+      },
+      operatorActionAccess: {
+        view: true, add: false, edit: false, delete: false, importExcel: false, exportExcel: true
+      },
+      backupEnabled: true,
+      lastAutoBackupDate: ''
     },
     currentUser: null,
     calls: [
@@ -109,9 +116,11 @@ function seedData() {
       { id: uid('STK'), referencia:'ALT-BMW-F30', nome:'Alternador BMW Série 3 F30', marca:'BMW', modelo:'320d', estado:'Recondicionada', local:'Prateleira A2', custo:110, venda:190, qtd:1 }
     ],
     users: [
-      { id: uid('USR'), nome:'Ricardo', email:'pica.fern@gmail.com', role:'Admin Master', status:'Ativo', pageAccess:{} },
-      { id: uid('USR'), nome:'Operador 1', email:'operador@empresa.pt', role:'Operador', status:'Ativo', pageAccess:{} }
+      { id: uid('USR'), nome:'Ricardo', email:'pica.fern@gmail.com', role:'Admin Master', status:'Ativo', pageAccess:{}, actionAccess:{} },
+      { id: uid('USR'), nome:'Operador 1', email:'operador@empresa.pt', role:'Operador', status:'Ativo', pageAccess:{}, actionAccess:{} }
     ],
+    auditLogs: [],
+    backups: [],
     contactGroups: [
       {
         id: uid('DIR'),
@@ -141,11 +150,24 @@ function seedData() {
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return seedData();
-    return { ...seedData(), ...JSON.parse(raw) };
+    const base = seedData();
+    if (!raw) return ensureStateShape(base);
+    return ensureStateShape({ ...base, ...JSON.parse(raw) });
   } catch {
-    return seedData();
+    return ensureStateShape(seedData());
   }
+}
+function ensureStateShape(appState){
+  const base = seedData();
+  appState.settings = { ...base.settings, ...(appState.settings || {}) };
+  appState.settings.operatorPageAccess = { ...base.settings.operatorPageAccess, ...(appState.settings.operatorPageAccess || {}) };
+  appState.settings.operatorActionAccess = { ...base.settings.operatorActionAccess, ...(appState.settings.operatorActionAccess || {}) };
+  appState.auditLogs = Array.isArray(appState.auditLogs) ? appState.auditLogs : [];
+  appState.backups = Array.isArray(appState.backups) ? appState.backups : [];
+  appState.users = (appState.users || []).map(u => ({ pageAccess:{}, actionAccess:{}, status:'Ativo', role:'Operador', ...u }));
+  appState.contactGroups = Array.isArray(appState.contactGroups) ? appState.contactGroups : [];
+  appState.suppliers = Array.isArray(appState.suppliers) ? appState.suppliers : [];
+  return appState;
 }
 function getStoredSession(){
   try {
@@ -181,9 +203,25 @@ function restoreStoredSession(){
   }
   return false;
 }
-function saveState(){
+function saveState(action='Alteração guardada'){
+  addAuditLog(action, currentPage || getDefaultPage());
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   scheduleCloudSave();
+}
+function addAuditLog(action, page=currentPage, details=''){
+  try {
+    state.auditLogs = Array.isArray(state.auditLogs) ? state.auditLogs : [];
+    state.auditLogs.unshift({
+      id: uid('AUD'),
+      date: new Date().toISOString(),
+      page: page || '',
+      action: action || 'Alteração guardada',
+      by: state.currentUser?.email || firebaseAuth?.currentUser?.email || 'local',
+      role: currentRole ? currentRole() : '',
+      details: details || ''
+    });
+    state.auditLogs = state.auditLogs.slice(0, 300);
+  } catch(err) { console.warn('Audit failed', err); }
 }
 function saveLocalOnly(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 function appIsVisible(){ return !qs('#appShell')?.classList.contains('hidden'); }
@@ -422,6 +460,8 @@ function showApp(){
   qs('#appShell').classList.remove('hidden');
   buildNav();
   bindShell();
+  ensureGlobalSearchBox();
+  checkAutoBackup();
   qs('#userBadge').textContent = state.currentUser?.name || 'Admin';
   renderPage(currentPage);
 }
@@ -680,6 +720,7 @@ function renderPage(id){
   }
   currentPage = id;
   qs('#appShell')?.classList.toggle('dashboard-mode', id === 'dashboard');
+  updateGlobalSearchVisibility(id);
   const meta = pages.find(p=>p.id===id) || pages[0];
   qs('#pageTitle').textContent = meta.title;
   qs('#pageSubtitle').textContent = meta.subtitle;
@@ -865,7 +906,7 @@ function fornecedores(){
       <div class="card-head"><h3>Lista de fornecedores</h3><span class="muted">${state.suppliers.length} registos</span></div>
       ${!canEdit ? '<div class="readonly-note">Modo leitura: podes consultar os fornecedores, sem adicionar nem editar.</div>' : ''}
       <div class="toolbar one"><input id="supplierSearch" class="field" placeholder="Pesquisar por marca ou código de ficha"></div>
-      <div id="suppliersTable">${suppliersTable(state.suppliers)}</div>
+      <div id="suppliersTable">${suppliersTable(sortedSuppliers(state.suppliers))}</div>
     </div>
   </div>`;
 }
@@ -933,7 +974,44 @@ function contactWarehouse(group){ return group.armazem || group.local || group.e
 function contactSection(group){ return group.seccao || group.nome || 'Geral'; }
 function uniqueWarehouses(){
   normalizeContactDirectory();
-  return [...new Set((state.contactGroups || []).map(contactWarehouse).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt'));
+  return orderedWarehouses([...new Set((state.contactGroups || []).map(contactWarehouse).filter(Boolean))]);
+}
+function allWarehouseNames(){
+  normalizeContactDirectory();
+  return [...new Set((state.contactGroups || []).map(contactWarehouse).filter(Boolean))];
+}
+function normalizeWarehouseOrder(){
+  state.settings = state.settings || {};
+  const names = [...new Set(allWarehouseNames())].sort((a,b)=>a.localeCompare(b,'pt',{sensitivity:'base',numeric:true}));
+  const saved = Array.isArray(state.settings.warehouseOrder) ? state.settings.warehouseOrder : [];
+  const kept = saved.filter(name => names.some(n => n.toLowerCase() === String(name).toLowerCase()));
+  const missing = names.filter(name => !kept.some(k => String(k).toLowerCase() === name.toLowerCase()));
+  state.settings.warehouseOrder = [...kept, ...missing];
+  return state.settings.warehouseOrder;
+}
+function orderedWarehouses(names){
+  const order = normalizeWarehouseOrder();
+  return [...names].sort((a,b)=>{
+    const ia = order.findIndex(x => String(x).toLowerCase() === String(a).toLowerCase());
+    const ib = order.findIndex(x => String(x).toLowerCase() === String(b).toLowerCase());
+    const aa = ia === -1 ? 9999 : ia;
+    const bb = ib === -1 ? 9999 : ib;
+    return aa - bb || String(a).localeCompare(String(b),'pt',{sensitivity:'base',numeric:true});
+  });
+}
+function moveWarehouse(name, direction){
+  const order = normalizeWarehouseOrder();
+  const idx = order.findIndex(x => String(x).toLowerCase() === String(name).toLowerCase());
+  if(idx < 0) return false;
+  const next = idx + direction;
+  if(next < 0 || next >= order.length) return false;
+  [order[idx], order[next]] = [order[next], order[idx]];
+  state.settings.warehouseOrder = order;
+  return true;
+}
+function resetWarehouseOrder(){
+  state.settings = state.settings || {};
+  state.settings.warehouseOrder = allWarehouseNames().sort((a,b)=>a.localeCompare(b,'pt',{sensitivity:'base',numeric:true}));
 }
 function uniqueSections(){
   normalizeContactDirectory();
@@ -966,7 +1044,7 @@ function groupedByWarehouse(groups){
 function contactGroupsView(groups){
   if(!groups.length) return '<div class="empty">Sem contactos encontrados.</div>';
   const grouped = groupedByWarehouse(groups);
-  const warehouses = Object.keys(grouped).sort((a,b)=>a.localeCompare(b,'pt'));
+  const warehouses = orderedWarehouses(Object.keys(grouped));
   return `<div class="warehouse-directory">${warehouses.map(armazem => {
     const sections = grouped[armazem].sort((a,b)=>contactSection(a).localeCompare(contactSection(b),'pt'));
     const total = sections.reduce((sum,g)=>sum + (g.contactos || []).length, 0);
@@ -1074,11 +1152,22 @@ function emailClient(id){
 }
 function supplierName(s){ return s.nomeMarca || s.nomeFornecedor || s.nome || ''; }
 function supplierRef(s){ return s.codigoFicha || s.numeroReferencia || s.referenciaFornecedor || s.referencia || ''; }
+function sortedSuppliers(rows){
+  return [...(rows || [])].sort((a,b)=>{
+    const byName = supplierName(a).localeCompare(supplierName(b),'pt',{sensitivity:'base',numeric:true});
+    if(byName) return byName;
+    return supplierRef(a).localeCompare(supplierRef(b),'pt',{sensitivity:'base',numeric:true});
+  });
+}
+function sortSuppliersState(){
+  state.suppliers = sortedSuppliers(state.suppliers);
+}
 function filterSuppliers(){
   const q = (qs('#supplierSearch')?.value || '').toLowerCase();
-  return state.suppliers.filter(s => `${supplierName(s)} ${supplierRef(s)}`.toLowerCase().includes(q));
+  return sortedSuppliers(state.suppliers.filter(s => `${supplierName(s)} ${supplierRef(s)}`.toLowerCase().includes(q)));
 }
 function suppliersTable(rows){
+  rows = sortedSuppliers(rows);
   if(!rows.length) return '<div class="empty">Sem fornecedores registados.</div>';
   return `<div class="table-wrap"><table class="suppliers-table"><thead><tr><th>Nome da marca</th><th>Código de ficha</th><th>Ações</th></tr></thead><tbody>${rows.map(s=>`<tr><td><strong>${esc(supplierName(s))}</strong></td><td><span class="supplier-ref">${esc(supplierRef(s) || '-')}</span></td><td><div class="actions">${canEditOperational()?`<button class="btn small" data-edit-entity="supplier:${s.id}">Editar</button>`:'<span class="muted">Consulta</span>'}${canDelete()?`<button class="btn danger small" data-delete-entity="supplier:${s.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`;
 }
@@ -1134,8 +1223,24 @@ function userIsActive(){
   if(isAdminMasterEmail() && !user) return true;
   return user?.status === 'Ativo';
 }
-function canEditOperational(){ return hasPermission('editAll') || hasPermission('createOperational'); }
-function canDelete(){ return hasPermission('deleteAll'); }
+function actionAccessDefaults(){ return { view:true, add:false, edit:false, delete:false, importExcel:false, exportExcel:true }; }
+function currentUserActionAccess(){
+  if(isAdminMaster()) return { view:true, add:true, edit:true, delete:true, importExcel:true, exportExcel:true };
+  const base = { ...actionAccessDefaults(), ...(state.settings?.operatorActionAccess || {}) };
+  const user = currentUserRecord();
+  const specific = user?.actionAccess || {};
+  return { ...base, ...specific };
+}
+function canAction(action){
+  if(isAdminMaster()) return true;
+  const access = currentUserActionAccess();
+  return access[action] === true;
+}
+function canEditOperational(){ return hasPermission('editAll') || hasPermission('createOperational') || canAction('add') || canAction('edit'); }
+function canCreateOperational(){ return hasPermission('editAll') || hasPermission('createOperational') || canAction('add'); }
+function canDelete(){ return hasPermission('deleteAll') || canAction('delete'); }
+function canImportExcel(){ return isAdminMaster() || hasPermission('manageSettings') || canAction('importExcel'); }
+function canExportExcel(){ return isAdminMaster() || canAction('exportExcel'); }
 function usersTable(rows){
   if(!rows.length) return '<div class="empty">Sem utilizadores.</div>';
   const actions = isAdminMaster();
@@ -1240,8 +1345,30 @@ function permissionsSettingsCard(){
     </form>
   </div>`;
 }
+function warehouseOrderSettingsCard(){
+  if(!isAdminMaster()) return '';
+  const warehouses = normalizeWarehouseOrder();
+  return `<div class="card warehouse-order-card span-all">
+    <div class="card-head">
+      <div>
+        <h3>Ordem dos Armazéns no Diretório</h3>
+        <span class="muted">Define a ordem em que os armazéns aparecem na página Diretório.</span>
+      </div>
+      <button class="btn small" id="resetWarehouseOrderBtn" type="button">Ordem A-Z</button>
+    </div>
+    ${warehouses.length ? `<div class="warehouse-order-list">${warehouses.map((name,idx)=>`
+      <div class="warehouse-order-row">
+        <div class="warehouse-order-rank">${idx + 1}</div>
+        <strong>${esc(name)}</strong>
+        <div class="actions">
+          <button class="btn small" type="button" data-warehouse-up="${esc(name)}" ${idx===0?'disabled':''}>↑</button>
+          <button class="btn small" type="button" data-warehouse-down="${esc(name)}" ${idx===warehouses.length-1?'disabled':''}>↓</button>
+        </div>
+      </div>`).join('')}</div>` : '<div class="empty compact">Ainda não existem armazéns no Diretório.</div>'}
+  </div>`;
+}
 function config(){
-  return `<div class="grid two config-page"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="companyNif" placeholder="NIF" value="${esc(state.settings.companyNif || '')}"><input class="field span3" name="companyAddress" placeholder="Morada" value="${esc(state.settings.companyAddress || '')}"><input class="field" name="companyPhone" placeholder="Telefone empresa" value="${esc(state.settings.companyPhone || '')}"><input class="field" name="companyEmail" placeholder="Email empresa" value="${esc(state.settings.companyEmail || '')}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><select class="select" name="theme"><option value="normal" ${currentTheme()==='normal'?'selected':''}>Tema normal</option><option value="dark" ${currentTheme()==='dark'?'selected':''}>Darkmode</option></select><label class="checkline span2 spellcheck-toggle"><input type="checkbox" name="spellcheckEnabled" ${spellcheckEnabled()?'checked':''}> Correção ortográfica ativa</label><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>Firebase</h3><span class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">Dados separados no Firestore por página: clientes, fornecedores, orçamentos, utilizadores, diretório de contactos e configurações.</p><div class="actions"><button class="btn" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div>${permissionsSettingsCard()}</div>`;
+  return `<div class="grid two config-page"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="companyNif" placeholder="NIF" value="${esc(state.settings.companyNif || '')}"><input class="field span3" name="companyAddress" placeholder="Morada" value="${esc(state.settings.companyAddress || '')}"><input class="field" name="companyPhone" placeholder="Telefone empresa" value="${esc(state.settings.companyPhone || '')}"><input class="field" name="companyEmail" placeholder="Email empresa" value="${esc(state.settings.companyEmail || '')}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><select class="select" name="theme"><option value="normal" ${currentTheme()==='normal'?'selected':''}>Tema normal</option><option value="dark" ${currentTheme()==='dark'?'selected':''}>Darkmode</option></select><label class="checkline span2 spellcheck-toggle"><input type="checkbox" name="spellcheckEnabled" ${spellcheckEnabled()?'checked':''}> Correção ortográfica ativa</label><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>Firebase</h3><span class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">Dados separados no Firestore por página: clientes, fornecedores, orçamentos, utilizadores, diretório de contactos e configurações.</p><div class="actions"><button class="btn" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div>${warehouseOrderSettingsCard()}${permissionsSettingsCard()}${actionPermissionsCard()}${auditCard()}${backupCard()}${presentationCard()}</div>`;
 }
 
 
@@ -1292,15 +1419,16 @@ function excelConfigForPage(pageId=currentPage){
 function excelToolbar(pageId){
   const cfg = excelConfigForPage(pageId);
   if(!cfg || pageId === 'dashboard') return '';
-  const canImport = Boolean(cfg.edit && cfg.edit());
+  const canImport = Boolean(canImportExcel() && cfg.edit && cfg.edit());
+  const canExport = Boolean(canExportExcel());
   return `<div class="excel-toolbar card">
     <div class="excel-toolbar-copy">
       <strong>Excel · ${esc(cfg.title)}</strong>
       <span>Exporta os dados desta página ou importa uma folha Excel no mesmo formato.</span>
     </div>
     <div class="excel-toolbar-actions">
-      <button class="btn small" type="button" data-excel-template="${pageId}">Modelo Excel</button>
-      <button class="btn primary small" type="button" data-excel-export="${pageId}">Exportar Excel</button>
+      ${canExport ? `<button class="btn small" type="button" data-excel-template="${pageId}">Modelo Excel</button>` : ''}
+      ${canExport ? `<button class="btn primary small" type="button" data-excel-export="${pageId}">Exportar Excel</button>` : ''}
       ${canImport ? `<button class="btn success small" type="button" data-excel-import="${pageId}">Importar Excel</button>` : ''}
     </div>
     <input class="hidden" type="file" id="excelImportInput" accept=".xlsx,.xls,.csv,.tsv,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
@@ -1415,7 +1543,7 @@ function exportPageExcelFallback(cfg, rows, filename){
 async function importPageExcel(pageId, file){
   const cfg = excelConfigForPage(pageId);
   if(!cfg) return toast('Esta página não tem importação Excel.');
-  if(!cfg.edit || !cfg.edit()) return toast('Sem permissão para importar nesta página.');
+  if(!canImportExcel() || !cfg.edit || !cfg.edit()) return toast('Sem permissão para importar nesta página.');
   try {
     const rows = await readExcelRows(file);
     if(!rows.length) return toast('O ficheiro não tem linhas para importar.');
@@ -1504,6 +1632,7 @@ function applyImportedRows(pageId, cfg, rows){
     if(index >= 0) target[index] = { ...target[index], ...row };
     else target.push(row);
   });
+  if(pageId === 'fornecedores') sortSuppliersState();
   return rows.length;
 }
 function uniqueExcelMatch(pageId, existing, row){
@@ -1559,7 +1688,9 @@ function bindPage(id){
   bindEntities();
   if(id==='agenda') bindFollowForm();
   if(id==='config') bindConfig();
+  qsa('[data-copy]').forEach(b=>b.addEventListener('click',()=>copyText(b.dataset.copy)));
 }
+
 function bindGlobalResults(){
   qsa('#globalSearchResults [data-go]').forEach(b=>b.addEventListener('click',()=>goPage(b.dataset.go)));
 }
@@ -1828,14 +1959,14 @@ function bindEntities(){
   qsa('[data-delete-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.deleteEntity.split(':'); if(!canDelete()) return toast('Sem permissão para apagar.'); if(type==='user' && !isAdminMaster()) return toast('Só o Admin Master pode alterar utilizadores.'); const target=map[type]; state[target[1]] = target[0].filter(x=>x.id!==id); saveState(); renderPage(currentPage); toast('Registo apagado.'); }));
   qsa('[data-edit-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.editEntity.split(':'); if(type==='user' && !isAdminMaster()) return toast('Só o Admin Master pode alterar utilizadores.'); openEntityModal(type,id); }));
   const forms = [{id:'clientForm',key:'clients',prefix:'CLI'},{id:'supplierForm',key:'suppliers',prefix:'FOR'},{id:'stockForm',key:'stock',prefix:'STK'},{id:'userForm',key:'users',prefix:'USR'}];
-  forms.forEach(f=>{ const form=qs('#'+f.id); if(form) form.addEventListener('submit',e=>{ e.preventDefault(); if(f.key==='users' && !hasPermission('manageUsers')) return toast('Sem permissão para gerir utilizadores.'); if(f.key!=='users' && !canEditOperational()) return toast('Sem permissão para guardar.'); state[f.key].push({id:uid(f.prefix),...Object.fromEntries(new FormData(e.target).entries())}); saveState(); renderPage(currentPage); toast('Registo guardado.'); }); });
+  forms.forEach(f=>{ const form=qs('#'+f.id); if(form) form.addEventListener('submit',e=>{ e.preventDefault(); if(f.key==='users' && !hasPermission('manageUsers')) return toast('Sem permissão para gerir utilizadores.'); if(f.key!=='users' && !canEditOperational()) return toast('Sem permissão para guardar.'); state[f.key].push({id:uid(f.prefix),...Object.fromEntries(new FormData(e.target).entries())}); if(f.key==='suppliers') sortSuppliersState(); saveState(); renderPage(currentPage); toast('Registo guardado.'); }); });
 }
 function openEntityModal(type,id){
   const map = { client:['clients','CLI'], supplier:['suppliers','FOR'], stock:['stock','STK'], user:['users','USR'], follow:['followups','AGE'] };
   const [key] = map[type]; const item = state[key].find(x=>x.id===id); if(!item) return;
   const fields = Object.keys(item).filter(k=>k!=='id' && !(type==='user' && k==='pageAccess'));
   openModal('Editar registo', `<form id="entityEditForm" class="form-grid">${fields.map(k=>`<input class="field" name="${k}" placeholder="${k}" value="${esc(item[k])}">`).join('')}<div class="span3"><button class="btn primary">Guardar</button></div></form>`);
-  qs('#entityEditForm').addEventListener('submit',e=>{e.preventDefault(); Object.assign(item,Object.fromEntries(new FormData(e.target).entries())); saveState(); closeModal(); renderPage(currentPage); toast('Registo atualizado.');});
+  qs('#entityEditForm').addEventListener('submit',e=>{e.preventDefault(); Object.assign(item,Object.fromEntries(new FormData(e.target).entries())); if(key==='suppliers') sortSuppliersState(); saveState(); closeModal(); renderPage(currentPage); toast('Registo atualizado.');});
 }
 function bindFollowForm(){
   qs('#followForm').addEventListener('submit',e=>{ e.preventDefault(); state.followups.push({id:uid('AGE'),...Object.fromEntries(new FormData(e.target).entries())}); saveState(); renderPage('agenda'); toast('Follow-up guardado.'); });
@@ -1880,6 +2011,32 @@ function bindConfig(){
     toast('Permissões guardadas.');
     renderPage('config');
   });
+  qsa('[data-warehouse-up]').forEach(btn=>btn.addEventListener('click',()=>{
+    if(!isAdminMaster()) return toast('Só o Admin Master pode alterar a ordem.');
+    moveWarehouse(btn.dataset.warehouseUp, -1);
+    saveState();
+    toast('Ordem dos armazéns atualizada.');
+    renderPage('config');
+  }));
+  qsa('[data-warehouse-down]').forEach(btn=>btn.addEventListener('click',()=>{
+    if(!isAdminMaster()) return toast('Só o Admin Master pode alterar a ordem.');
+    moveWarehouse(btn.dataset.warehouseDown, 1);
+    saveState();
+    toast('Ordem dos armazéns atualizada.');
+    renderPage('config');
+  }));
+  const resetWarehouseBtn = qs('#resetWarehouseOrderBtn');
+  if(resetWarehouseBtn) resetWarehouseBtn.addEventListener('click',()=>{
+    if(!isAdminMaster()) return toast('Só o Admin Master pode alterar a ordem.');
+    resetWarehouseOrder();
+    saveState();
+    toast('Armazéns ordenados A-Z.');
+    renderPage('config');
+  });
+  bindActionPermissions();
+  bindAuditControls();
+  bindBackupControls();
+  bindPresentationControls();
   const syncBtn = qs('#syncFirebaseBtn');
   if(syncBtn) syncBtn.addEventListener('click',async()=>{ await pushCloudState(); toast(firebaseReady ? 'Sincronizado com Firebase.' : 'Firebase indisponível.'); renderPage('config'); });
   const exportBtn = qs('#exportJsonBtn');
@@ -1890,5 +2047,173 @@ function bindConfig(){
 
 function openModal(title, html){ qs('#modalRoot').innerHTML = `<div class="modal"><div class="modal-head"><h3>${title}</h3><button class="btn danger-soft small" id="closeModalBtn">Fechar</button></div>${html}</div>`; qs('#modalRoot').classList.remove('hidden'); qs('#closeModalBtn').addEventListener('click',closeModal); qsa('#modalRoot [data-client-email]').forEach(b=>b.addEventListener('click',()=>emailClient(b.dataset.clientEmail))); applySpellcheckEnhancements(qs('#modalRoot')); }
 function closeModal(){ qs('#modalRoot').classList.add('hidden'); qs('#modalRoot').innerHTML=''; }
+
+
+
+/* v1.8.0 - Sistemas avançados: pesquisa global, auditoria, backups, permissões finas, modo TV */
+function ensureGlobalSearchBox(){
+  const header = qs('.shell-header');
+  if(!header || qs('#globalSearchWrap')) return;
+  const html = `<div id="globalSearchWrap" class="global-search-wrap"><input id="globalSearch" class="field global-search-input" placeholder="Pesquisa global: cliente, fornecedor, contacto, orçamento..."><div id="globalSearchResults" class="global-search-results"></div></div>`;
+  const copy = qs('.header-copy');
+  if(copy) copy.insertAdjacentHTML('afterend', html);
+  updateGlobalSearchVisibility(currentPage);
+}
+function updateGlobalSearchVisibility(pageId){
+  const wrap = qs('#globalSearchWrap');
+  if(wrap) wrap.classList.toggle('hidden', pageId === 'dashboard');
+}
+function copyText(value){
+  const text = value || '';
+  if(!text) return toast('Nada para copiar.');
+  navigator.clipboard?.writeText(text).then(()=>toast('Copiado.')).catch(()=>{
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('Copiado.');
+  });
+}
+function actionPermissionsCard(){
+  if(!isAdminMaster()) return '';
+  const access = currentUserActionAccess();
+  const base = { ...actionAccessDefaults(), ...(state.settings?.operatorActionAccess || {}) };
+  const users = (state.users || []).filter(u => (u.role || 'Operador') !== 'Admin Master');
+  const actions = [
+    ['add','Adicionar'],['edit','Editar'],['delete','Apagar'],['importExcel','Importar Excel'],['exportExcel','Exportar Excel']
+  ];
+  return `<div class="card permissions-card span-all"><div class="card-head"><h3>Permissões finas</h3><span class="muted">Controla ações para operadores e exceções por utilizador.</span></div>
+    <form id="actionPermissionsForm" class="permissions-form">
+      <div class="permission-block"><h4>Regra geral para Operadores</h4><div class="permission-grid">
+        ${actions.map(([key,label])=>`<label class="permission-check"><input type="checkbox" name="operatorAction:${key}" ${base[key]===true?'checked':''}> <span>${esc(label)}</span></label>`).join('')}
+      </div></div>
+      <div class="permission-block"><h4>Acesso específico por utilizador</h4><div class="permission-users">
+        ${users.map(u=>`<div class="permission-user-row"><div class="permission-user-info"><strong>${esc(u.nome || u.email || '-')}</strong><span>${esc(u.email || '')}</span></div><div class="permission-grid user-specific-grid">
+          ${actions.map(([key,label])=>`<label class="permission-check compact"><input type="checkbox" name="userAction:${u.id}:${key}" ${u.actionAccess?.[key]===true?'checked':''}> <span>${esc(label)}</span></label>`).join('')}
+        </div></div>`).join('') || '<div class="empty compact">Sem utilizadores.</div>'}
+      </div></div>
+      <div class="actions"><button class="btn primary" type="submit">Guardar permissões finas</button></div>
+    </form></div>`;
+}
+function bindActionPermissions(){
+  const form = qs('#actionPermissionsForm');
+  if(!form) return;
+  form.addEventListener('submit', e=>{
+    e.preventDefault();
+    const fd = new FormData(form);
+    state.settings.operatorActionAccess = actionAccessDefaults();
+    ['add','edit','delete','importExcel','exportExcel'].forEach(key=>{
+      state.settings.operatorActionAccess[key] = fd.get(`operatorAction:${key}`) === 'on';
+    });
+    (state.users || []).forEach(u=>{
+      if((u.role || 'Operador') === 'Admin Master') return;
+      u.actionAccess = u.actionAccess || {};
+      ['add','edit','delete','importExcel','exportExcel'].forEach(key=>{
+        u.actionAccess[key] = fd.get(`userAction:${u.id}:${key}`) === 'on';
+      });
+    });
+    saveState('Permissões finas atualizadas');
+    toast('Permissões finas guardadas.');
+    renderPage('config');
+  });
+}
+function auditCard(){
+  if(!isAdminMaster()) return '';
+  const rows = (state.auditLogs || []).slice(0,80);
+  return `<div class="card span-all audit-card"><div class="card-head"><h3>Auditoria</h3><span class="muted">Últimas alterações da app.</span></div>
+    <div class="actions audit-actions"><button class="btn" id="exportAuditBtn" type="button">Exportar auditoria</button><button class="btn danger-soft" id="clearAuditBtn" type="button">Limpar auditoria</button></div>
+    ${rows.length ? `<div class="table-wrap"><table><thead><tr><th>Data</th><th>Utilizador</th><th>Página</th><th>Ação</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(new Date(r.date).toLocaleString('pt-PT'))}</td><td>${esc(r.by)}</td><td>${esc(r.page)}</td><td>${esc(r.action)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Ainda não existem registos de auditoria.</div>'}
+  </div>`;
+}
+function bindAuditControls(){
+  qs('#exportAuditBtn')?.addEventListener('click',()=>{
+    const blob = new Blob([JSON.stringify(state.auditLogs || [], null, 2)], {type:'application/json'});
+    downloadBlob(blob, `auditoria-callcenter-${today()}.json`);
+  });
+  qs('#clearAuditBtn')?.addEventListener('click',()=>{
+    if(!confirm('Limpar todos os registos de auditoria?')) return;
+    state.auditLogs = [];
+    saveState('Auditoria limpa');
+    renderPage('config');
+  });
+}
+function backupCard(){
+  if(!isAdminMaster()) return '';
+  const backups = (state.backups || []).slice(0,10);
+  return `<div class="card span-all backup-card"><div class="card-head"><h3>Backups</h3><span class="muted">Exportação e restauro por JSON.</span></div>
+    <div class="backup-grid">
+      <div class="backup-panel"><h4>Criar backup</h4><p class="muted">Cria um ponto de restauro completo com todos os dados atuais.</p><button class="btn primary" id="createBackupBtn" type="button">Criar backup agora</button><button class="btn" id="downloadFullBackupBtn" type="button">Exportar JSON completo</button></div>
+      <div class="backup-panel"><h4>Restaurar backup</h4><p class="muted">Importa um ficheiro JSON exportado pela app.</p><input class="field" id="restoreBackupInput" type="file" accept=".json,application/json"></div>
+    </div>
+    <h4>Últimos backups</h4>
+    ${backups.length ? `<div class="backup-list">${backups.map(b=>`<div class="backup-row"><div><strong>${esc(b.name)}</strong><span>${esc(new Date(b.date).toLocaleString('pt-PT'))}</span></div><div class="actions"><button class="btn small" data-download-backup="${b.id}">Download</button><button class="btn success small" data-restore-backup="${b.id}">Restaurar</button></div></div>`).join('')}</div>` : '<div class="empty compact">Ainda não existem backups.</div>'}
+  </div>`;
+}
+function createBackup(name='Backup manual'){
+  state.backups = Array.isArray(state.backups) ? state.backups : [];
+  const rawSnapshot = { ...state, currentUser: state.currentUser };
+  delete rawSnapshot.backups;
+  const snapshot = JSON.parse(JSON.stringify(rawSnapshot));
+  const backup = { id:uid('BKP'), name, date:new Date().toISOString(), appVersion:APP_VERSION, snapshot }; 
+  state.backups.unshift(backup);
+  state.backups = state.backups.slice(0,20);
+  saveState(name);
+  return backup;
+}
+function checkAutoBackup(){
+  try {
+    if(!isAdminMaster()) return;
+    if(state.settings?.backupEnabled === false) return;
+    const todayKey = today();
+    if(state.settings?.lastAutoBackupDate === todayKey) return;
+    state.settings.lastAutoBackupDate = todayKey;
+    createBackup('Backup automático diário');
+  } catch(err){ console.warn('Auto backup failed', err); }
+}
+function bindBackupControls(){
+  qs('#createBackupBtn')?.addEventListener('click',()=>{ createBackup('Backup manual'); toast('Backup criado.'); renderPage('config'); });
+  qs('#downloadFullBackupBtn')?.addEventListener('click',()=>downloadBackupSnapshot({ id:'full', name:'backup-completo', snapshot:state }));
+  qs('#restoreBackupInput')?.addEventListener('change', async e=>{
+    const file = e.target.files?.[0]; if(!file) return;
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const snapshot = data.snapshot || data;
+    if(!snapshot || typeof snapshot !== 'object') return toast('Backup inválido.');
+    if(!confirm('Restaurar este backup? Os dados atuais serão substituídos.')) return;
+    const keepUser = state.currentUser;
+    state = ensureStateShape({ ...seedData(), ...snapshot, currentUser: keepUser });
+    saveState('Backup restaurado por ficheiro');
+    toast('Backup restaurado.');
+    renderPage('config');
+  });
+  qsa('[data-download-backup]').forEach(b=>b.addEventListener('click',()=>{
+    const backup = (state.backups || []).find(x=>x.id===b.dataset.downloadBackup);
+    if(backup) downloadBackupSnapshot(backup);
+  }));
+  qsa('[data-restore-backup]').forEach(b=>b.addEventListener('click',()=>{
+    const backup = (state.backups || []).find(x=>x.id===b.dataset.restoreBackup);
+    if(!backup) return;
+    if(!confirm(`Restaurar ${backup.name}?`)) return;
+    const keepUser = state.currentUser;
+    state = ensureStateShape({ ...seedData(), ...backup.snapshot, currentUser: keepUser, backups: state.backups });
+    saveState('Backup restaurado');
+    toast('Backup restaurado.');
+    renderPage('config');
+  }));
+}
+function downloadBackupSnapshot(backup){
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
+  downloadBlob(blob, `${backup.name || 'backup'}-${today()}.json`.replace(/\s+/g,'-').toLowerCase());
+}
+function presentationCard(){
+  return `<div class="card span-all presentation-card"><div class="card-head"><h3>Modo apresentação / TV</h3><span class="muted">Painel simples para ecrã grande.</span></div><div class="actions"><button class="btn primary" id="openTvModeBtn" type="button">Abrir modo TV</button></div></div>`;
+}
+function bindPresentationControls(){
+  qs('#openTvModeBtn')?.addEventListener('click',openTvMode);
+}
+function openTvMode(){
+  const totalClients = (state.clients || []).length;
+  const totalSuppliers = (state.suppliers || []).length;
+  const totalContacts = flattenContactGroups().length;
+  const totalQuotes = (state.quotes || []).length;
+  openModal('Modo apresentação / TV', `<div class="tv-mode-panel"><div><strong>${totalClients}</strong><span>Clientes</span></div><div><strong>${totalSuppliers}</strong><span>Fornecedores</span></div><div><strong>${totalContacts}</strong><span>Contactos</span></div><div><strong>${totalQuotes}</strong><span>Orçamentos</span></div></div><p class="muted tv-note">Este painel é limpo para ecrã de TV/reunião. Usa F11 no browser ou fullscreen no Electron.</p>`);
+}
+
 
 document.addEventListener('DOMContentLoaded', init);

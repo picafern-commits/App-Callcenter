@@ -9,15 +9,21 @@ function createWindow() {
     height: 920,
     minWidth: 1180,
     minHeight: 760,
-    backgroundColor: '#070b16',
+    backgroundColor: '#edf4fb',
     title: 'AutoParts CallCenter',
     autoHideMenuBar: true,
+    show: false,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
       spellcheck: true
     }
+  });
+
+  win.once('ready-to-show', () => {
+    win.show();
+    if (process.env.START_MAXIMIZED === '1') win.maximize();
   });
 
   if (GITHUB_APP_URL) {
@@ -32,6 +38,7 @@ function createWindow() {
   });
 }
 
+app.setName('AutoParts CallCenter');
 app.whenReady().then(() => {
   createWindow();
   app.on('activate', () => {
