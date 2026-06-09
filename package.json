@@ -1,13 +1,15 @@
 {
   "name": "autoparts-callcenter",
-  "version": "1.8.3",
+  "version": "1.8.6",
   "description": "App de callcenter para peças automóveis",
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win --x64",
+    "pack:win": "electron-builder --dir --win --x64"
   },
   "author": "",
   "license": "UNLICENSED",
@@ -46,6 +48,8 @@
       "createStartMenuShortcut": true,
       "shortcutName": "AutoParts CallCenter",
       "artifactName": "AutoParts-CallCenter-Setup-${version}.${ext}"
-    }
+    },
+    "asar": true,
+    "compression": "maximum"
   }
 }

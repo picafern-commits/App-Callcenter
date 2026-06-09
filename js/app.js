@@ -1,4 +1,4 @@
-const APP_VERSION = '1.8.3';
+const APP_VERSION = '1.8.6';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
@@ -40,6 +40,7 @@ const pages = [
   { id: 'fornecedores', icon: '🏭', title: 'Fornecedores', subtitle: 'Lista de fornecedores e referências' },
   { id: 'orcamentos', icon: '🧾', title: 'Orçamentos', subtitle: 'Criar, enviar e acompanhar propostas' },
   { id: 'users', icon: '🛡️', title: 'Utilizadores', subtitle: 'Equipa, cargos e permissões' },
+  { id: 'configs-user', icon: '🎛️', title: 'Minhas Configs', subtitle: 'Tema e preferências do utilizador' },
   { id: 'config', icon: '⚙️', title: 'Configurações', subtitle: 'GitHub, Electron, Firebase e backups' }
 ];
 
@@ -55,6 +56,7 @@ const pageFiles = {
   stock: 'stock.html',
   relatorios: 'relatorios.html',
   users: 'users.html',
+  'configs-user': 'configs-user.html',
   config: 'configuracoes.html'
 };
 
@@ -400,6 +402,7 @@ function companyName(){ return state.settings?.companyName || 'AutoParts CallCen
 function currentTheme(){ return state.settings?.theme === 'dark' ? 'dark' : 'normal'; }
 function applyTheme(){
   document.body.classList.toggle('theme-dark', currentTheme() === 'dark');
+  document.body.classList.toggle('admin-master', isAdminMaster());
   const btn = qs('#themeToggleBtn');
   if(btn) btn.textContent = currentTheme() === 'dark' ? 'Modo Normal' : 'Darkmode';
 }
@@ -411,7 +414,7 @@ function toggleTheme(){
   toast(state.settings.theme === 'dark' ? 'Darkmode ativo.' : 'Modo normal ativo.');
 }
 function managedPageList(){
-  return pages.filter(p => !['dashboard','users','config'].includes(p.id));
+  return pages.filter(p => !['dashboard','users','config','configs-user'].includes(p.id));
 }
 function defaultOperatorPageAccess(){
   return managedPageList().reduce((acc,p)=>{ acc[p.id] = true; return acc; }, {});
@@ -437,7 +440,7 @@ function userCanOpenManagedPage(user, pageId){
 function pageUrl(id){ return pageFiles[id] || 'index.html'; }
 function goPage(id){ window.location.href = pageUrl(id); }
 function canOpenPage(id){
-  if(id === 'dashboard') return true;
+  if(id === 'dashboard' || id === 'configs-user') return true;
   if(isAdminMaster()) return true;
   if(id === 'users') return hasPermission('manageUsers') || hasPermission('approveUsers');
   if(id === 'config') return hasPermission('manageSettings');
@@ -623,16 +626,6 @@ async function logoutCurrentUser(){
 function bindShell(){
   const home = qs('#homeBtn');
   const logout = qs('#logoutBtn');
-  const topActions = qs('.top-actions');
-  if(topActions && !qs('#themeToggleBtn')) {
-    const themeBtn = document.createElement('button');
-    themeBtn.id = 'themeToggleBtn';
-    themeBtn.className = 'btn ghost';
-    themeBtn.type = 'button';
-    topActions.insertBefore(themeBtn, qs('#userBadge'));
-    themeBtn.addEventListener('click', toggleTheme);
-    applyTheme();
-  }
   if(!home || !logout || home.dataset.bound === '1') return;
   home.dataset.bound = '1';
   logout.dataset.bound = '1';
@@ -725,7 +718,7 @@ function renderPage(id){
   qs('#pageTitle').textContent = meta.title;
   qs('#pageSubtitle').textContent = meta.subtitle;
   qsa('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.page===id));
-  const renderers = { dashboard, 'nova-chamada': novaChamada, pedidos, clientes, contactos, fornecedores, orcamentos, agenda, stock, relatorios, users, config };
+  const renderers = { dashboard, 'nova-chamada': novaChamada, pedidos, clientes, contactos, fornecedores, orcamentos, agenda, stock, relatorios, users, 'configs-user': configsUser, config };
   const pageBody = renderers[id]();
   qs('#pageContent').innerHTML = `${excelToolbar(id)}${pageBody}`;
   bindPage(id);
@@ -1092,13 +1085,15 @@ function filterClients(){
 function clientsTable(rows){
   if(!rows.length) return '<div class="empty">Sem clientes registados.</div>';
   return `<div class="clean-card-list client-card-list">${rows.map(c=>`
-    <article class="clean-data-card client-data-card">
-      <div class="data-card-main">
-        <span class="data-card-code">${esc(clientCode(c) || 'Sem código')}</span>
+    <article class="clean-data-card client-data-card code-centered-card">
+      <div class="data-card-main client-name-box">
         <strong>${esc(c.nome || '-')}</strong>
         <small>${esc(c.email || 'Sem email')}</small>
       </div>
-      <div class="data-card-meta">
+      <div class="card-code-center client-code-box">
+        <span class="data-card-code big-visible-code">${esc(clientCode(c) || 'Sem código')}</span>
+      </div>
+      <div class="data-card-meta client-phone-box">
         <span>☎ ${esc(c.telefone || 'Sem telefone')}</span>
       </div>
       <div class="actions data-card-actions">
@@ -1179,7 +1174,7 @@ function suppliersTable(rows){
         <small>Fornecedor</small>
       </div>
       <div class="supplier-code-box">
-        <span class="data-card-code">${esc(supplierRef(s) || 'Sem código')}</span>
+        <span class="data-card-code big-visible-code">${esc(supplierRef(s) || 'Sem código')}</span>
       </div>
       <div class="actions data-card-actions supplier-actions-box">
         ${canEditOperational()?`<button class="btn small" data-edit-entity="supplier:${s.id}">Editar</button>`:'<span class="muted">Consulta</span>'}
@@ -1310,7 +1305,7 @@ function quotesTable(){
   return `<div class="clean-card-list quote-card-list">${state.quotes.map(q=>`
     <article class="clean-data-card quote-data-card">
       <div class="data-card-main">
-        <span class="data-card-code">${esc(q.id)}</span>
+        <span class="data-card-code big-visible-code">${esc(q.id)}</span>
         <strong>${esc(q.cliente || '-')}</strong>
         <small>${esc(q.peca || '-')} ${q.referencia ? '· ' + esc(q.referencia) : ''}</small>
       </div>
@@ -1470,8 +1465,114 @@ function productionReadyCard(){
   </div>`;
 }
 
+
+
+function configsUser(){
+  const dark = currentTheme() === 'dark';
+  const user = currentDisplayName();
+  return `<div class="user-configs-page">
+    <div class="user-configs-card card">
+      <div class="user-configs-head">
+        <span class="dashboard-user-avatar">${esc(user.charAt(0).toUpperCase())}</span>
+        <div>
+          <h3>Minhas Configs</h3>
+          <p>Preferências rápidas do utilizador.</p>
+        </div>
+      </div>
+      <div class="theme-choice-box">
+        <div>
+          <strong>${dark ? 'Darkmode ativo' : 'Tema normal ativo'}</strong>
+          <span>${dark ? 'Interface escura para ambientes com pouca luz.' : 'Interface clara e limpa para uso diário.'}</span>
+        </div>
+        <button class="btn primary" id="userThemeToggleBtn" type="button">${dark ? 'Mudar para Tema Normal' : 'Ativar Darkmode'}</button>
+      </div>
+      <div class="theme-preview-grid">
+        <button class="theme-preview ${!dark ? 'active' : ''}" data-set-theme="normal" type="button"><i></i><strong>Tema Normal</strong><span>Claro, azul e clean</span></button>
+        <button class="theme-preview ${dark ? 'active' : ''}" data-set-theme="dark" type="button"><i></i><strong>Darkmode</strong><span>Escuro e confortável</span></button>
+      </div>
+    </div>
+  </div>`;
+}
+function setUserTheme(theme){
+  state.settings = state.settings || {};
+  state.settings.theme = theme === 'dark' ? 'dark' : 'normal';
+  saveState();
+  applyTheme();
+  toast(state.settings.theme === 'dark' ? 'Darkmode ativo.' : 'Tema normal ativo.');
+  renderPage('configs-user');
+}
+function bindUserConfigs(){
+  qs('#userThemeToggleBtn')?.addEventListener('click',()=>toggleThemeAndRefreshUserConfigs());
+  qsa('[data-set-theme]').forEach(btn=>btn.addEventListener('click',()=>setUserTheme(btn.dataset.setTheme)));
+}
+function toggleThemeAndRefreshUserConfigs(){
+  state.settings = state.settings || {};
+  state.settings.theme = currentTheme() === 'dark' ? 'normal' : 'dark';
+  saveState();
+  applyTheme();
+  toast(state.settings.theme === 'dark' ? 'Darkmode ativo.' : 'Tema normal ativo.');
+  renderPage('configs-user');
+}
+
+function configAccordion(title, subtitle, html, options={}){
+  if(!html) return '';
+  const open = options.open ? 'open' : '';
+  const icon = options.icon || '⚙️';
+  return `<details class="config-accordion" ${open}>
+    <summary>
+      <span class="config-accordion-icon">${icon}</span>
+      <span class="config-accordion-title"><strong>${esc(title)}</strong><em>${esc(subtitle || '')}</em></span>
+      <span class="config-accordion-chevron">⌄</span>
+    </summary>
+    <div class="config-accordion-body">${html}</div>
+  </details>`;
+}
+function generalSettingsCard(){
+  return `<div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="companyNif" placeholder="NIF" value="${esc(state.settings.companyNif || '')}"><input class="field span3" name="companyAddress" placeholder="Morada" value="${esc(state.settings.companyAddress || '')}"><input class="field" name="companyPhone" placeholder="Telefone empresa" value="${esc(state.settings.companyPhone || '')}"><input class="field" name="companyEmail" placeholder="Email empresa" value="${esc(state.settings.companyEmail || '')}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><label class="checkline span2 spellcheck-toggle"><input type="checkbox" name="spellcheckEnabled" ${spellcheckEnabled()?'checked':''}> Correção ortográfica ativa</label><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div>`;
+}
+function firebaseSettingsCard(){
+  return `<div class="card"><div class="card-head"><h3>Firebase</h3><span class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">Dados separados no Firestore por página: clientes, fornecedores, orçamentos, utilizadores, diretório de contactos e configurações.</p><div class="actions"><button class="btn" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div>`;
+}
+function electronSetupCard(){
+  if(!isAdminMaster()) return '';
+  const githubUrl = state.settings?.githubUrl || '';
+  return `<div class="card span-all electron-setup-card">
+    <div class="card-head"><h3>Electron / Setup final</h3><span class="muted">Preparação para criar o programa .exe.</span></div>
+    <div class="electron-grid">
+      <div class="electron-step"><b>1</b><strong>Publicar GitHub Pages</strong><span>${githubUrl ? esc(githubUrl) : 'Define o URL GitHub Pages nas configurações gerais.'}</span></div>
+      <div class="electron-step"><b>2</b><strong>Instalar dependências</strong><span>Executar npm install na pasta da app.</span></div>
+      <div class="electron-step"><b>3</b><strong>Gerar setup</strong><span>Executar npm run dist para criar o instalador Windows.</span></div>
+      <div class="electron-step"><b>4</b><strong>Testar noutro PC</strong><span>Confirmar login, permissões, Excel, backups e sincronização.</span></div>
+    </div>
+    <div class="code-box"><code>npm install<br>npm run dist</code></div>
+    <p class="muted">O Electron abre maximizado, sem menu, com instância única e pronto para apontar ao GitHub Pages através da variável APP_URL.</p>
+  </div>`;
+}
+function productionCleanCard(){
+  if(!isAdminMaster()) return '';
+  return `<div class="card span-all production-clean-card">
+    <div class="card-head"><h3>Modo produção limpa</h3><span class="muted">Limpa dados de teste sem apagar utilizadores, permissões, configurações e backups.</span></div>
+    <div class="clean-production-grid">
+      <div><strong>Mantém</strong><span>Utilizadores, permissões, tema, Firebase, GitHub, backups e configurações gerais.</span></div>
+      <div><strong>Limpa</strong><span>Clientes, fornecedores, diretório, orçamentos, pedidos, stock e follow-ups de teste.</span></div>
+      <div><strong>Antes de limpar</strong><span>A app pode criar automaticamente um backup completo para segurança.</span></div>
+    </div>
+    <div class="actions"><button class="btn primary" id="prepareCleanProductionBtn" type="button">Criar backup e preparar produção limpa</button><button class="btn danger" id="cleanDemoDataBtnAlt" type="button">Limpar sem backup</button></div>
+  </div>`;
+}
+
 function config(){
-  return `<div class="grid two config-page"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="companyNif" placeholder="NIF" value="${esc(state.settings.companyNif || '')}"><input class="field span3" name="companyAddress" placeholder="Morada" value="${esc(state.settings.companyAddress || '')}"><input class="field" name="companyPhone" placeholder="Telefone empresa" value="${esc(state.settings.companyPhone || '')}"><input class="field" name="companyEmail" placeholder="Email empresa" value="${esc(state.settings.companyEmail || '')}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><select class="select" name="theme"><option value="normal" ${currentTheme()==='normal'?'selected':''}>Tema normal</option><option value="dark" ${currentTheme()==='dark'?'selected':''}>Darkmode</option></select><label class="checkline span2 spellcheck-toggle"><input type="checkbox" name="spellcheckEnabled" ${spellcheckEnabled()?'checked':''}> Correção ortográfica ativa</label><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>Firebase</h3><span class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">Dados separados no Firestore por página: clientes, fornecedores, orçamentos, utilizadores, diretório de contactos e configurações.</p><div class="actions"><button class="btn" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div>${warehouseOrderSettingsCard()}${permissionsSettingsCard()}${actionPermissionsCard()}${auditCard()}${backupCard()}${productionReadyCard()}${presentationCard()}</div>`;
+  const sections = [
+    configAccordion('Geral', 'Empresa, GitHub e correção ortográfica.', generalSettingsCard(), {open:true, icon:'🏢'}),
+    configAccordion('Firebase / Sincronização', 'Sincronizar e exportar dados.', firebaseSettingsCard(), {icon:'☁️'}),
+    configAccordion('Diretório', 'Ordem dos armazéns e organização do diretório.', warehouseOrderSettingsCard(), {icon:'📇'}),
+    configAccordion('Utilizadores e permissões', 'Páginas visíveis, permissões finas e acessos por utilizador.', `${permissionsSettingsCard()}${actionPermissionsCard()}`, {icon:'🛡️'}),
+    configAccordion('Auditoria', 'Histórico de ações só para Admin Master.', auditCard(), {icon:'📜'}),
+    configAccordion('Backups', 'Criar, exportar e restaurar backups.', backupCard(), {icon:'💾'}),
+    configAccordion('Produção / Electron', 'Checklist, produção limpa e setup final.', `${productionReadyCard()}${productionCleanCard()}${electronSetupCard()}`, {icon:'🚀'}),
+    configAccordion('Modo TV', 'Painel de apresentação para ecrã grande.', presentationCard(), {icon:'📺'})
+  ].filter(Boolean).join('');
+  return `<div class="config-page config-accordion-page">${sections}</div>`;
 }
 
 
@@ -1521,7 +1622,7 @@ function excelConfigForPage(pageId=currentPage){
 }
 function excelToolbar(pageId){
   const cfg = excelConfigForPage(pageId);
-  if(!cfg || pageId === 'dashboard') return '';
+  if(!cfg || pageId === 'dashboard' || pageId === 'configs-user' || !isAdminMaster()) return '';
   const canImport = Boolean(canImportExcel() && cfg.edit && cfg.edit());
   const canExport = Boolean(canExportExcel());
   return `<div class="excel-toolbar card">
@@ -1790,6 +1891,7 @@ function bindPage(id){
   if(id==='users') bindUsersPage();
   bindEntities();
   if(id==='agenda') bindFollowForm();
+  if(id==='configs-user') bindUserConfigs();
   if(id==='config') bindConfig();
   qsa('[data-copy]').forEach(b=>b.addEventListener('click',()=>copyText(b.dataset.copy)));
 }
@@ -2087,7 +2189,7 @@ function bindConfig(){
       companyPhone:fd.get('companyPhone'),
       companyEmail:fd.get('companyEmail'),
       dailyBackupHour:fd.get('dailyBackupHour'),
-      theme:fd.get('theme') || 'normal',
+      theme:fd.get('theme') || currentTheme(),
       spellcheckEnabled:fd.get('spellcheckEnabled')==='on',
       githubUrl:fd.get('githubUrl'),
       firebaseEnabled:firebaseReady
@@ -2207,6 +2309,21 @@ function bindProductionControls(){
     if(!confirm('Limpar os dados demo/operacionais atuais? Esta ação mantém utilizadores, configurações e backups.')) return;
     cleanDemoData();
     toast('Dados demo limpos.');
+    renderPage('config');
+  });
+  qs('#cleanDemoDataBtnAlt')?.addEventListener('click',()=>{
+    if(!isAdminMaster()) return toast('Só o Admin Master pode limpar dados demo.');
+    if(!confirm('Limpar sem criar backup? Esta ação mantém utilizadores, permissões e configurações.')) return;
+    cleanDemoData();
+    toast('Produção limpa preparada.');
+    renderPage('config');
+  });
+  qs('#prepareCleanProductionBtn')?.addEventListener('click',()=>{
+    if(!isAdminMaster()) return toast('Só o Admin Master pode preparar produção limpa.');
+    if(!confirm('Criar backup completo e limpar dados operacionais/demo?')) return;
+    createBackup('backup-antes-producao-limpa');
+    cleanDemoData();
+    toast('Backup criado e produção limpa preparada.');
     renderPage('config');
   });
 }
