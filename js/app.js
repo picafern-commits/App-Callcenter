@@ -1,6 +1,9 @@
-const APP_VERSION = '1.8.6';
+const APP_VERSION = '1.8.8';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
+const THEME_KEY = 'autoparts_user_theme_v1';
+const RESOLUTION_KEY = 'autoparts_resolution_v1';
+const COLOR_SCHEME_KEY = 'autoparts_color_scheme_v1';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
 const FIREBASE_LEGACY_STATE_DOC = 'main';
 const FIREBASE_META_COLLECTION = 'meta';
@@ -84,6 +87,8 @@ function seedData() {
       firebaseEnabled: false,
       dailyBackupHour: '19:30',
       theme: 'normal',
+      resolution: 'standard',
+      colorScheme: 'az',
       spellcheckEnabled: true,
       operatorPageAccess: {
         clientes: true,
@@ -92,7 +97,7 @@ function seedData() {
         orcamentos: true
       },
       operatorActionAccess: {
-        view: true, add: false, edit: false, delete: false, importExcel: false, exportExcel: true
+        view: true, add: false, edit: false, delete: false
       },
       backupEnabled: true,
       lastAutoBackupDate: ''
@@ -300,6 +305,8 @@ async function loadCloudState(){
 
     if (metaSnap.exists && metaSnap.data()?.settings) {
       state.settings = { ...base.settings, ...metaSnap.data().settings, firebaseEnabled: true };
+      const localTheme = getLocalTheme();
+      if(localTheme) state.settings.theme = localTheme;
     }
 
     let loadedRows = 0;
@@ -343,8 +350,11 @@ function startFirebaseListeners(){
   firebaseUnsubscribers.push(firebaseDb.collection(FIREBASE_META_COLLECTION).doc(FIREBASE_META_DOC).onSnapshot(doc => {
     if (!doc.exists || !doc.data()?.settings) return;
     state.settings = { ...state.settings, ...doc.data().settings, firebaseEnabled: true };
+    const localTheme = getLocalTheme();
+    if(localTheme) state.settings.theme = localTheme;
     saveLocalOnly();
-    if (appIsVisible() && currentPage === 'config') renderPage(currentPage);
+    applyTheme();
+    if (appIsVisible() && (currentPage === 'config' || currentPage === 'configs-user')) renderPage(currentPage);
   }));
 
   Object.entries(FIREBASE_COLLECTIONS).forEach(([stateKey, collectionName]) => {
@@ -399,19 +409,66 @@ function toast(msg){ const el = qs('#toast'); el.textContent = msg; el.classList
 function qs(s){ return document.querySelector(s); }
 function qsa(s){ return [...document.querySelectorAll(s)]; }
 function companyName(){ return state.settings?.companyName || 'AutoParts CallCenter'; }
-function currentTheme(){ return state.settings?.theme === 'dark' ? 'dark' : 'normal'; }
+function getLocalTheme(){
+  const localTheme = localStorage.getItem(THEME_KEY);
+  return localTheme === 'dark' || localTheme === 'normal' ? localTheme : '';
+}
+function currentTheme(){
+  const localTheme = getLocalTheme();
+  if(localTheme) return localTheme;
+  return state.settings?.theme === 'dark' ? 'dark' : 'normal';
+}
+function getLocalResolution(){
+  const value = localStorage.getItem(RESOLUTION_KEY);
+  return ['compact','standard','wide','large'].includes(value) ? value : '';
+}
+function currentResolution(){
+  return getLocalResolution() || state.settings?.resolution || 'standard';
+}
+function persistResolution(value){
+  const next = ['compact','standard','wide','large'].includes(value) ? value : 'standard';
+  localStorage.setItem(RESOLUTION_KEY, next);
+  state.settings = state.settings || {};
+  state.settings.resolution = next;
+  saveLocalOnly();
+}
+function getLocalColorScheme(){
+  const value = localStorage.getItem(COLOR_SCHEME_KEY);
+  return ['az','ocean','graphite','emerald','sunset'].includes(value) ? value : '';
+}
+function currentColorScheme(){
+  return getLocalColorScheme() || state.settings?.colorScheme || 'az';
+}
+function persistColorScheme(value){
+  const next = ['az','ocean','graphite','emerald','sunset'].includes(value) ? value : 'az';
+  localStorage.setItem(COLOR_SCHEME_KEY, next);
+  state.settings = state.settings || {};
+  state.settings.colorScheme = next;
+  saveLocalOnly();
+}
+function persistTheme(theme){
+  const next = theme === 'dark' ? 'dark' : 'normal';
+  localStorage.setItem(THEME_KEY, next);
+  state.settings = state.settings || {};
+  state.settings.theme = next;
+  saveLocalOnly();
+}
 function applyTheme(){
-  document.body.classList.toggle('theme-dark', currentTheme() === 'dark');
+  const dark = currentTheme() === 'dark';
+  const resolution = currentResolution();
+  const scheme = currentColorScheme();
+  document.documentElement.classList.toggle('theme-dark', dark);
+  document.body.classList.toggle('theme-dark', dark);
   document.body.classList.toggle('admin-master', isAdminMaster());
+  ['compact','standard','wide','large'].forEach(v=>{ document.documentElement.classList.toggle(`res-${v}`, resolution===v); document.body.classList.toggle(`res-${v}`, resolution===v); });
+  ['az','ocean','graphite','emerald','sunset'].forEach(v=>{ document.documentElement.classList.toggle(`scheme-${v}`, scheme===v); document.body.classList.toggle(`scheme-${v}`, scheme===v); });
   const btn = qs('#themeToggleBtn');
-  if(btn) btn.textContent = currentTheme() === 'dark' ? 'Modo Normal' : 'Darkmode';
+  if(btn) btn.textContent = dark ? 'Modo Normal' : 'Darkmode';
 }
 function toggleTheme(){
-  state.settings = state.settings || {};
-  state.settings.theme = currentTheme() === 'dark' ? 'normal' : 'dark';
-  saveState();
+  persistTheme(currentTheme() === 'dark' ? 'normal' : 'dark');
   applyTheme();
-  toast(state.settings.theme === 'dark' ? 'Darkmode ativo.' : 'Modo normal ativo.');
+  toast(currentTheme() === 'dark' ? 'Darkmode ativo.' : 'Modo normal ativo.');
 }
 function managedPageList(){
   return pages.filter(p => !['dashboard','users','config','configs-user'].includes(p.id));
@@ -458,6 +515,7 @@ function getDefaultPage(){
   return found ? found[0] : 'dashboard';
 }
 function showApp(){
+  document.body.classList.remove('auth-boot');
   applyTheme();
   qs('#loginScreen').classList.add('hidden');
   qs('#appShell').classList.remove('hidden');
@@ -491,6 +549,7 @@ async function init(){
           clearStoredSession();
           toast('Conta pendente de aprovação pelo Admin Master.');
           qs('#appShell').classList.add('hidden');
+          document.body.classList.remove('auth-boot');
           qs('#loginScreen').classList.remove('hidden');
           return;
         }
@@ -508,6 +567,7 @@ async function init(){
         state.currentUser = null;
         saveLocalOnly();
         qs('#appShell').classList.add('hidden');
+        document.body.classList.remove('auth-boot');
         qs('#loginScreen').classList.remove('hidden');
       }
     });
@@ -515,6 +575,7 @@ async function init(){
   }
 
   if(state.currentUser || hasLocalSession) showApp();
+  else document.body.classList.remove('auth-boot');
 }
 
 function restoreLogin(){
@@ -620,6 +681,7 @@ async function logoutCurrentUser(){
   state.currentUser = null;
   saveLocalOnly();
   qs('#appShell')?.classList.add('hidden');
+  document.body.classList.remove('auth-boot');
   qs('#loginScreen')?.classList.remove('hidden');
 }
 
@@ -1234,9 +1296,9 @@ function userIsActive(){
   if(isAdminMasterEmail() && !user) return true;
   return user?.status === 'Ativo';
 }
-function actionAccessDefaults(){ return { view:true, add:false, edit:false, delete:false, importExcel:false, exportExcel:true }; }
+function actionAccessDefaults(){ return { view:true, add:false, edit:false, delete:false }; }
 function currentUserActionAccess(){
-  if(isAdminMaster()) return { view:true, add:true, edit:true, delete:true, importExcel:true, exportExcel:true };
+  if(isAdminMaster()) return { view:true, add:true, edit:true, delete:true };
   const base = { ...actionAccessDefaults(), ...(state.settings?.operatorActionAccess || {}) };
   const user = currentUserRecord();
   const specific = user?.actionAccess || {};
@@ -1250,8 +1312,8 @@ function canAction(action){
 function canEditOperational(){ return hasPermission('editAll') || hasPermission('createOperational') || canAction('add') || canAction('edit'); }
 function canCreateOperational(){ return hasPermission('editAll') || hasPermission('createOperational') || canAction('add'); }
 function canDelete(){ return hasPermission('deleteAll') || canAction('delete'); }
-function canImportExcel(){ return isAdminMaster() || hasPermission('manageSettings') || canAction('importExcel'); }
-function canExportExcel(){ return isAdminMaster() || canAction('exportExcel'); }
+function canImportExcel(){ return isAdminMaster(); }
+function canExportExcel(){ return isAdminMaster(); }
 function usersTable(rows){
   if(!rows.length) return '<div class="empty">Sem utilizadores.</div>';
   const actions = isAdminMaster();
@@ -1470,6 +1532,21 @@ function productionReadyCard(){
 function configsUser(){
   const dark = currentTheme() === 'dark';
   const user = currentDisplayName();
+  const resolution = currentResolution();
+  const scheme = currentColorScheme();
+  const resolutionOptions = [
+    ['compact','Compacto','Mais informação no ecrã'],
+    ['standard','Normal','Equilíbrio recomendado'],
+    ['wide','Largo','Usa mais largura do ecrã'],
+    ['large','Grande','Texto e botões maiores']
+  ];
+  const colorOptions = [
+    ['az','AZ Azul','Azul profissional com laranja'],
+    ['ocean','Ocean','Azul/ciano limpo'],
+    ['graphite','Graphite','Cinza premium'],
+    ['emerald','Emerald','Verde empresarial'],
+    ['sunset','Sunset','Laranja quente']
+  ];
   return `<div class="user-configs-page">
     <div class="user-configs-card card">
       <div class="user-configs-head">
@@ -1479,38 +1556,66 @@ function configsUser(){
           <p>Preferências rápidas do utilizador.</p>
         </div>
       </div>
-      <div class="theme-choice-box">
-        <div>
-          <strong>${dark ? 'Darkmode ativo' : 'Tema normal ativo'}</strong>
-          <span>${dark ? 'Interface escura para ambientes com pouca luz.' : 'Interface clara e limpa para uso diário.'}</span>
+
+      <section class="user-setting-section">
+        <div class="setting-title"><strong>Tema</strong><span>Escolhe o modo de visualização.</span></div>
+        <div class="theme-choice-box">
+          <div>
+            <strong>${dark ? 'Darkmode ativo' : 'Tema normal ativo'}</strong>
+            <span>${dark ? 'Interface escura com a imagem de fundo ainda perceptível.' : 'Interface clara e limpa para uso diário.'}</span>
+          </div>
+          <button class="btn primary" id="userThemeToggleBtn" type="button">${dark ? 'Mudar para Tema Normal' : 'Ativar Darkmode'}</button>
         </div>
-        <button class="btn primary" id="userThemeToggleBtn" type="button">${dark ? 'Mudar para Tema Normal' : 'Ativar Darkmode'}</button>
-      </div>
-      <div class="theme-preview-grid">
-        <button class="theme-preview ${!dark ? 'active' : ''}" data-set-theme="normal" type="button"><i></i><strong>Tema Normal</strong><span>Claro, azul e clean</span></button>
-        <button class="theme-preview ${dark ? 'active' : ''}" data-set-theme="dark" type="button"><i></i><strong>Darkmode</strong><span>Escuro e confortável</span></button>
-      </div>
+        <div class="theme-preview-grid two-options">
+          <button class="theme-preview ${!dark ? 'active' : ''}" data-set-theme="normal" type="button"><i></i><strong>Tema Normal</strong><span>Claro, azul e clean</span></button>
+          <button class="theme-preview ${dark ? 'active' : ''}" data-set-theme="dark" type="button"><i></i><strong>Darkmode</strong><span>Escuro e confortável</span></button>
+        </div>
+      </section>
+
+      <section class="user-setting-section">
+        <div class="setting-title"><strong>Resolução / Escala</strong><span>Ajusta a app ao tamanho do ecrã.</span></div>
+        <div class="choice-grid resolution-grid">
+          ${resolutionOptions.map(([key,title,desc])=>`<button class="choice-card ${resolution===key?'active':''}" data-set-resolution="${key}" type="button"><strong>${esc(title)}</strong><span>${esc(desc)}</span></button>`).join('')}
+        </div>
+      </section>
+
+      <section class="user-setting-section">
+        <div class="setting-title"><strong>Esquema de cores</strong><span>Paletas predefinidas para a app.</span></div>
+        <div class="choice-grid color-scheme-grid">
+          ${colorOptions.map(([key,title,desc])=>`<button class="choice-card scheme-choice ${scheme===key?'active':''}" data-set-scheme="${key}" type="button"><i class="scheme-dot scheme-dot-${key}"></i><strong>${esc(title)}</strong><span>${esc(desc)}</span></button>`).join('')}
+        </div>
+      </section>
     </div>
   </div>`;
 }
 function setUserTheme(theme){
-  state.settings = state.settings || {};
-  state.settings.theme = theme === 'dark' ? 'dark' : 'normal';
-  saveState();
+  persistTheme(theme);
   applyTheme();
-  toast(state.settings.theme === 'dark' ? 'Darkmode ativo.' : 'Tema normal ativo.');
+  toast(currentTheme() === 'dark' ? 'Darkmode ativo.' : 'Tema normal ativo.');
+  renderPage('configs-user');
+}
+function setUserResolution(value){
+  persistResolution(value);
+  applyTheme();
+  toast('Resolução atualizada.');
+  renderPage('configs-user');
+}
+function setUserColorScheme(value){
+  persistColorScheme(value);
+  applyTheme();
+  toast('Esquema de cores atualizado.');
   renderPage('configs-user');
 }
 function bindUserConfigs(){
   qs('#userThemeToggleBtn')?.addEventListener('click',()=>toggleThemeAndRefreshUserConfigs());
   qsa('[data-set-theme]').forEach(btn=>btn.addEventListener('click',()=>setUserTheme(btn.dataset.setTheme)));
+  qsa('[data-set-resolution]').forEach(btn=>btn.addEventListener('click',()=>setUserResolution(btn.dataset.setResolution)));
+  qsa('[data-set-scheme]').forEach(btn=>btn.addEventListener('click',()=>setUserColorScheme(btn.dataset.setScheme)));
 }
 function toggleThemeAndRefreshUserConfigs(){
-  state.settings = state.settings || {};
-  state.settings.theme = currentTheme() === 'dark' ? 'normal' : 'dark';
-  saveState();
+  persistTheme(currentTheme() === 'dark' ? 'normal' : 'dark');
   applyTheme();
-  toast(state.settings.theme === 'dark' ? 'Darkmode ativo.' : 'Tema normal ativo.');
+  toast(currentTheme() === 'dark' ? 'Darkmode ativo.' : 'Tema normal ativo.');
   renderPage('configs-user');
 }
 
@@ -1717,12 +1822,33 @@ function downloadBlob(blob, filename){
   a.click();
   setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1200);
 }
-function exportPageExcel(pageId=currentPage, template=false){
+
+function loadExcelLibrary(){
+  if(window.XLSX) return Promise.resolve(true);
+  return new Promise((resolve, reject)=>{
+    const existing = document.querySelector('script[data-xlsx-loader="1"]');
+    if(existing){
+      existing.addEventListener('load',()=>resolve(true), { once:true });
+      existing.addEventListener('error',reject, { once:true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    script.async = true;
+    script.dataset.xlsxLoader = '1';
+    script.onload = ()=>resolve(true);
+    script.onerror = ()=>reject(new Error('Não foi possível carregar a biblioteca Excel.'));
+    document.head.appendChild(script);
+  });
+}
+
+async function exportPageExcel(pageId=currentPage, template=false){
   const cfg = excelConfigForPage(pageId);
   if(!cfg) return toast('Esta página não tem exportação Excel.');
   const rows = excelRowsForPage(pageId, template);
   const filename = `${cfg.file}-${template ? 'modelo' : 'export'}-${today()}.xlsx`;
   try {
+    await loadExcelLibrary();
     if(window.XLSX){
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(rows, { header: cfg.fields.map(f=>f[1]) });
@@ -1763,6 +1889,7 @@ async function importPageExcel(pageId, file){
 }
 async function readExcelRows(file){
   const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if(!window.XLSX) await loadExcelLibrary();
   if(window.XLSX){
     const buffer = await file.arrayBuffer();
     const wb = XLSX.read(buffer, { type:'array', cellDates:true });
@@ -2189,7 +2316,7 @@ function bindConfig(){
       companyPhone:fd.get('companyPhone'),
       companyEmail:fd.get('companyEmail'),
       dailyBackupHour:fd.get('dailyBackupHour'),
-      theme:fd.get('theme') || currentTheme(),
+      theme:currentTheme(),
       spellcheckEnabled:fd.get('spellcheckEnabled')==='on',
       githubUrl:fd.get('githubUrl'),
       firebaseEnabled:firebaseReady
@@ -2359,7 +2486,7 @@ function actionPermissionsCard(){
   const base = { ...actionAccessDefaults(), ...(state.settings?.operatorActionAccess || {}) };
   const users = (state.users || []).filter(u => (u.role || 'Operador') !== 'Admin Master');
   const actions = [
-    ['add','Adicionar'],['edit','Editar'],['delete','Apagar'],['importExcel','Importar Excel'],['exportExcel','Exportar Excel']
+    ['add','Adicionar'],['edit','Editar'],['delete','Apagar']
   ];
   return `<div class="card permissions-card span-all"><div class="card-head"><h3>Permissões finas</h3><span class="muted">Controla ações para operadores e exceções por utilizador.</span></div>
     <form id="actionPermissionsForm" class="permissions-form">
@@ -2381,13 +2508,13 @@ function bindActionPermissions(){
     e.preventDefault();
     const fd = new FormData(form);
     state.settings.operatorActionAccess = actionAccessDefaults();
-    ['add','edit','delete','importExcel','exportExcel'].forEach(key=>{
+    ['add','edit','delete'].forEach(key=>{
       state.settings.operatorActionAccess[key] = fd.get(`operatorAction:${key}`) === 'on';
     });
     (state.users || []).forEach(u=>{
       if((u.role || 'Operador') === 'Admin Master') return;
       u.actionAccess = u.actionAccess || {};
-      ['add','edit','delete','importExcel','exportExcel'].forEach(key=>{
+      ['add','edit','delete'].forEach(key=>{
         u.actionAccess[key] = fd.get(`userAction:${u.id}:${key}`) === 'on';
       });
     });

@@ -1,9 +1,15 @@
 const { app, BrowserWindow, shell, Menu } = require('electron');
 const path = require('path');
 
-const GITHUB_APP_URL = process.env.APP_URL || '';
+// GitHub Pages é agora a app principal. Podes trocar este link pelo URL final do teu repositório.
+const DEFAULT_GITHUB_APP_URL = 'https://picafern-commits.github.io/App-Callcenter-main/html/index.html';
+const GITHUB_APP_URL = process.env.APP_URL || DEFAULT_GITHUB_APP_URL;
 const startMaximized = process.env.START_MAXIMIZED !== '0';
 let mainWindow = null;
+
+function loadLocalFallback(win) {
+  win.loadFile(path.join(__dirname, '..', 'html', 'index.html'));
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -31,11 +37,11 @@ function createWindow() {
     mainWindow.show();
   });
 
-  if (GITHUB_APP_URL) {
-    mainWindow.loadURL(GITHUB_APP_URL);
-  } else {
-    mainWindow.loadFile(path.join(__dirname, '..', 'html', 'index.html'));
-  }
+  mainWindow.loadURL(GITHUB_APP_URL).catch(() => loadLocalFallback(mainWindow));
+
+  mainWindow.webContents.on('did-fail-load', (_event, _code, _desc, validatedURL) => {
+    if (validatedURL === GITHUB_APP_URL) loadLocalFallback(mainWindow);
+  });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);

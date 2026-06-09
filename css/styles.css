@@ -2097,3 +2097,213 @@ body.theme-dark .client-code-box .data-card-code{
   .supplier-code-box .data-card-code,
   .client-code-box .data-card-code{min-width:0;width:max-content;max-width:100%;}
 }
+
+/* v1.8.7 - Persistência de tema, velocidade, barra limpa e dark mode legível */
+html.theme-dark, html.theme-dark body{background:#071523!important;}
+.nav-strip-wrap{
+  display:flex!important;
+  justify-content:center!important;
+}
+.nav-strip{
+  width:100%;
+  justify-content:center!important;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:10px 12px;
+  padding-inline:8px;
+}
+.nav-btn{
+  border:none!important;
+  outline:none!important;
+  box-shadow:none!important;
+  background:rgba(255,255,255,.64)!important;
+  color:var(--brand3)!important;
+}
+.nav-btn.active{
+  border:none!important;
+  background:linear-gradient(135deg,var(--brand2),var(--brand))!important;
+  color:#fff!important;
+  box-shadow:0 10px 22px rgba(17,55,91,.12)!important;
+}
+.nav-btn:hover{
+  box-shadow:0 10px 22px rgba(17,55,91,.10)!important;
+}
+body.theme-dark::before{
+  opacity:.43!important;
+  filter:blur(5px) saturate(1.08) brightness(.82)!important;
+}
+body.theme-dark::after{
+  background:linear-gradient(180deg,rgba(6,16,28,.76),rgba(10,28,44,.72)), radial-gradient(circle at 80% 8%,rgba(238,127,34,.10),transparent 24rem)!important;
+}
+body.theme-dark .app-shell,
+body.theme-dark .login-screen{
+  background:transparent!important;
+}
+body.theme-dark .nav-btn{
+  background:rgba(12,26,42,.66)!important;
+  color:#e8f3fb!important;
+}
+body.theme-dark .nav-btn.active{
+  background:linear-gradient(135deg,#145c97,#0b426f)!important;
+  color:white!important;
+}
+body.theme-dark .warehouse-block,
+body.theme-dark .directory-section,
+body.theme-dark .section-toggle,
+body.theme-dark .contact-card{
+  background:rgba(8,20,34,.76)!important;
+  border-color:rgba(130,172,210,.18)!important;
+  color:#e8f3fb!important;
+}
+body.theme-dark .warehouse-head{
+  background:linear-gradient(135deg,rgba(10,45,76,.92),rgba(12,32,52,.88))!important;
+  color:#f1f7ff!important;
+  border-bottom:1px solid rgba(130,172,210,.20)!important;
+}
+body.theme-dark .warehouse-head strong,
+body.theme-dark .section-toggle b,
+body.theme-dark .contact-main strong{
+  color:#f4f9ff!important;
+}
+body.theme-dark .warehouse-head span,
+body.theme-dark .section-toggle small,
+body.theme-dark .contact-main span,
+body.theme-dark .contact-lines a,
+body.theme-dark .contact-lines span{
+  color:#b9d0e6!important;
+}
+body.theme-dark .section-toggle i{
+  color:#7ec0ff!important;
+}
+body.theme-dark .directory-searchbar{
+  background:rgba(8,20,34,.58)!important;
+  border-color:rgba(130,172,210,.18)!important;
+}
+/* menos peso visual no topo para carregar e ler mais rápido */
+.shell-header{
+  box-shadow:0 10px 24px rgba(17,55,91,.08)!important;
+}
+.content{scroll-behavior:auto;}
+@media(max-width:900px){
+  .nav-strip{justify-content:flex-start!important;flex-wrap:nowrap;}
+}
+
+/* v1.8.8 - Boot sem flash de login, resolução e paletas predefinidas */
+body.auth-boot #loginScreen{display:none!important;}
+body.auth-boot #appShell{display:none!important;}
+body.auth-boot::before{opacity:.36;}
+body.auth-boot::after{background:linear-gradient(180deg,rgba(240,247,253,.90),rgba(224,236,247,.86));}
+body.auth-boot{cursor:progress;}
+
+/* Excel apenas Admin Master: operadores/users não veem nem têm permissões de Excel */
+body:not(.admin-master) .excel-toolbar,
+body:not(.admin-master) [data-excel-template],
+body:not(.admin-master) [data-excel-export],
+body:not(.admin-master) [data-excel-import],
+.permission-check input[name*="Excel"],
+.permission-check:has(input[name*="importExcel"]),
+.permission-check:has(input[name*="exportExcel"]){display:none!important;}
+
+/* Barra de páginas limpa, sem linhas, centrada */
+.nav-strip-wrap{display:flex!important;justify-content:center!important;}
+.nav-strip{justify-content:center!important;align-items:center!important;gap:10px 12px!important;}
+.nav-btn{border:0!important;box-shadow:none!important;outline:0!important;background:rgba(255,255,255,.58)!important;}
+.nav-btn.active{border:0!important;box-shadow:0 10px 22px rgba(17,55,91,.12)!important;}
+
+/* Sistema de resolução */
+body.res-compact .shell-header,
+body.res-compact .nav-strip-wrap,
+body.res-compact .content{width:min(1540px,calc(100% - 24px));}
+body.res-compact .shell-header{min-height:60px;padding:10px 14px;margin-top:10px;border-radius:18px;}
+body.res-compact .nav-btn{padding:8px 11px!important;font-size:13px;}
+body.res-compact .content{padding-top:4px;}
+body.res-compact .card{padding:14px;border-radius:16px;}
+body.res-compact .field,
+body.res-compact .select,
+body.res-compact textarea{min-height:40px;padding:9px 11px;}
+body.res-compact .btn{min-height:38px;padding:8px 11px;}
+body.res-compact .table-wrap th,
+body.res-compact .table-wrap td{padding:10px 11px;}
+
+body.res-wide .shell-header,
+body.res-wide .nav-strip-wrap,
+body.res-wide .content{width:min(1660px,calc(100% - 22px));}
+body.res-wide .two{grid-template-columns:.62fr 1.38fr;}
+body.res-wide .apps-center{width:min(1180px,100%);}
+
+body.res-large .shell-header,
+body.res-large .nav-strip-wrap,
+body.res-large .content{width:min(1260px,calc(100% - 44px));}
+body.res-large .nav-btn{padding:13px 18px!important;font-size:15px;}
+body.res-large .card{padding:24px;border-radius:22px;}
+body.res-large .field,
+body.res-large .select,
+body.res-large textarea{min-height:52px;font-size:16px;}
+body.res-large .btn{min-height:50px;font-size:15px;}
+body.res-large .apps-center{width:min(980px,100%);}
+body.res-large .big-page-button{min-height:185px;}
+
+/* Paletas de cores predefinidas */
+body.scheme-az{
+  --brand:#0b426f;--brand2:#145c97;--brand3:#183b5d;--accent:#ee7f22;--accent2:#ffb067;
+}
+body.scheme-ocean{
+  --brand:#075985;--brand2:#0284c7;--brand3:#0f3d56;--accent:#06b6d4;--accent2:#67e8f9;
+}
+body.scheme-graphite{
+  --brand:#334155;--brand2:#475569;--brand3:#1f2937;--accent:#64748b;--accent2:#cbd5e1;
+}
+body.scheme-emerald{
+  --brand:#065f46;--brand2:#059669;--brand3:#064e3b;--accent:#10b981;--accent2:#86efac;
+}
+body.scheme-sunset{
+  --brand:#7c2d12;--brand2:#ea580c;--brand3:#65230f;--accent:#f97316;--accent2:#fed7aa;
+}
+body.scheme-ocean .brand-mark,
+body.scheme-emerald .brand-mark,
+body.scheme-graphite .brand-mark,
+body.scheme-sunset .brand-mark{background:linear-gradient(135deg,var(--brand),var(--brand2));}
+
+/* Minhas Configs: resolução e esquemas */
+.user-setting-section{display:grid;gap:14px;padding-top:4px;}
+.setting-title strong{display:block;color:var(--brand3);font-size:18px;}
+.setting-title span{display:block;color:var(--muted);font-weight:800;font-size:13px;margin-top:4px;}
+.choice-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;}
+.choice-card{border:1px solid rgba(20,92,151,.10);border-radius:18px;padding:15px;text-align:left;background:rgba(255,255,255,.62);color:var(--brand3);box-shadow:0 10px 22px rgba(17,55,91,.07);}
+.choice-card:hover{transform:translateY(-1px);}
+.choice-card.active{border-color:rgba(238,127,34,.42);box-shadow:0 14px 28px rgba(238,127,34,.14);}
+.choice-card.active::after{content:"Ativo";display:inline-flex;margin-top:10px;padding:6px 9px;border-radius:999px;background:rgba(238,127,34,.12);color:#b54708;font-size:12px;font-weight:950;}
+.choice-card strong{display:block;font-size:15px;}
+.choice-card span{display:block;color:var(--muted);font-weight:750;font-size:12px;margin-top:5px;line-height:1.35;}
+.scheme-choice{display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:start;}
+.scheme-choice span{grid-column:2;}
+.scheme-dot{width:22px;height:22px;border-radius:999px;display:block;box-shadow:inset 0 0 0 2px rgba(255,255,255,.5), 0 4px 10px rgba(17,55,91,.12);}
+.scheme-dot-az{background:linear-gradient(135deg,#145c97,#ee7f22);}
+.scheme-dot-ocean{background:linear-gradient(135deg,#0284c7,#06b6d4);}
+.scheme-dot-graphite{background:linear-gradient(135deg,#334155,#94a3b8);}
+.scheme-dot-emerald{background:linear-gradient(135deg,#059669,#86efac);}
+.scheme-dot-sunset{background:linear-gradient(135deg,#ea580c,#fed7aa);}
+
+/* Darkmode: imagem de fundo visível e diretório legível */
+body.theme-dark::before{opacity:.48!important;filter:blur(5px) saturate(1.12) brightness(.86)!important;}
+body.theme-dark::after{background:linear-gradient(180deg,rgba(6,16,28,.72),rgba(10,28,44,.68)),radial-gradient(circle at 80% 8%,rgba(238,127,34,.10),transparent 24rem)!important;}
+body.theme-dark .warehouse-block,
+body.theme-dark .directory-section{background:rgba(5,17,30,.84)!important;border-color:rgba(126,192,255,.20)!important;}
+body.theme-dark .warehouse-head{background:linear-gradient(135deg,rgba(8,31,53,.96),rgba(5,20,34,.92))!important;color:#f5faff!important;}
+body.theme-dark .warehouse-head strong{color:#fff!important;text-shadow:0 1px 0 rgba(0,0,0,.22);}
+body.theme-dark .warehouse-head span{color:#c7ddf2!important;}
+body.theme-dark .section-toggle{background:rgba(8,25,42,.88)!important;color:#f4f9ff!important;border-color:rgba(126,192,255,.20)!important;}
+body.theme-dark .section-toggle b{color:#fff!important;}
+body.theme-dark .section-toggle small{color:#c7ddf2!important;}
+body.theme-dark .contact-card{background:rgba(8,25,42,.78)!important;border-color:rgba(126,192,255,.15)!important;}
+body.theme-dark .choice-card,
+body.theme-dark .theme-choice-box{background:rgba(8,25,42,.78)!important;border-color:rgba(126,192,255,.15)!important;color:#f4f9ff!important;}
+body.theme-dark .setting-title strong,
+body.theme-dark .choice-card strong{color:#f4f9ff!important;}
+
+@media(max-width:900px){.choice-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:640px){.choice-grid{grid-template-columns:1fr;}.nav-strip{justify-content:flex-start!important;flex-wrap:nowrap;overflow:auto;}}
+/* Tema aplicado antes do JS terminar, para não piscar entre páginas */
+html.theme-dark body{background:#071523!important;}
+html.theme-dark body::before{opacity:.48!important;filter:blur(5px) saturate(1.12) brightness(.86)!important;}
+html.theme-dark body::after{background:linear-gradient(180deg,rgba(6,16,28,.72),rgba(10,28,44,.68)),radial-gradient(circle at 80% 8%,rgba(238,127,34,.10),transparent 24rem)!important;}
