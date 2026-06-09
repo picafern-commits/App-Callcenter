@@ -1,4 +1,4 @@
-const APP_VERSION = '1.8.1';
+const APP_VERSION = '1.8.2';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
@@ -869,44 +869,54 @@ function badge(v){
 
 function clientes(){
   const canEdit = canEditOperational();
-  const addCard = canEdit ? `<div class="card compact-form-card">
-      <div class="card-head"><h3>Adicionar cliente</h3><span class="muted">O código fica antes do nome na ficha.</span></div>
-      <form id="clientForm" class="form-grid">
+  const total = state.clients.length;
+  const withEmail = state.clients.filter(c=>c.email).length;
+  const withPhone = state.clients.filter(c=>c.telefone).length;
+  const addCard = canEdit ? `<div class="card compact-form-card clean-side-card">
+      <div class="card-head clean-card-head"><div><h3>Novo cliente</h3><span class="muted">Registo rápido</span></div></div>
+      <form id="clientForm" class="simple-stack-form">
         <input class="field" name="codigoCliente" placeholder="Código cliente" required>
-        <input class="field span2" name="nome" placeholder="Nome do cliente" required>
+        <input class="field" name="nome" placeholder="Nome do cliente" required>
         <input class="field" name="telefone" placeholder="Telefone">
         <input class="field" name="email" placeholder="Email">
-        <textarea class="span3" name="notas" placeholder="Notas"></textarea>
-        <div class="span3"><button class="btn primary" type="submit">Guardar cliente</button></div>
+        <textarea name="notas" placeholder="Notas internas"></textarea>
+        <button class="btn primary full" type="submit">Guardar cliente</button>
       </form>
     </div>` : '';
-  return `<div class="grid ${canEdit ? 'two split-form-list' : 'single-list'} clients-page">
+  return `<div class="grid ${canEdit ? 'two split-form-list clean-page-layout' : 'single-list'} clients-page clean-module-page">
     ${addCard}
-    <div class="card">
-      <div class="card-head"><h3>Lista de clientes</h3><span class="muted">${state.clients.length} registos</span></div>
+    <div class="card clean-main-card">
+      <div class="clean-page-head">
+        <div><span class="clean-eyebrow">Clientes</span><h3>Base de clientes</h3></div>
+        <div class="clean-stats"><span><b>${total}</b> total</span><span><b>${withEmail}</b> email</span><span><b>${withPhone}</b> telefone</span></div>
+      </div>
       ${!canEdit ? '<div class="readonly-note">Modo leitura: podes consultar dados e enviar emails, mas não podes adicionar nem editar clientes.</div>' : ''}
-      <div class="toolbar one"><input id="clientSearch" class="field" placeholder="Pesquisar por código, nome, telefone ou email"></div>
+      <div class="clean-search-row"><input id="clientSearch" class="field" placeholder="Pesquisar cliente, código, telefone ou email"></div>
       <div id="clientsTable">${clientsTable(state.clients)}</div>
     </div>
   </div>`;
 }
 function fornecedores(){
   const canEdit = canEditOperational();
-  const addCard = canEdit ? `<div class="card compact-form-card">
-      <div class="card-head"><h3>Adicionar fornecedor</h3><span class="muted">Apenas marca e código de ficha.</span></div>
-      <form id="supplierForm" class="form-grid">
-        <input class="field span2" name="nomeMarca" placeholder="Nome da marca" required>
+  const rows = sortedSuppliers(state.suppliers);
+  const addCard = canEdit ? `<div class="card compact-form-card clean-side-card">
+      <div class="card-head clean-card-head"><div><h3>Novo fornecedor</h3><span class="muted">Marca + código</span></div></div>
+      <form id="supplierForm" class="simple-stack-form">
+        <input class="field" name="nomeMarca" placeholder="Nome do fornecedor / marca" required>
         <input class="field" name="codigoFicha" placeholder="Código de ficha" required>
-        <div class="span3"><button class="btn primary" type="submit">Guardar fornecedor</button></div>
+        <button class="btn primary full" type="submit">Guardar fornecedor</button>
       </form>
     </div>` : '';
-  return `<div class="grid ${canEdit ? 'two split-form-list' : 'single-list'} suppliers-page">
+  return `<div class="grid ${canEdit ? 'two split-form-list clean-page-layout' : 'single-list'} suppliers-page clean-module-page">
     ${addCard}
-    <div class="card supplier-list-card">
-      <div class="card-head"><h3>Lista de fornecedores</h3><span class="muted">${state.suppliers.length} registos</span></div>
+    <div class="card supplier-list-card clean-main-card">
+      <div class="clean-page-head">
+        <div><span class="clean-eyebrow">Fornecedores</span><h3>Lista A-Z</h3></div>
+        <div class="clean-stats"><span><b>${rows.length}</b> registos</span></div>
+      </div>
       ${!canEdit ? '<div class="readonly-note">Modo leitura: podes consultar os fornecedores, sem adicionar nem editar.</div>' : ''}
-      <div class="toolbar one"><input id="supplierSearch" class="field" placeholder="Pesquisar por marca ou código de ficha"></div>
-      <div id="suppliersTable">${suppliersTable(sortedSuppliers(state.suppliers))}</div>
+      <div class="clean-search-row"><input id="supplierSearch" class="field" placeholder="Pesquisar por fornecedor ou código de ficha"></div>
+      <div id="suppliersTable">${suppliersTable(rows)}</div>
     </div>
   </div>`;
 }
@@ -914,51 +924,29 @@ function contactos(){
   const warehouses = uniqueWarehouses();
   const sections = uniqueSections();
   const canEdit = canEditOperational();
-  const addCard = canEdit ? `<div class="card directory-add-card compact-form-card">
-      <div class="card-head">
-        <h3>Adicionar contacto</h3>
-        <span class="muted">Escolhe o armazém e a secção</span>
-      </div>
-      <form id="quickContactForm" class="directory-simple-form">
-        <label>Armazém</label>
-        <input class="field" name="armazem" list="warehouseList" placeholder="Ex: Armazém Lisboa" required>
+  const totalContacts = contactCount();
+  const addCard = canEdit ? `<div class="card directory-add-card compact-form-card clean-side-card">
+      <div class="card-head clean-card-head"><div><h3>Contacto rápido</h3><span class="muted">Armazém → Secção</span></div></div>
+      <form id="quickContactForm" class="simple-stack-form directory-simple-form">
+        <input class="field" name="armazem" list="warehouseList" placeholder="Armazém" required>
         <datalist id="warehouseList">${warehouses.map(w=>`<option value="${esc(w)}"></option>`).join('')}</datalist>
-
-        <label>Secção</label>
-        <input class="field" name="seccao" list="sectionList" placeholder="Ex: Peças, Vendas, Administração" required>
+        <input class="field" name="seccao" list="sectionList" placeholder="Secção" required>
         <datalist id="sectionList">${sections.map(sec=>`<option value="${esc(sec)}"></option>`).join('')}</datalist>
-
-        <label>Nome</label>
         <input class="field" name="nome" placeholder="Nome do contacto" required>
-
-        <div class="directory-form-pair">
-          <div>
-            <label>Telemóvel</label>
-            <input class="field" name="telemovel" placeholder="Telemóvel">
-          </div>
-          <div>
-            <label>Telefone</label>
-            <input class="field" name="telefone" placeholder="Telefone fixo">
-          </div>
-        </div>
-
-        <label>Email</label>
-        <input class="field" name="email" type="email" placeholder="email@empresa.pt">
-
+        <div class="mini-two-fields"><input class="field" name="telemovel" placeholder="Telemóvel"><input class="field" name="telefone" placeholder="Telefone"></div>
+        <input class="field" name="email" type="email" placeholder="Email">
         <button class="btn primary full" type="submit">Guardar contacto</button>
       </form>
     </div>` : '';
-  return `<div class="grid ${canEdit ? 'two split-form-list' : 'single-list'} contacts-page directory-clean-page">
+  return `<div class="grid ${canEdit ? 'two split-form-list clean-page-layout' : 'single-list'} contacts-page directory-clean-page clean-module-page">
     ${addCard}
-    <div class="card directory-main-card">
-      <div class="card-head">
-        <h3>Diretório</h3>
-        <span class="muted">${contactCount()} contactos</span>
+    <div class="card directory-main-card clean-main-card">
+      <div class="clean-page-head">
+        <div><span class="clean-eyebrow">Diretório</span><h3>Armazéns e secções</h3></div>
+        <div class="clean-stats"><span><b>${warehouses.length}</b> armazéns</span><span><b>${sections.length}</b> secções</span><span><b>${totalContacts}</b> contactos</span></div>
       </div>
       ${!canEdit ? '<div class="readonly-note">Modo leitura: podes consultar contactos, ligar ou enviar email, mas não podes adicionar nem editar.</div>' : ''}
-      <div class="directory-searchbar">
-        <input id="contactSearch" class="field" placeholder="Pesquisar por armazém, secção, nome, telefone ou email">
-      </div>
+      <div class="clean-search-row"><input id="contactSearch" class="field" placeholder="Pesquisar armazém, secção, nome, telefone ou email"></div>
       <div id="contactsTable">${contactGroupsView(filterContactGroups())}</div>
     </div>
   </div>`;
@@ -1103,7 +1091,23 @@ function filterClients(){
 }
 function clientsTable(rows){
   if(!rows.length) return '<div class="empty">Sem clientes registados.</div>';
-  return `<div class="table-wrap"><table><thead><tr><th>Código cliente</th><th>Nome</th><th>Telefone</th><th>Email</th><th>Ações</th></tr></thead><tbody>${rows.map(c=>`<tr><td><span class="supplier-ref">${esc(clientCode(c) || '-')}</span></td><td><strong>${esc(c.nome || '')}</strong></td><td>${esc(c.telefone || '-')}</td><td>${esc(c.email || '-')}</td><td><div class="actions"><button class="btn small" data-client-detail="${c.id}">Ficha</button>${c.email ? `<button class="btn success small" data-client-email="${c.id}">Email</button>` : ''}${canEditOperational()?`<button class="btn small" data-edit-entity="client:${c.id}">Editar</button>`:''}${canDelete()?`<button class="btn danger small" data-delete-entity="client:${c.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="clean-card-list client-card-list">${rows.map(c=>`
+    <article class="clean-data-card client-data-card">
+      <div class="data-card-main">
+        <span class="data-card-code">${esc(clientCode(c) || 'Sem código')}</span>
+        <strong>${esc(c.nome || '-')}</strong>
+        <small>${esc(c.email || 'Sem email')}</small>
+      </div>
+      <div class="data-card-meta">
+        <span>☎ ${esc(c.telefone || 'Sem telefone')}</span>
+      </div>
+      <div class="actions data-card-actions">
+        <button class="btn small" data-client-detail="${c.id}">Ficha</button>
+        ${c.email ? `<button class="btn success small" data-client-email="${c.id}">Email</button>` : ''}
+        ${canEditOperational()?`<button class="btn small" data-edit-entity="client:${c.id}">Editar</button>`:''}
+        ${canDelete()?`<button class="btn danger small" data-delete-entity="client:${c.id}">Apagar</button>`:''}
+      </div>
+    </article>`).join('')}</div>`;
 }
 function openClientDetail(id){
   const c = state.clients.find(x=>x.id===id); if(!c) return;
@@ -1167,9 +1171,19 @@ function filterSuppliers(){
   return sortedSuppliers(state.suppliers.filter(s => `${supplierName(s)} ${supplierRef(s)}`.toLowerCase().includes(q)));
 }
 function suppliersTable(rows){
-  rows = sortedSuppliers(rows);
   if(!rows.length) return '<div class="empty">Sem fornecedores registados.</div>';
-  return `<div class="table-wrap"><table class="suppliers-table"><thead><tr><th>Nome da marca</th><th>Código de ficha</th><th>Ações</th></tr></thead><tbody>${rows.map(s=>`<tr><td><strong>${esc(supplierName(s))}</strong></td><td><span class="supplier-ref">${esc(supplierRef(s) || '-')}</span></td><td><div class="actions">${canEditOperational()?`<button class="btn small" data-edit-entity="supplier:${s.id}">Editar</button>`:'<span class="muted">Consulta</span>'}${canDelete()?`<button class="btn danger small" data-delete-entity="supplier:${s.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="clean-card-list supplier-card-list">${rows.map(s=>`
+    <article class="clean-data-card supplier-data-card">
+      <div class="data-card-main">
+        <span class="data-card-code">${esc(supplierRef(s) || 'Sem código')}</span>
+        <strong>${esc(supplierName(s) || '-')}</strong>
+        <small>Fornecedor</small>
+      </div>
+      <div class="actions data-card-actions">
+        ${canEditOperational()?`<button class="btn small" data-edit-entity="supplier:${s.id}">Editar</button>`:'<span class="muted">Consulta</span>'}
+        ${canDelete()?`<button class="btn danger small" data-delete-entity="supplier:${s.id}">Apagar</button>`:''}
+      </div>
+    </article>`).join('')}</div>`;
 }
 function stock(){
   return entityPage('Stock / Catálogo','stockForm',[
@@ -1257,39 +1271,59 @@ function entityTable(rows, cols, type){
 function orcamentos(){
   const clientOptions = state.clients.map(c=>`<option value="${esc(c.nome)}" data-email="${esc(c.email || '')}" data-phone="${esc(c.telefone || '')}" data-code="${esc(clientCode(c))}">${esc(clientCode(c) ? `${clientCode(c)} - ${c.nome}` : c.nome)}</option>`).join('');
   const canEdit = canEditOperational();
-  const addCard = canEdit ? `<div class="card compact-form-card">
-      <div class="card-head"><h3>Criar orçamento</h3><span class="muted">Depois podes gerar PDF e email.</span></div>
-      <form id="quoteForm" class="form-grid">
-        <select class="select span2" name="cliente" id="quoteClientSelect" required>
-          <option value="">Selecionar cliente</option>${clientOptions}
-        </select>
+  const total = state.quotes.length;
+  const totalValue = state.quotes.reduce((sum,q)=>sum + Number(q.total || 0), 0);
+  const addCard = canEdit ? `<div class="card compact-form-card clean-side-card">
+      <div class="card-head clean-card-head"><div><h3>Novo orçamento</h3><span class="muted">Criação rápida</span></div></div>
+      <form id="quoteForm" class="simple-stack-form quote-clean-form">
+        <select class="select" name="cliente" id="quoteClientSelect" required><option value="">Selecionar cliente</option>${clientOptions}</select>
         <input class="field" name="codigoCliente" placeholder="Código cliente">
         <input class="field" name="telefone" placeholder="Telefone">
-        <input class="field span2" name="email" placeholder="Email do cliente">
+        <input class="field" name="email" placeholder="Email do cliente">
         <input class="field" name="viatura" placeholder="Viatura / matrícula">
-        <input class="field span2" name="peca" placeholder="Peça / serviço" required>
+        <input class="field" name="peca" placeholder="Peça / serviço" required>
         <input class="field" name="referencia" placeholder="Referência">
-        <input class="field" name="quantidade" type="number" min="1" value="1" placeholder="Qtd">
-        <input class="field" name="precoUnitario" type="number" min="0" step="0.01" placeholder="Preço unitário" required>
+        <div class="mini-two-fields"><input class="field" name="quantidade" type="number" min="1" value="1" placeholder="Qtd"><input class="field" name="precoUnitario" type="number" min="0" step="0.01" placeholder="Preço" required></div>
         <select class="select" name="estado"><option>Rascunho</option><option>Enviado</option><option>Aceite</option><option>Recusado</option></select>
         <input class="field" name="validade" type="date" value="${today()}">
-        <input class="field span2" name="prazoEntrega" placeholder="Prazo de entrega">
-        <input class="field span3" name="condicoes" placeholder="Condições comerciais" value="Preços sujeitos a disponibilidade da peça no momento da confirmação.">
-        <textarea class="span3" name="observacoes" placeholder="Notas para o orçamento"></textarea>
-        <div class="span3"><button class="btn primary" type="submit">Criar orçamento</button></div>
+        <input class="field" name="prazoEntrega" placeholder="Prazo de entrega">
+        <textarea name="condicoes" placeholder="Condições comerciais">Preços sujeitos a disponibilidade da peça no momento da confirmação.</textarea>
+        <textarea name="observacoes" placeholder="Notas internas"></textarea>
+        <button class="btn primary full" type="submit">Criar orçamento</button>
       </form>
     </div>` : '';
-  return `<div class="grid ${canEdit ? 'two split-form-list' : 'single-list'} quotes-page">
+  return `<div class="grid ${canEdit ? 'two split-form-list clean-page-layout' : 'single-list'} quotes-page clean-module-page">
     ${addCard}
-    <div class="card">
-      <div class="card-head"><h3>Orçamentos</h3><span class="muted">${state.quotes.length} registos</span></div>
+    <div class="card clean-main-card">
+      <div class="clean-page-head">
+        <div><span class="clean-eyebrow">Orçamentos</span><h3>Propostas comerciais</h3></div>
+        <div class="clean-stats"><span><b>${total}</b> registos</span><span><b>${money(totalValue)}</b> total</span></div>
+      </div>
       ${!canEdit ? '<div class="readonly-note">Modo leitura: podes consultar e enviar orçamento por email, mas não podes criar nem alterar estados.</div>' : ''}
       ${state.quotes.length ? quotesTable() : '<div class="empty">Ainda não existem orçamentos.</div>'}
     </div>
   </div>`;
 }
-function quotesTable(){ return `<div class="table-wrap"><table><thead><tr><th>ID</th><th>Cliente</th><th>Peça</th><th>Total</th><th>Estado</th><th>Ações</th></tr></thead><tbody>${state.quotes.map(q=>`<tr><td>${esc(q.id)}</td><td><strong>${esc(q.cliente)}</strong><br><span class="muted">${esc(q.email || '')}</span></td><td>${esc(q.peca)}<br><span class="muted">${esc(q.referencia || '')}</span></td><td>${money(q.total)}</td><td>${badge(q.estado)}</td><td><div class="actions"><button class="btn small" data-print-quote="${q.id}">PDF</button><button class="btn success small" data-email-quote="${q.id}">Email</button>${canEditOperational()?`<button class="btn success small" data-quote-status="${q.id}:Aceite">Aceite</button><button class="btn warn small" data-quote-status="${q.id}:Recusado">Recusado</button>`:''}${canDelete()?`<button class="btn danger small" data-delete-quote="${q.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`; }
-
+function quotesTable(){
+  return `<div class="clean-card-list quote-card-list">${state.quotes.map(q=>`
+    <article class="clean-data-card quote-data-card">
+      <div class="data-card-main">
+        <span class="data-card-code">${esc(q.id)}</span>
+        <strong>${esc(q.cliente || '-')}</strong>
+        <small>${esc(q.peca || '-')} ${q.referencia ? '· ' + esc(q.referencia) : ''}</small>
+      </div>
+      <div class="quote-value-box">
+        <b>${money(q.total)}</b>
+        ${badge(q.estado)}
+      </div>
+      <div class="actions data-card-actions">
+        <button class="btn small" data-print-quote="${q.id}">PDF</button>
+        <button class="btn success small" data-email-quote="${q.id}">Email</button>
+        ${canEditOperational()?`<button class="btn success small" data-quote-status="${q.id}:Aceite">Aceite</button><button class="btn warn small" data-quote-status="${q.id}:Recusado">Recusado</button>`:''}
+        ${canDelete()?`<button class="btn danger small" data-delete-quote="${q.id}">Apagar</button>`:''}
+      </div>
+    </article>`).join('')}</div>`;
+}
 function agenda(){
   return `<div class="grid two"><div class="card"><div class="card-head"><h3>Novo follow-up</h3></div><form id="followForm" class="form-grid"><input class="field" type="date" name="date" value="${today()}"><input class="field" type="time" name="time"><input class="field" name="title" placeholder="Título"><input class="field span2" name="related" placeholder="Relacionado com"><select class="select" name="status"><option>Pendente</option><option>Feito</option></select><textarea class="span3" name="notes" placeholder="Notas"></textarea><div class="span3"><button class="btn primary">Guardar</button></div></form></div><div class="card"><div class="card-head"><h3>Agenda</h3></div>${entityTable(state.followups, ['date','time','title','related','status'], 'follow')}</div></div>`;
 }
