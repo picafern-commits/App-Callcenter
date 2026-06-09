@@ -1,4 +1,4 @@
-const APP_VERSION = '1.5.7';
+const APP_VERSION = '1.5.9';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
@@ -80,7 +80,13 @@ function seedData() {
       firebaseEnabled: false,
       dailyBackupHour: '19:30',
       theme: 'normal',
-      spellcheckEnabled: true
+      spellcheckEnabled: true,
+      operatorPageAccess: {
+        clientes: true,
+        contactos: true,
+        fornecedores: true,
+        orcamentos: true
+      }
     },
     currentUser: null,
     calls: [
@@ -103,8 +109,8 @@ function seedData() {
       { id: uid('STK'), referencia:'ALT-BMW-F30', nome:'Alternador BMW Série 3 F30', marca:'BMW', modelo:'320d', estado:'Recondicionada', local:'Prateleira A2', custo:110, venda:190, qtd:1 }
     ],
     users: [
-      { id: uid('USR'), nome:'Ricardo', email:'pica.fern@gmail.com', role:'Admin Master', status:'Ativo' },
-      { id: uid('USR'), nome:'Operador 1', email:'operador@empresa.pt', role:'Operador', status:'Ativo' }
+      { id: uid('USR'), nome:'Ricardo', email:'pica.fern@gmail.com', role:'Admin Master', status:'Ativo', pageAccess:{} },
+      { id: uid('USR'), nome:'Operador 1', email:'operador@empresa.pt', role:'Operador', status:'Ativo', pageAccess:{} }
     ],
     contactGroups: [
       {
@@ -366,13 +372,43 @@ function toggleTheme(){
   applyTheme();
   toast(state.settings.theme === 'dark' ? 'Darkmode ativo.' : 'Modo normal ativo.');
 }
+function managedPageList(){
+  return pages.filter(p => !['dashboard','users','config'].includes(p.id));
+}
+function defaultOperatorPageAccess(){
+  return managedPageList().reduce((acc,p)=>{ acc[p.id] = true; return acc; }, {});
+}
+function operatorPageAccess(){
+  return { ...defaultOperatorPageAccess(), ...(state.settings?.operatorPageAccess || {}) };
+}
+function currentUserRecordSafe(){
+  return currentUserRecord ? currentUserRecord() : null;
+}
+function hasOwn(obj, key){
+  return Object.prototype.hasOwnProperty.call(obj || {}, key);
+}
+function userPageOverride(user, pageId){
+  const access = user?.pageAccess || {};
+  return hasOwn(access, pageId) ? access[pageId] === true : null;
+}
+function userCanOpenManagedPage(user, pageId){
+  const override = userPageOverride(user, pageId);
+  if(override !== null) return override;
+  return operatorPageAccess()[pageId] !== false;
+}
 function pageUrl(id){ return pageFiles[id] || 'index.html'; }
 function goPage(id){ window.location.href = pageUrl(id); }
 function canOpenPage(id){
-  if(['dashboard','clientes','contactos','fornecedores','orcamentos'].includes(id)) return true;
+  if(id === 'dashboard') return true;
+  if(isAdminMaster()) return true;
   if(id === 'users') return hasPermission('manageUsers') || hasPermission('approveUsers');
   if(id === 'config') return hasPermission('manageSettings');
-  return true;
+  const managedIds = managedPageList().map(p=>p.id);
+  if(managedIds.includes(id)) {
+    if(currentRole() === 'Operador') return userCanOpenManagedPage(currentUserRecord(), id);
+    return true;
+  }
+  return hasPermission('manageSettings');
 }
 function getDefaultPage(){
   if (window.DEFAULT_PAGE) return window.DEFAULT_PAGE;
@@ -534,6 +570,16 @@ function buildNav(){
   qs('#navMenu').innerHTML = pages.filter(p=>canOpenPage(p.id)).map(p => `<a class="nav-btn" href="${pageUrl(p.id)}" data-page="${p.id}"><span class="nav-icon">${p.icon}</span><span>${p.title}</span></a>`).join('');
 }
 
+async function logoutCurrentUser(){
+  stopFirebaseListeners();
+  clearStoredSession();
+  if (firebaseReady && firebaseAuth?.currentUser) await firebaseAuth.signOut();
+  state.currentUser = null;
+  saveLocalOnly();
+  qs('#appShell')?.classList.add('hidden');
+  qs('#loginScreen')?.classList.remove('hidden');
+}
+
 function bindShell(){
   const home = qs('#homeBtn');
   const logout = qs('#logoutBtn');
@@ -551,14 +597,7 @@ function bindShell(){
   home.dataset.bound = '1';
   logout.dataset.bound = '1';
   home.addEventListener('click',()=>goPage('dashboard'));
-  logout.addEventListener('click',async ()=>{
-    stopFirebaseListeners();
-    clearStoredSession();
-    if (firebaseReady && firebaseAuth?.currentUser) await firebaseAuth.signOut();
-    state.currentUser = null; saveLocalOnly();
-    qs('#appShell').classList.add('hidden');
-    qs('#loginScreen').classList.remove('hidden');
-  });
+  logout.addEventListener('click', logoutCurrentUser);
 }
 
 
@@ -698,8 +737,19 @@ function personalStat(label, value, note){
 }
 function dashboard(){
   const visiblePages = pages.filter(p => p.id !== 'dashboard' && canOpenPage(p.id));
+  const userName = currentDisplayName();
   return `
     <div class="dashboard-apps-only">
+      <div class="dashboard-user-corner">
+        <div class="dashboard-user-chip">
+          <span class="dashboard-user-avatar">${esc(userName.charAt(0).toUpperCase())}</span>
+          <div>
+            <small>Utilizador</small>
+            <strong>${esc(userName)}</strong>
+          </div>
+        </div>
+        <button id="dashboardLogoutBtn" class="btn danger-soft dashboard-logout" type="button">Terminar sessão</button>
+      </div>
       <div class="apps-center">
         <div class="apps-title">
           <span>Menu principal</span>
@@ -1152,13 +1202,52 @@ function topParts(){
   if(!rows.length) return '<div class="empty">Sem dados.</div>';
   return `<div class="table-wrap"><table><thead><tr><th>Peça</th><th>Pedidos</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r[0])}</td><td>${r[1]}</td></tr>`).join('')}</tbody></table></div>`;
 }
+function permissionsSettingsCard(){
+  if(!isAdminMaster()) return '';
+  const globalAccess = operatorPageAccess();
+  const managed = managedPageList();
+  const operators = (state.users || []).filter(u => (u.role || 'Operador') !== 'Admin Master');
+  return `<div class="card permissions-card span-all">
+    <div class="card-head">
+      <h3>Permissões dos operadores</h3>
+      <span class="muted">Ativar páginas por regra geral ou por utilizador específico.</span>
+    </div>
+    <form id="permissionsForm" class="permissions-form">
+      <div class="permission-block">
+        <h4>Páginas visíveis para Operadores</h4>
+        <p class="muted">Esta é a regra geral. Se desligar uma página aqui, podes voltar a dar acesso só a determinados utilizadores na zona abaixo.</p>
+        <div class="permission-grid">
+          ${managed.map(p=>`<label class="permission-check"><input type="checkbox" name="operatorPage:${p.id}" ${globalAccess[p.id] !== false ? 'checked' : ''}> <span>${p.icon} ${esc(p.title)}</span></label>`).join('')}
+        </div>
+      </div>
+      <div class="permission-block">
+        <h4>Acesso específico por utilizador</h4>
+        <p class="muted">Aqui defines exatamente o que cada utilizador pode abrir. Estas permissões específicas têm prioridade sobre a regra geral.</p>
+        ${operators.length ? `<div class="permission-users">
+          ${operators.map(u=>`<div class="permission-user-row">
+            <div class="permission-user-info">
+              <strong>${esc(u.nome || u.email || '-')}</strong>
+              <span>${esc(u.email || '')} · ${esc(u.role || 'Operador')}</span>
+            </div>
+            <div class="permission-grid user-specific-grid">
+              ${managed.map(p=>`<label class="permission-check compact"><input type="checkbox" name="userPage:${u.id}:${p.id}" ${userCanOpenManagedPage(u,p.id) ? 'checked' : ''}> <span>${p.icon} ${esc(p.title)}</span></label>`).join('')}
+            </div>
+          </div>`).join('')}
+        </div>` : '<div class="empty compact">Ainda não tens operadores criados.</div>'}
+      </div>
+      <div class="actions"><button class="btn primary" type="submit">Guardar permissões</button></div>
+    </form>
+  </div>`;
+}
 function config(){
-  return `<div class="grid two"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="companyNif" placeholder="NIF" value="${esc(state.settings.companyNif || '')}"><input class="field span3" name="companyAddress" placeholder="Morada" value="${esc(state.settings.companyAddress || '')}"><input class="field" name="companyPhone" placeholder="Telefone empresa" value="${esc(state.settings.companyPhone || '')}"><input class="field" name="companyEmail" placeholder="Email empresa" value="${esc(state.settings.companyEmail || '')}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><select class="select" name="theme"><option value="normal" ${currentTheme()==='normal'?'selected':''}>Tema normal</option><option value="dark" ${currentTheme()==='dark'?'selected':''}>Darkmode</option></select><label class="checkline span2 spellcheck-toggle"><input type="checkbox" name="spellcheckEnabled" ${spellcheckEnabled()?'checked':''}> Correção ortográfica ativa</label><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>Firebase</h3><span class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">Dados separados no Firestore por página: clientes, fornecedores, orçamentos, pedidos, agenda, stock, utilizadores, diretório de contactos e configurações.</p><div class="actions"><button class="btn" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div></div>`;
+  return `<div class="grid two config-page"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="companyNif" placeholder="NIF" value="${esc(state.settings.companyNif || '')}"><input class="field span3" name="companyAddress" placeholder="Morada" value="${esc(state.settings.companyAddress || '')}"><input class="field" name="companyPhone" placeholder="Telefone empresa" value="${esc(state.settings.companyPhone || '')}"><input class="field" name="companyEmail" placeholder="Email empresa" value="${esc(state.settings.companyEmail || '')}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><select class="select" name="theme"><option value="normal" ${currentTheme()==='normal'?'selected':''}>Tema normal</option><option value="dark" ${currentTheme()==='dark'?'selected':''}>Darkmode</option></select><label class="checkline span2 spellcheck-toggle"><input type="checkbox" name="spellcheckEnabled" ${spellcheckEnabled()?'checked':''}> Correção ortográfica ativa</label><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>Firebase</h3><span class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">Dados separados no Firestore por página: clientes, fornecedores, orçamentos, utilizadores, diretório de contactos e configurações.</p><div class="actions"><button class="btn" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div>${permissionsSettingsCard()}</div>`;
 }
 
 function bindPage(id){
   qsa('[data-go]').forEach(b=>b.addEventListener('click',()=>goPage(b.dataset.go)));
   qsa('[data-page-card]').forEach(b=>b.addEventListener('click',()=>goPage(b.dataset.pageCard)));
+  const dashboardLogout = qs('#dashboardLogoutBtn');
+  if(dashboardLogout) dashboardLogout.addEventListener('click', logoutCurrentUser);
   qsa('[data-client-detail]').forEach(b=>b.addEventListener('click',()=>openClientDetail(b.dataset.clientDetail)));
   qsa('[data-client-email]').forEach(b=>b.addEventListener('click',()=>emailClient(b.dataset.clientEmail)));
   const globalSearch = qs('#globalSearch');
@@ -1357,7 +1446,7 @@ function bindUsersPage(){
     e.preventDefault();
     if(!isAdminMaster()) return toast('Só o Admin Master pode criar contas.');
     const data = Object.fromEntries(new FormData(e.target).entries());
-    const user = { id: uid('USR'), nome:data.nome, email:data.email, role:data.role, status:data.status || 'Ativo' };
+    const user = { id: uid('USR'), nome:data.nome, email:data.email, role:data.role, status:data.status || 'Ativo', pageAccess:{} };
     try {
       const created = await createFirebaseUserAsAdmin(data.email, data.password);
       if(created?.uid) user.id = created.uid;
@@ -1403,7 +1492,7 @@ function bindEntities(){
 function openEntityModal(type,id){
   const map = { client:['clients','CLI'], supplier:['suppliers','FOR'], stock:['stock','STK'], user:['users','USR'], follow:['followups','AGE'] };
   const [key] = map[type]; const item = state[key].find(x=>x.id===id); if(!item) return;
-  const fields = Object.keys(item).filter(k=>k!=='id');
+  const fields = Object.keys(item).filter(k=>k!=='id' && !(type==='user' && k==='pageAccess'));
   openModal('Editar registo', `<form id="entityEditForm" class="form-grid">${fields.map(k=>`<input class="field" name="${k}" placeholder="${k}" value="${esc(item[k])}">`).join('')}<div class="span3"><button class="btn primary">Guardar</button></div></form>`);
   qs('#entityEditForm').addEventListener('submit',e=>{e.preventDefault(); Object.assign(item,Object.fromEntries(new FormData(e.target).entries())); saveState(); closeModal(); renderPage(currentPage); toast('Registo atualizado.');});
 }
@@ -1411,11 +1500,53 @@ function bindFollowForm(){
   qs('#followForm').addEventListener('submit',e=>{ e.preventDefault(); state.followups.push({id:uid('AGE'),...Object.fromEntries(new FormData(e.target).entries())}); saveState(); renderPage('agenda'); toast('Follow-up guardado.'); });
 }
 function bindConfig(){
-  qs('#settingsForm').addEventListener('submit',e=>{ e.preventDefault(); const fd=new FormData(e.target); state.settings={ companyName:fd.get('companyName'), companyNif:fd.get('companyNif'), companyAddress:fd.get('companyAddress'), companyPhone:fd.get('companyPhone'), companyEmail:fd.get('companyEmail'), dailyBackupHour:fd.get('dailyBackupHour'), theme:fd.get('theme') || 'normal', spellcheckEnabled:fd.get('spellcheckEnabled')==='on', githubUrl:fd.get('githubUrl'), firebaseEnabled:firebaseReady}; saveState(); applyTheme(); toast('Configurações guardadas.'); renderPage('config'); });
-  qs('#syncFirebaseBtn').addEventListener('click',async()=>{ await pushCloudState(); toast(firebaseReady ? 'Sincronizado com Firebase.' : 'Firebase indisponível.'); renderPage('config'); });
-  qs('#exportJsonBtn').addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='autoparts-callcenter-export.json'; a.click(); URL.revokeObjectURL(a.href); });
-  qs('#resetDemoBtn').addEventListener('click',()=>{ const currentUser = state.currentUser; localStorage.removeItem(STORAGE_KEY); state=seedData(); state.currentUser=currentUser; saveState(); toast('Demo reposta.'); setTimeout(()=>goPage('dashboard'), 250); });
+  const settingsForm = qs('#settingsForm');
+  if(settingsForm) settingsForm.addEventListener('submit',e=>{
+    e.preventDefault();
+    const fd=new FormData(e.target);
+    state.settings={
+      ...(state.settings || {}),
+      companyName:fd.get('companyName'),
+      companyNif:fd.get('companyNif'),
+      companyAddress:fd.get('companyAddress'),
+      companyPhone:fd.get('companyPhone'),
+      companyEmail:fd.get('companyEmail'),
+      dailyBackupHour:fd.get('dailyBackupHour'),
+      theme:fd.get('theme') || 'normal',
+      spellcheckEnabled:fd.get('spellcheckEnabled')==='on',
+      githubUrl:fd.get('githubUrl'),
+      firebaseEnabled:firebaseReady
+    };
+    saveState(); applyTheme(); toast('Configurações guardadas.'); renderPage('config');
+  });
+  const permissionsForm = qs('#permissionsForm');
+  if(permissionsForm) permissionsForm.addEventListener('submit', e=>{
+    e.preventDefault();
+    if(!isAdminMaster()) return toast('Só o Admin Master pode alterar permissões.');
+    const fd = new FormData(e.target);
+    const managed = managedPageList();
+    const globalAccess = {};
+    managed.forEach(p=>{ globalAccess[p.id] = fd.get(`operatorPage:${p.id}`) === 'on'; });
+    state.settings = { ...(state.settings || {}), operatorPageAccess: globalAccess };
+    (state.users || []).forEach(u=>{
+      if((u.role || 'Operador') === 'Admin Master') return;
+      const userAccess = {};
+      managed.forEach(p=>{ userAccess[p.id] = fd.get(`userPage:${u.id}:${p.id}`) === 'on'; });
+      u.pageAccess = userAccess;
+    });
+    saveState();
+    buildNav();
+    toast('Permissões guardadas.');
+    renderPage('config');
+  });
+  const syncBtn = qs('#syncFirebaseBtn');
+  if(syncBtn) syncBtn.addEventListener('click',async()=>{ await pushCloudState(); toast(firebaseReady ? 'Sincronizado com Firebase.' : 'Firebase indisponível.'); renderPage('config'); });
+  const exportBtn = qs('#exportJsonBtn');
+  if(exportBtn) exportBtn.addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='autoparts-callcenter-export.json'; a.click(); URL.revokeObjectURL(a.href); });
+  const resetBtn = qs('#resetDemoBtn');
+  if(resetBtn) resetBtn.addEventListener('click',()=>{ const currentUser = state.currentUser; localStorage.removeItem(STORAGE_KEY); state=seedData(); state.currentUser=currentUser; saveState(); toast('Demo reposta.'); setTimeout(()=>goPage('dashboard'), 250); });
 }
+
 function openModal(title, html){ qs('#modalRoot').innerHTML = `<div class="modal"><div class="modal-head"><h3>${title}</h3><button class="btn danger-soft small" id="closeModalBtn">Fechar</button></div>${html}</div>`; qs('#modalRoot').classList.remove('hidden'); qs('#closeModalBtn').addEventListener('click',closeModal); qsa('#modalRoot [data-client-email]').forEach(b=>b.addEventListener('click',()=>emailClient(b.dataset.clientEmail))); applySpellcheckEnhancements(qs('#modalRoot')); }
 function closeModal(){ qs('#modalRoot').classList.add('hidden'); qs('#modalRoot').innerHTML=''; }
 
