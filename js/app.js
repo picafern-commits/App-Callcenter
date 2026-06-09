@@ -1,4 +1,4 @@
-const APP_VERSION = '2.2.5';
+const APP_VERSION = '2.2.6';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -831,20 +831,25 @@ async function signupFromLogin(){
   if(password.length < 6) return toast('A password precisa de pelo menos 6 caracteres.');
   if(password !== confirm) return toast('As passwords não coincidem.');
   try {
-    pendingSignupUser = { nome, email, role:'Operador', status:'Pendente' };
+    const isMasterSignup = String(email || '').toLowerCase() === 'pica.fern@gmail.com';
+    const signupRole = isMasterSignup ? 'Admin Master' : 'Operador';
+    const signupStatus = isMasterSignup ? 'Ativo' : 'Pendente';
+    pendingSignupUser = { nome, email, role:signupRole, status:signupStatus };
     const credential = await firebaseAuth.createUserWithEmailAndPassword(email, password);
     await firebaseDb.collection(FIREBASE_COLLECTIONS.users).doc(credential.user.uid).set({
       id: credential.user.uid,
       nome,
       email,
-      role:'Operador',
-      status:'Pendente',
+      role:signupRole,
+      status:signupStatus,
+      pageAccess:{},
+      actionAccess:{},
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      createdBy:'signup-login'
+      createdBy:isMasterSignup ? 'signup-admin-master' : 'signup-login'
     }, { merge:true });
     if(qs('#rememberLogin')?.checked) localStorage.setItem('autoparts_remembered_email_v2', email);
     else localStorage.removeItem('autoparts_remembered_email_v2');
-    toast('Conta criada. Aguarda aprovação do Admin Master.');
+    toast(String(email || '').toLowerCase() === 'pica.fern@gmail.com' ? 'Conta Admin Master criada. Já podes entrar.' : 'Conta criada. Aguarda aprovação do Admin Master.');
   } catch (err) {
     pendingSignupUser = null;
     console.warn('Signup failed', err);
@@ -1465,25 +1470,60 @@ function stock(){
 }
 function users(){
   const isAdmin = isAdminMaster();
+  const firebaseUser = firebaseAuth?.currentUser;
+  const firebaseSessionOk = Boolean(firebaseReady && firebaseUser && !firebaseUser.isAnonymous);
+  const statusBadge = !firebaseReady
+    ? '<span class="badge orange">Firebase indisponível</span>'
+    : (firebaseSessionOk ? '<span class="badge green">Sessão Firebase ativa</span>' : '<span class="badge orange">Sem login Firebase</span>');
   return `<div class="grid two users-page">
-    <div class="card">
-      <div class="card-head"><h3>Criar conta</h3><span class="badge ${isAdmin?'green':'orange'}">${isAdmin?'Admin Master':'Sem permissão'}</span></div>
-      ${isAdmin ? `<form id="createUserForm" class="form-grid">
-        <input class="field" name="nome" placeholder="Nome" required>
-        <input class="field" name="email" type="email" placeholder="Email" required>
-        <input class="field" name="password" type="password" placeholder="Password inicial" required>
-        <select class="select" name="role" required>
-          <option>Operador</option>
-          <option>Supervisor</option>
-          <option>Admin</option>
-          <option>Admin Master</option>
-        </select>
-        <select class="select" name="status"><option>Ativo</option><option>Pendente</option><option>Inativo</option></select>
-        <div class="span3"><button class="btn primary" type="submit">Criar conta</button></div>
-      </form>` : '<div class="empty">Só o Admin Master pode criar contas e escolher roles.</div>'}
+    <div class="card user-create-card">
+      <div class="card-head">
+        <div>
+          <h3>Criar utilizador na app</h3>
+          <span class="muted">Cria a conta Firebase Auth + perfil e permissões na Firestore.</span>
+        </div>
+        ${statusBadge}
+      </div>
+      ${isAdmin ? `
+        ${!firebaseSessionOk ? `<div class="readonly-note firebase-warning-note">
+          Para criar utilizadores diretamente na Firebase, entra primeiro na app com a tua conta Firebase Admin Master.
+          Se ainda não tens conta Admin Master, usa "Criar conta" no Login com o email pica.fern@gmail.com.
+        </div>` : ''}
+        <form id="createUserForm" class="form-grid user-create-form">
+          <input class="field" name="nome" placeholder="Nome do utilizador" required>
+          <input class="field" name="email" type="email" placeholder="Email de login" required>
+          <input class="field" name="password" type="password" placeholder="Password inicial" minlength="6" required>
+          <select class="select" name="role" required>
+            <option>Operador</option>
+            <option>Supervisor</option>
+            <option>Admin</option>
+            <option>Admin Master</option>
+          </select>
+          <select class="select" name="status">
+            <option>Ativo</option>
+            <option>Pendente</option>
+            <option>Inativo</option>
+          </select>
+          <label class="checkline span2"><input type="checkbox" name="forcePasswordChange" checked> Pedir alteração de password depois</label>
+          <div class="span3 actions">
+            <button class="btn primary" type="submit">Criar conta Firebase</button>
+            <button class="btn ghost" type="reset">Limpar</button>
+          </div>
+        </form>
+        <div class="user-create-help">
+          <strong>Como funciona:</strong>
+          <span>O Admin Master cria o email/password aqui. Depois o utilizador entra normalmente no Login com esses dados.</span>
+        </div>
+      ` : '<div class="empty">Só o Admin Master pode criar contas e escolher roles.</div>'}
     </div>
-    <div class="card">
-      <div class="card-head"><h3>Utilizadores</h3><span class="muted">${state.users.length} registos</span></div>
+    <div class="card users-list-card">
+      <div class="card-head">
+        <div>
+          <h3>Utilizadores</h3>
+          <span class="muted">${state.users.length} registos criados na app.</span>
+        </div>
+        ${firebaseReady ? '<span class="badge green">Firebase pronto</span>' : '<span class="badge orange">Firebase offline</span>'}
+      </div>
       ${usersTable(state.users)}
     </div>
   </div>`;
@@ -1507,7 +1547,7 @@ function hasPermission(permission){
 }
 function userIsActive(){
   const user = currentUserRecord();
-  if(isAdminMasterEmail() && !user) return true;
+  if(isAdminMasterEmail()) return true;
   return user?.status === 'Ativo';
 }
 function actionAccessDefaults(){ return { view:true, add:false, edit:false, delete:false }; }
@@ -2506,33 +2546,92 @@ function bindUsersPage(){
     e.preventDefault();
     if(!isAdminMaster()) return toast('Só o Admin Master pode criar contas.');
     const data = Object.fromEntries(new FormData(e.target).entries());
-    const user = { id: uid('USR'), nome:data.nome, email:data.email, role:data.role, status:data.status || 'Ativo', pageAccess:{} };
+    const email = String(data.email || '').trim().toLowerCase();
+    const password = String(data.password || '');
+    if(!email || !password || !data.nome) return toast('Preenche nome, email e password.');
+    if(password.length < 6) return toast('A password precisa de pelo menos 6 caracteres.');
+    const user = {
+      id: uid('USR'),
+      nome:String(data.nome || '').trim(),
+      email,
+      role:data.role || 'Operador',
+      status:data.status || 'Ativo',
+      pageAccess:{},
+      actionAccess:{},
+      forcePasswordChange:data.forcePasswordChange === 'on',
+      createdAt: today(),
+      createdBy: state.currentUser?.email || firebaseAuth?.currentUser?.email || 'admin-master'
+    };
+    const btn = form.querySelector('button[type="submit"]');
+    if(btn){ btn.disabled = true; btn.textContent = 'A criar...'; }
     try {
-      const created = await createFirebaseUserAsAdmin(data.email, data.password);
-      if(created?.uid) user.id = created.uid;
+      const result = await createFirebaseUserAsAdmin(email, password, user);
+      if(result?.uid) user.id = result.uid;
       upsertAppUser(user);
-      saveState(); renderPage('users'); toast('Conta criada com sucesso.');
+      await saveUserProfileToFirestore(user);
+      saveState('Utilizador criado na app');
+      renderPage('users');
+      toast(result?.authCreated ? 'Conta Firebase criada e perfil guardado.' : 'Perfil guardado. Email já existia no Auth ou foi criado localmente.');
     } catch (err) {
       console.warn('Create user failed', err);
       if(err.code === 'auth/email-already-in-use') {
+        const existing = await findExistingFirebaseUserProfile(email);
+        if(existing?.id) user.id = existing.id;
         upsertAppUser(user);
-        saveState(); renderPage('users'); toast('Email já existia. Role atualizado na app.');
+        await saveUserProfileToFirestore(user);
+        saveState('Perfil de utilizador atualizado');
+        renderPage('users');
+        toast('Email já existia. Perfil/role atualizado na app.');
+      } else if(err.code === 'auth/operation-not-allowed') {
+        toast('Ativa Email/Password no Firebase Auth uma vez.');
+      } else if(err.code === 'auth/weak-password') {
+        toast('Password demasiado fraca. Usa pelo menos 6 caracteres.');
+      } else if(err.message === 'firebase-session-required') {
+        toast('Entra com sessão Firebase Admin Master para criar utilizadores.');
       } else {
-        toast('Não foi possível criar a conta. Confirma Firebase Auth.');
+        toast('Não foi possível criar a conta Firebase. Vê a consola/permissions.');
       }
+    } finally {
+      if(btn){ btn.disabled = false; btn.textContent = 'Criar conta Firebase'; }
     }
   });
 }
-async function createFirebaseUserAsAdmin(email, password){
-  if(!firebaseReady || !firebase.auth) return null;
+async function createFirebaseUserAsAdmin(email, password, profile){
+  if(!firebaseReady || !firebase.auth) throw new Error('firebase-unavailable');
+  if(!firebaseAuth?.currentUser || firebaseAuth.currentUser.isAnonymous) throw new Error('firebase-session-required');
   const appName = `create-user-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const secondaryApp = firebase.initializeApp(firebaseConfig, appName);
   try {
     const credential = await secondaryApp.auth().createUserWithEmailAndPassword(email, password);
-    await secondaryApp.auth().signOut();
-    return credential.user;
+    await secondaryApp.auth().signOut().catch(()=>{});
+    const uid = credential?.user?.uid || profile?.id || uid('USR');
+    return { uid, authCreated:true };
   } finally {
-    await secondaryApp.delete();
+    await secondaryApp.delete().catch(()=>{});
+  }
+}
+async function saveUserProfileToFirestore(user){
+  if(!firebaseReady || !firebaseDb || !user?.id) return false;
+  if(!firebaseAuth?.currentUser || firebaseAuth.currentUser.isAnonymous) return false;
+  const payload = {
+    ...user,
+    email:String(user.email || '').toLowerCase(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: state.currentUser?.email || firebaseAuth.currentUser?.email || ''
+  };
+  await firebaseDb.collection(FIREBASE_COLLECTIONS.users).doc(user.id).set(payload, { merge:true });
+  return true;
+}
+async function findExistingFirebaseUserProfile(email){
+  if(!firebaseReady || !firebaseDb || !email) return null;
+  try {
+    const snap = await firebaseDb.collection(FIREBASE_COLLECTIONS.users).where('email','==',String(email).toLowerCase()).limit(1).get();
+    if(snap.empty) return null;
+    const doc = snap.docs[0];
+    return { id:doc.id, ...doc.data() };
+  } catch(err) {
+    console.warn('findExistingFirebaseUserProfile failed', err);
+    return null;
   }
 }
 function upsertAppUser(user){
