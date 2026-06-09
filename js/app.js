@@ -1,4 +1,4 @@
-const APP_VERSION = '1.8.8';
+const APP_VERSION = '1.9.1';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -409,6 +409,9 @@ function toast(msg){ const el = qs('#toast'); el.textContent = msg; el.classList
 function qs(s){ return document.querySelector(s); }
 function qsa(s){ return [...document.querySelectorAll(s)]; }
 function companyName(){ return state.settings?.companyName || 'AutoParts CallCenter'; }
+function isLoginPage(){ return window.LOGIN_PAGE === true || (window.location.pathname.split('/').pop() || '').toLowerCase() === 'login.html'; }
+function redirectToLogin(){ if(!isLoginPage()) window.location.href = 'login.html'; }
+function redirectAfterLogin(){ if(isLoginPage()) window.location.href = pageUrl('dashboard'); }
 function getLocalTheme(){
   const localTheme = localStorage.getItem(THEME_KEY);
   return localTheme === 'dark' || localTheme === 'normal' ? localTheme : '';
@@ -517,13 +520,13 @@ function getDefaultPage(){
 function showApp(){
   document.body.classList.remove('auth-boot');
   applyTheme();
-  qs('#loginScreen').classList.add('hidden');
-  qs('#appShell').classList.remove('hidden');
+  qs('#loginScreen')?.classList.add('hidden');
+  qs('#appShell')?.classList.remove('hidden');
   buildNav();
   bindShell();
   ensureGlobalSearchBox();
   checkAutoBackup();
-  qs('#userBadge').textContent = state.currentUser?.name || 'Admin';
+  if(qs('#userBadge')) qs('#userBadge').textContent = state.currentUser?.name || 'Admin';
   renderPage(currentPage);
 }
 
@@ -566,25 +569,33 @@ async function init(){
         }
         state.currentUser = null;
         saveLocalOnly();
-        qs('#appShell').classList.add('hidden');
+        if(!isLoginPage()) { redirectToLogin(); return; }
+        qs('#appShell')?.classList.add('hidden');
         document.body.classList.remove('auth-boot');
-        qs('#loginScreen').classList.remove('hidden');
+        qs('#loginScreen')?.classList.remove('hidden');
       }
     });
     return;
   }
 
   if(state.currentUser || hasLocalSession) showApp();
-  else document.body.classList.remove('auth-boot');
+  else {
+    if(!isLoginPage()) { redirectToLogin(); return; }
+    document.body.classList.remove('auth-boot');
+  }
 }
 
 function restoreLogin(){
-  const saved = localStorage.getItem('autoparts_login_email') || 'pica.fern@gmail.com';
-  qs('#loginEmail').value = saved;
-  qs('#loginPassword').value = '123456';
+  const emailInput = qs('#loginEmail');
+  const passwordInput = qs('#loginPassword');
+  const rememberInput = qs('#rememberLogin');
+  const saved = localStorage.getItem('autoparts_remembered_email_v2') || '';
+  if(emailInput) emailInput.value = saved;
+  if(passwordInput && !passwordInput.value) passwordInput.value = '';
+  if(rememberInput) rememberInput.checked = !!saved;
   enhanceLoginScreen();
-  qs('#loginBtn').addEventListener('click', login);
-  qs('#loginPassword').addEventListener('keydown', e => { if(e.key === 'Enter') login(); });
+  qs('#loginBtn')?.addEventListener('click', login);
+  qs('#loginPassword')?.addEventListener('keydown', e => { if(e.key === 'Enter') login(); });
 }
 function enhanceLoginScreen(){
   const card = qs('.login-card');
@@ -622,7 +633,8 @@ async function login(){
   const email = qs('#loginEmail').value.trim();
   const password = qs('#loginPassword').value;
   if(!email) return toast('Mete o email para entrar.');
-  if(qs('#rememberLogin').checked) localStorage.setItem('autoparts_login_email', email);
+  if(qs('#rememberLogin')?.checked) localStorage.setItem('autoparts_remembered_email_v2', email);
+  else localStorage.removeItem('autoparts_remembered_email_v2');
   if (firebaseReady) {
     if(!password) return toast('Mete a password para entrar no Firebase.');
     try {
@@ -659,7 +671,8 @@ async function signupFromLogin(){
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy:'signup-login'
     }, { merge:true });
-    if(qs('#rememberLogin')?.checked) localStorage.setItem('autoparts_login_email', email);
+    if(qs('#rememberLogin')?.checked) localStorage.setItem('autoparts_remembered_email_v2', email);
+    else localStorage.removeItem('autoparts_remembered_email_v2');
     toast('Conta criada. Aguarda aprovação do Admin Master.');
   } catch (err) {
     pendingSignupUser = null;
@@ -671,7 +684,9 @@ async function signupFromLogin(){
 }
 
 function buildNav(){
-  qs('#navMenu').innerHTML = pages.filter(p=>canOpenPage(p.id)).map(p => `<a class="nav-btn" href="${pageUrl(p.id)}" data-page="${p.id}"><span class="nav-icon">${p.icon}</span><span>${p.title}</span></a>`).join('');
+  const nav = qs('#navMenu');
+  if(!nav) return;
+  nav.innerHTML = pages.filter(p=>canOpenPage(p.id)).map(p => `<a class="nav-btn" href="${pageUrl(p.id)}" data-page="${p.id}"><span class="nav-icon">${p.icon}</span><span>${p.title}</span></a>`).join('');
 }
 
 async function logoutCurrentUser(){
@@ -682,6 +697,7 @@ async function logoutCurrentUser(){
   saveLocalOnly();
   qs('#appShell')?.classList.add('hidden');
   document.body.classList.remove('auth-boot');
+  if(!isLoginPage()) { redirectToLogin(); return; }
   qs('#loginScreen')?.classList.remove('hidden');
 }
 
