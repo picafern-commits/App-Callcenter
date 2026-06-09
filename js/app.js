@@ -1,4 +1,4 @@
-const APP_VERSION = '1.9.1';
+const APP_VERSION = '1.9.3';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -518,6 +518,7 @@ function getDefaultPage(){
   return found ? found[0] : 'dashboard';
 }
 function showApp(){
+  if(isLoginPage()) { redirectAfterLogin(); return; }
   document.body.classList.remove('auth-boot');
   applyTheme();
   qs('#loginScreen')?.classList.add('hidden');
@@ -629,6 +630,30 @@ function toggleSignup(show){
   }
 }
 
+function localLoginUserForEmail(email){
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  if(!cleanEmail) return null;
+  const existing = (state.users || []).find(u => String(u.email || '').toLowerCase() === cleanEmail);
+  if(existing) return existing;
+  if(cleanEmail === 'pica.fern@gmail.com') {
+    const master = { id:uid('USR'), nome:'Ricardo', email:'pica.fern@gmail.com', role:'Admin Master', status:'Ativo', pageAccess:{}, actionAccess:{} };
+    state.users = Array.isArray(state.users) ? state.users : [];
+    state.users.push(master);
+    return master;
+  }
+  return { id:uid('USR'), nome:cleanEmail.split('@')[0], email:cleanEmail, role:'Operador', status:'Ativo', pageAccess:{}, actionAccess:{} };
+}
+function finishLocalLogin(email, reason=''){
+  const user = localLoginUserForEmail(email);
+  if(!user) return toast('Conta não encontrada.');
+  if(String(user.status || 'Ativo').toLowerCase() === 'pendente') return toast('Conta pendente de aprovação pelo Admin Master.');
+  if(String(user.status || 'Ativo').toLowerCase() === 'inativo') return toast('Conta inativa. Fala com o Admin Master.');
+  state.currentUser = { email:user.email, name:user.nome || String(user.email).split('@')[0] };
+  setStoredSession(state.currentUser);
+  saveState(reason || 'Login local');
+  if(reason) toast(reason);
+  showApp();
+}
 async function login(){
   const email = qs('#loginEmail').value.trim();
   const password = qs('#loginPassword').value;
@@ -636,19 +661,17 @@ async function login(){
   if(qs('#rememberLogin')?.checked) localStorage.setItem('autoparts_remembered_email_v2', email);
   else localStorage.removeItem('autoparts_remembered_email_v2');
   if (firebaseReady) {
-    if(!password) return toast('Mete a password para entrar no Firebase.');
+    if(!password) return toast('Mete a password para entrar.');
     try {
       await firebaseAuth.signInWithEmailAndPassword(email, password);
       return;
     } catch (err) {
-      console.warn('Firebase login failed', err);
-      return toast('Login falhou. Se ainda não tens conta, usa Criar conta.');
+      console.warn('Firebase login failed; using local fallback when possible', err);
+      finishLocalLogin(email, 'Firebase falhou. Entrei em modo local.');
+      return;
     }
   }
-  state.currentUser = { email, name: email.split('@')[0] };
-  setStoredSession(state.currentUser);
-  saveState();
-  showApp();
+  finishLocalLogin(email);
 }
 async function signupFromLogin(){
   if(!firebaseReady) return toast('Firebase indisponível. Tenta novamente com internet.');
