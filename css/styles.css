@@ -3343,3 +3343,14 @@ body.scheme-night .shell-header{background:linear-gradient(180deg, rgba(4,12,22,
   .apps-title.premium{display:grid;justify-items:start}
   .shell-header{grid-template-columns:1fr !important}
 }
+
+
+/* v2.2.2 - remover chip empresa e esquemas de cor */
+.company-mini-badge,
+.company-mini-mark,
+.color-scheme-grid,
+.scheme-choice,
+.scheme-dot{display:none!important;}
+.header-brand{gap:10px!important;}
+.header-brand #companyMiniBadge{display:none!important;}
+.user-configs-page .user-setting-section{margin-bottom:16px;}

@@ -1,9 +1,8 @@
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.2.2';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
 const RESOLUTION_KEY = 'autoparts_resolution_v1';
-const COLOR_SCHEME_KEY = 'autoparts_color_scheme_v1';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
 const FIREBASE_LEGACY_STATE_DOC = 'main';
 const FIREBASE_META_COLLECTION = 'meta';
@@ -112,7 +111,6 @@ function seedData() {
       dailyBackupHour: '19:30',
       theme: 'normal',
       resolution: 'auto',
-      colorScheme: 'az',
       spellcheckEnabled: true,
       operatorPageAccess: {
         clientes: true,
@@ -489,20 +487,6 @@ function persistResolution(value){
   state.settings.resolution = next;
   saveLocalOnly();
 }
-function getLocalColorScheme(){
-  const value = localStorage.getItem(COLOR_SCHEME_KEY);
-  return ['az','graphite','ice','night'].includes(value) ? value : '';
-}
-function currentColorScheme(){
-  return getLocalColorScheme() || state.settings?.colorScheme || 'az';
-}
-function persistColorScheme(value){
-  const next = ['az','graphite','ice','night'].includes(value) ? value : 'az';
-  localStorage.setItem(COLOR_SCHEME_KEY, next);
-  state.settings = state.settings || {};
-  state.settings.colorScheme = next;
-  saveLocalOnly();
-}
 function persistTheme(theme){
   const next = theme === 'dark' ? 'dark' : 'normal';
   localStorage.setItem(THEME_KEY, next);
@@ -514,7 +498,6 @@ function applyTheme(){
   const dark = currentTheme() === 'dark';
   const resolution = currentResolution();
   const resolvedResolution = effectiveResolution();
-  const scheme = currentColorScheme();
   document.documentElement.classList.toggle('theme-dark', dark);
   document.body.classList.toggle('theme-dark', dark);
   document.body.classList.toggle('admin-master', isAdminMaster());
@@ -526,7 +509,6 @@ function applyTheme(){
   document.documentElement.classList.toggle('res-auto', resolution === 'auto');
   document.body.classList.toggle('res-auto', resolution === 'auto');
   ['compact','standard','wide','large'].forEach(v=>{ document.documentElement.classList.toggle(`res-${v}`, resolvedResolution===v); document.body.classList.toggle(`res-${v}`, resolvedResolution===v); });
-  ['az','graphite','ice','night'].forEach(v=>{ document.documentElement.classList.toggle(`scheme-${v}`, scheme===v); document.body.classList.toggle(`scheme-${v}`, scheme===v); });
   const btn = qs('#themeToggleBtn');
   if(btn) btn.textContent = dark ? 'Modo Normal' : 'Darkmode';
 }
@@ -594,7 +576,6 @@ function showApp(){
   buildNav();
   bindShell();
   ensureGlobalSearchBox();
-  ensureCompanyMiniBadge();
   ensureBrandFavicon();
   checkAutoBackup();
   if(qs('#userBadge')) qs('#userBadge').textContent = state.currentUser?.name || 'Admin';
@@ -1693,19 +1674,12 @@ function configsUser(){
   const dark = currentTheme() === 'dark';
   const user = currentDisplayName();
   const resolution = currentResolution();
-  const scheme = currentColorScheme();
   const resolutionOptions = [
     ['auto','Auto Windows','Ajusta automaticamente à resolução/escala do Windows'],
     ['compact','Compacto','Mais informação no ecrã'],
     ['standard','Normal','Equilíbrio recomendado'],
     ['wide','Largo','Usa mais largura do ecrã'],
     ['large','Grande','Texto e botões maiores']
-  ];
-  const colorOptions = [
-    ['az','AZ Premium','Azul escuro, ciano e laranja'],
-    ['graphite','Graphite','Cinza escuro com verde premium'],
-    ['ice','Ice Blue','Claro, clean e azul gelo'],
-    ['night','Night Drive','Dark mode automóvel']
   ];
   return `<div class="user-configs-page">
     <div class="user-configs-card card">
@@ -1738,13 +1712,6 @@ function configsUser(){
           ${resolutionOptions.map(([key,title,desc])=>`<button class="choice-card ${resolution===key?'active':''}" data-set-resolution="${key}" type="button"><strong>${esc(title)}</strong><span>${esc(desc)}</span></button>`).join('')}
         </div>
       </section>
-
-      <section class="user-setting-section">
-        <div class="setting-title"><strong>Esquema de cores</strong><span>Paletas predefinidas para a app.</span></div>
-        <div class="choice-grid color-scheme-grid">
-          ${colorOptions.map(([key,title,desc])=>`<button class="choice-card scheme-choice ${scheme===key?'active':''}" data-set-scheme="${key}" type="button"><i class="scheme-dot scheme-dot-${key}"></i><strong>${esc(title)}</strong><span>${esc(desc)}</span></button>`).join('')}
-        </div>
-      </section>
     </div>
   </div>`;
 }
@@ -1760,17 +1727,10 @@ function setUserResolution(value){
   toast('Resolução atualizada.');
   renderPage('configs-user');
 }
-function setUserColorScheme(value){
-  persistColorScheme(value);
-  applyTheme();
-  toast('Esquema de cores atualizado.');
-  renderPage('configs-user');
-}
 function bindUserConfigs(){
   qs('#userThemeToggleBtn')?.addEventListener('click',()=>toggleThemeAndRefreshUserConfigs());
   qsa('[data-set-theme]').forEach(btn=>btn.addEventListener('click',()=>setUserTheme(btn.dataset.setTheme)));
   qsa('[data-set-resolution]').forEach(btn=>btn.addEventListener('click',()=>setUserResolution(btn.dataset.setResolution)));
-  qsa('[data-set-scheme]').forEach(btn=>btn.addEventListener('click',()=>setUserColorScheme(btn.dataset.setScheme)));
 }
 function toggleThemeAndRefreshUserConfigs(){
   persistTheme(currentTheme() === 'dark' ? 'normal' : 'dark');
@@ -2371,7 +2331,16 @@ function bindContactDirectory(){
     const group = (state.contactGroups || []).find(g=>g.id===btn.dataset.toggleContactGroup);
     if(!group) return;
     group.aberto = !group.aberto;
-    saveState(); renderPage('contactos');
+
+    // Não redesenhar a página toda ao abrir/fechar uma secção.
+    // Isto evita o efeito de desaparecer tudo e voltar a aparecer já aberto.
+    const section = btn.closest('.directory-section');
+    const body = section?.querySelector('.section-body');
+    const icon = btn.querySelector('.section-toggle-icon, i');
+    if(body) body.classList.toggle('hidden', !group.aberto);
+    if(icon) icon.textContent = group.aberto ? '−' : '+';
+
+    saveState();
   }));
 
   qsa('[data-add-contact-section]').forEach(btn=>btn.addEventListener('click',()=>openQuickContactModal(btn.dataset.addContactSection)));
@@ -2657,17 +2626,6 @@ function ensureBrandFavicon(){
     document.head.appendChild(link);
   }
   link.href = href;
-}
-
-function ensureCompanyMiniBadge(){
-  const brand = qs('.header-brand');
-  if(!brand) return;
-  const existing = qs('#companyMiniBadge');
-  const name = companyName();
-  const initials = String(name || 'Empresa').split(/\s+/).filter(Boolean).slice(0,2).map(v=>v[0]?.toUpperCase() || '').join('') || 'EM';
-  const html = `<div id="companyMiniBadge" class="company-mini-badge" title="${esc(name)}"><span class="company-mini-mark">${esc(initials)}</span><small>${esc(name)}</small></div>`;
-  if(existing) existing.outerHTML = html;
-  else brand.insertAdjacentHTML('beforeend', html);
 }
 
 function updateGlobalSearchVisibility(pageId){
