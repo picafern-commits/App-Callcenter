@@ -1,4 +1,4 @@
-const APP_VERSION = '2.2.4';
+const APP_VERSION = '2.2.5';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -35,6 +35,8 @@ let cloudSaveTimer = null;
 let firebaseUnsubscribers = [];
 let pendingSignupUser = null;
 let cloudReadOnlyMode = false;
+let firebaseRefreshTimer = null;
+const CONFIG_OPEN_KEY = 'autoparts_config_open_sections_v1';
 function isElectronApp(){
   return new URLSearchParams(window.location.search).get('electron') === '1' || navigator.userAgent.toLowerCase().includes('electron');
 }
@@ -232,6 +234,57 @@ function restoreStoredSession(){
   }
   return false;
 }
+
+function configSectionId(title){
+  return String(title || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,'-')
+    .replace(/^-|-$/g,'') || 'secao';
+}
+function getOpenConfigSections(){
+  try {
+    const raw = localStorage.getItem(CONFIG_OPEN_KEY);
+    const arr = JSON.parse(raw || '[]');
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+function setOpenConfigSections(ids){
+  try { localStorage.setItem(CONFIG_OPEN_KEY, JSON.stringify([...new Set(ids)])); } catch {}
+}
+function rememberConfigAccordionState(){
+  const ids = qsa('.config-accordion').filter(d => d.open).map(d => d.dataset.configSection).filter(Boolean);
+  setOpenConfigSections(ids);
+}
+function restoreConfigAccordionState(){
+  const open = getOpenConfigSections();
+  qsa('.config-accordion').forEach(d => {
+    const id = d.dataset.configSection;
+    if(!id) return;
+    d.open = open.length ? open.includes(id) : d.open;
+  });
+}
+function scheduleFirebasePageRefresh(reason='firebase'){
+  if(!appIsVisible()) return;
+  if(qs('#modalRoot') && !qs('#modalRoot').classList.contains('hidden')) return;
+  if(currentPage === 'config' || currentPage === 'configs-user') {
+    applyTheme();
+    updateFirebaseStatusBadge();
+    return;
+  }
+  clearTimeout(firebaseRefreshTimer);
+  firebaseRefreshTimer = setTimeout(()=>{
+    if(appIsVisible() && currentPage !== 'config' && currentPage !== 'configs-user') renderPage(currentPage);
+  }, 220);
+}
+function updateFirebaseStatusBadge(){
+  const badge = qs('#firebaseStatusBadge');
+  if(badge){
+    badge.textContent = firebaseStatus();
+    badge.className = `badge ${firebaseReady ? 'green' : 'orange'}`;
+  }
+}
+
 function saveState(action='Alteração guardada'){
   addAuditLog(action, currentPage || getDefaultPage());
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -268,6 +321,7 @@ async function pushCloudState(){
   if (!firebaseReady || !firebaseAuth?.currentUser || !firebaseDb || cloudReadOnlyMode) return;
   try {
     await saveFirebaseCollections();
+    updateFirebaseStatusBadge();
   } catch (err) {
     console.warn('Firebase save failed', err);
     toast('Guardado localmente. Firebase sem permissões.');
@@ -383,14 +437,14 @@ function startFirebaseListeners(){
     if(localTheme) state.settings.theme = localTheme;
     saveLocalOnly();
     applyTheme();
-    if (appIsVisible() && (currentPage === 'config' || currentPage === 'configs-user')) renderPage(currentPage);
+    scheduleFirebasePageRefresh('meta');
   }));
 
   Object.entries(FIREBASE_COLLECTIONS).forEach(([stateKey, collectionName]) => {
     const unsubscribe = firebaseDb.collection(collectionName).onSnapshot(snapshot => {
       state[stateKey] = snapshot.docs.map(doc => cleanFirebaseDoc({ id: doc.id, ...doc.data() }));
       saveLocalOnly();
-      if (appIsVisible()) renderPage(currentPage);
+      scheduleFirebasePageRefresh(collectionName);
     }, err => {
       console.warn(`Firebase listener failed for ${collectionName}`, err);
     });
@@ -582,6 +636,25 @@ function showApp(){
   renderPage(currentPage);
 }
 
+
+async function autoConnectFirebaseForLocalSession(){
+  if(!firebaseReady || !firebaseAuth || firebaseAuth.currentUser) return false;
+  const stored = getStoredSession();
+  const hasSession = !!(stored?.email || state.currentUser?.email);
+  if(!hasSession) return false;
+  try {
+    await ensureFirebaseReadForLocalSession();
+    if(firebaseAuth.currentUser) {
+      await loadCloudState({ readOnly: firebaseAuth.currentUser.isAnonymous });
+      updateFirebaseStatusBadge();
+      return true;
+    }
+  } catch(err){
+    console.warn('Firebase auto connect failed', err);
+  }
+  return false;
+}
+
 async function init(){
   applyTheme();
   buildNav();
@@ -624,6 +697,7 @@ async function init(){
           state.currentUser = { email: stored.email, name: stored.name || String(stored.email).split('@')[0] };
           saveLocalOnly();
           if(!appIsVisible()) showApp();
+          autoConnectFirebaseForLocalSession();
           return;
         }
         state.currentUser = null;
@@ -1740,9 +1814,12 @@ function toggleThemeAndRefreshUserConfigs(){
 
 function configAccordion(title, subtitle, html, options={}){
   if(!html) return '';
-  const open = options.open ? 'open' : '';
+  const id = options.id || configSectionId(title);
+  const savedOpen = getOpenConfigSections();
+  const isOpen = savedOpen.length ? savedOpen.includes(id) : !!options.open;
+  const open = isOpen ? 'open' : '';
   const icon = options.icon || '⚙️';
-  return `<details class="config-accordion" ${open}>
+  return `<details class="config-accordion" data-config-section="${esc(id)}" ${open}>
     <summary>
       <span class="config-accordion-icon">${icon}</span>
       <span class="config-accordion-title"><strong>${esc(title)}</strong><em>${esc(subtitle || '')}</em></span>
@@ -1755,7 +1832,7 @@ function generalSettingsCard(){
   return `<div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="companyNif" placeholder="NIF" value="${esc(state.settings.companyNif || '')}"><input class="field span3" name="companyAddress" placeholder="Morada" value="${esc(state.settings.companyAddress || '')}"><input class="field" name="companyPhone" placeholder="Telefone empresa" value="${esc(state.settings.companyPhone || '')}"><input class="field" name="companyEmail" placeholder="Email empresa" value="${esc(state.settings.companyEmail || '')}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><label class="checkline span2 spellcheck-toggle"><input type="checkbox" name="spellcheckEnabled" ${spellcheckEnabled()?'checked':''}> Correção ortográfica ativa</label><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div>`;
 }
 function firebaseSettingsCard(){
-  return `<div class="card"><div class="card-head"><h3>Firebase</h3><span class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">Dados separados no Firestore por página: clientes, fornecedores, orçamentos, utilizadores, diretório de contactos e configurações.</p><div class="actions"><button class="btn" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div>`;
+  return `<div class="card"><div class="card-head"><h3>Firebase</h3><span id="firebaseStatusBadge" class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">A Firebase liga automaticamente ao iniciar sessão. Alterações são guardadas localmente e sincronizadas automaticamente quando houver sessão Firebase com permissões.</p><div class="firebase-status-line"><strong>${firebaseAuth?.currentUser ? 'Sessão Firebase ativa' : 'Sem sessão Firebase ativa'}</strong><span>${firebaseAuth?.currentUser?.isAnonymous ? 'Modo leitura automática. Para escrever na Firebase, entra com uma conta Firebase válida.' : (firebaseAuth?.currentUser?.email || 'A app tenta ligar automaticamente.')}</span></div><div class="actions"><button class="btn primary" id="reconnectFirebaseBtn" type="button">Ligar Firebase</button><button class="btn" id="syncFirebaseBtn" type="button">Sincronizar agora</button><button class="btn" id="exportJsonBtn" type="button">Exportar JSON</button><button class="btn warn" id="resetDemoBtn" type="button">Reset demo</button></div></div>`;
 }
 function electronSetupCard(){
   if(!isAdminMaster()) return '';
@@ -2491,7 +2568,22 @@ function openEntityReadModal(type,id){
 function bindFollowForm(){
   qs('#followForm').addEventListener('submit',e=>{ e.preventDefault(); state.followups.push({id:uid('AGE'),...Object.fromEntries(new FormData(e.target).entries())}); saveState(); renderPage('agenda'); toast('Follow-up guardado.'); });
 }
+
+function refreshConfigPage(message){
+  rememberConfigAccordionState();
+  const content = qs('#pageContent');
+  const scrollTop = content?.scrollTop || 0;
+  renderPage('config');
+  setTimeout(()=>{
+    restoreConfigAccordionState();
+    const nextContent = qs('#pageContent');
+    if(nextContent) nextContent.scrollTop = scrollTop;
+  }, 160);
+  if(message) toast(message);
+}
 function bindConfig(){
+  restoreConfigAccordionState();
+  qsa('.config-accordion').forEach(d=>d.addEventListener('toggle', rememberConfigAccordionState));
   const settingsForm = qs('#settingsForm');
   if(settingsForm) settingsForm.addEventListener('submit',e=>{
     e.preventDefault();
@@ -2509,7 +2601,7 @@ function bindConfig(){
       githubUrl:fd.get('githubUrl'),
       firebaseEnabled:firebaseReady
     };
-    saveState(); applyTheme(); toast('Configurações guardadas.'); renderPage('config');
+    saveState(); applyTheme(); refreshConfigPage('Configurações guardadas.');
   });
   const permissionsForm = qs('#permissionsForm');
   if(permissionsForm) permissionsForm.addEventListener('submit', e=>{
@@ -2528,38 +2620,42 @@ function bindConfig(){
     });
     saveState();
     buildNav();
-    toast('Permissões guardadas.');
-    renderPage('config');
+    refreshConfigPage('Permissões guardadas.');
   });
   qsa('[data-warehouse-up]').forEach(btn=>btn.addEventListener('click',()=>{
     if(!isAdminMaster()) return toast('Só o Admin Master pode alterar a ordem.');
     moveWarehouse(btn.dataset.warehouseUp, -1);
     saveState();
-    toast('Ordem dos armazéns atualizada.');
-    renderPage('config');
+    refreshConfigPage('Ordem dos armazéns atualizada.');
   }));
   qsa('[data-warehouse-down]').forEach(btn=>btn.addEventListener('click',()=>{
     if(!isAdminMaster()) return toast('Só o Admin Master pode alterar a ordem.');
     moveWarehouse(btn.dataset.warehouseDown, 1);
     saveState();
-    toast('Ordem dos armazéns atualizada.');
-    renderPage('config');
+    refreshConfigPage('Ordem dos armazéns atualizada.');
   }));
   const resetWarehouseBtn = qs('#resetWarehouseOrderBtn');
   if(resetWarehouseBtn) resetWarehouseBtn.addEventListener('click',()=>{
     if(!isAdminMaster()) return toast('Só o Admin Master pode alterar a ordem.');
     resetWarehouseOrder();
     saveState();
-    toast('Armazéns ordenados A-Z.');
-    renderPage('config');
+    refreshConfigPage('Armazéns ordenados A-Z.');
   });
   bindActionPermissions();
   bindAuditControls();
   bindBackupControls();
   bindProductionControls();
   bindPresentationControls();
+  const reconnectBtn = qs('#reconnectFirebaseBtn');
+  if(reconnectBtn) reconnectBtn.addEventListener('click',async()=>{
+    const ok = firebaseReady || await initFirebase();
+    if(!ok) return toast('Firebase indisponível.');
+    if(!firebaseAuth.currentUser) await autoConnectFirebaseForLocalSession();
+    if(firebaseAuth.currentUser) await loadCloudState({ readOnly: firebaseAuth.currentUser.isAnonymous });
+    refreshConfigPage(firebaseAuth.currentUser ? 'Firebase ligada automaticamente.' : 'Firebase pronta. Faz login com conta Firebase para sincronizar escrita.');
+  });
   const syncBtn = qs('#syncFirebaseBtn');
-  if(syncBtn) syncBtn.addEventListener('click',async()=>{ await pushCloudState(); toast(firebaseReady ? 'Sincronizado com Firebase.' : 'Firebase indisponível.'); renderPage('config'); });
+  if(syncBtn) syncBtn.addEventListener('click',async()=>{ if(!firebaseAuth?.currentUser) await autoConnectFirebaseForLocalSession(); await pushCloudState(); updateFirebaseStatusBadge(); toast(firebaseReady ? (cloudReadOnlyMode ? 'Firebase ligada em modo leitura. Entra com conta Firebase para gravar.' : 'Sincronizado com Firebase.') : 'Firebase indisponível.'); });
   const exportBtn = qs('#exportJsonBtn');
   if(exportBtn) exportBtn.addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='autoparts-callcenter-export.json'; a.click(); URL.revokeObjectURL(a.href); });
   const resetBtn = qs('#resetDemoBtn');
@@ -2610,36 +2706,32 @@ function exportProductionReport(){
   downloadBlob(blob, `relatorio-producao-${today()}.txt`);
 }
 function bindProductionControls(){
-  qs('#validateProductionBtn')?.addEventListener('click',()=>{ renderPage('config'); toast('Checklist atualizada.'); });
+  qs('#validateProductionBtn')?.addEventListener('click',()=>refreshConfigPage('Checklist atualizada.')); 
   qs('#toggleProductionModeBtn')?.addEventListener('click',()=>{
     if(!isAdminMaster()) return toast('Só o Admin Master pode alterar isto.');
     state.settings = { ...(state.settings || {}), productionMode: !(state.settings?.productionMode === true) };
     saveState();
-    toast(state.settings.productionMode ? 'Modo produção ativado.' : 'Modo produção desativado.');
-    renderPage('config');
+    refreshConfigPage(state.settings.productionMode ? 'Modo produção ativado.' : 'Modo produção desativado.');
   });
   qs('#exportProductionReportBtn')?.addEventListener('click',()=>exportProductionReport());
   qs('#cleanDemoDataBtn')?.addEventListener('click',()=>{
     if(!isAdminMaster()) return toast('Só o Admin Master pode limpar dados demo.');
     if(!confirm('Limpar os dados demo/operacionais atuais? Esta ação mantém utilizadores, configurações e backups.')) return;
     cleanDemoData();
-    toast('Dados demo limpos.');
-    renderPage('config');
+    refreshConfigPage('Dados demo limpos.');
   });
   qs('#cleanDemoDataBtnAlt')?.addEventListener('click',()=>{
     if(!isAdminMaster()) return toast('Só o Admin Master pode limpar dados demo.');
     if(!confirm('Limpar sem criar backup? Esta ação mantém utilizadores, permissões e configurações.')) return;
     cleanDemoData();
-    toast('Produção limpa preparada.');
-    renderPage('config');
+    refreshConfigPage('Produção limpa preparada.');
   });
   qs('#prepareCleanProductionBtn')?.addEventListener('click',()=>{
     if(!isAdminMaster()) return toast('Só o Admin Master pode preparar produção limpa.');
     if(!confirm('Criar backup completo e limpar dados operacionais/demo?')) return;
     createBackup('backup-antes-producao-limpa');
     cleanDemoData();
-    toast('Backup criado e produção limpa preparada.');
-    renderPage('config');
+    refreshConfigPage('Backup criado e produção limpa preparada.');
   });
 }
 
@@ -2718,8 +2810,7 @@ function bindActionPermissions(){
       });
     });
     saveState('Permissões finas atualizadas');
-    toast('Permissões finas guardadas.');
-    renderPage('config');
+    refreshConfigPage('Permissões finas guardadas.');
   });
 }
 function auditCard(){
@@ -2739,7 +2830,7 @@ function bindAuditControls(){
     if(!confirm('Limpar todos os registos de auditoria?')) return;
     state.auditLogs = [];
     saveState('Auditoria limpa');
-    renderPage('config');
+    refreshConfigPage('Auditoria limpa.');
   });
 }
 function backupCard(){
@@ -2776,7 +2867,7 @@ function checkAutoBackup(){
   } catch(err){ console.warn('Auto backup failed', err); }
 }
 function bindBackupControls(){
-  qs('#createBackupBtn')?.addEventListener('click',()=>{ createBackup('Backup manual'); toast('Backup criado.'); renderPage('config'); });
+  qs('#createBackupBtn')?.addEventListener('click',()=>{ createBackup('Backup manual'); refreshConfigPage('Backup criado.'); });
   qs('#downloadFullBackupBtn')?.addEventListener('click',()=>downloadBackupSnapshot({ id:'full', name:'backup-completo', snapshot:state }));
   qs('#restoreBackupInput')?.addEventListener('change', async e=>{
     const file = e.target.files?.[0]; if(!file) return;
@@ -2788,8 +2879,7 @@ function bindBackupControls(){
     const keepUser = state.currentUser;
     state = ensureStateShape({ ...seedData(), ...snapshot, currentUser: keepUser });
     saveState('Backup restaurado por ficheiro');
-    toast('Backup restaurado.');
-    renderPage('config');
+    refreshConfigPage('Backup restaurado.');
   });
   qsa('[data-download-backup]').forEach(b=>b.addEventListener('click',()=>{
     const backup = (state.backups || []).find(x=>x.id===b.dataset.downloadBackup);
@@ -2802,8 +2892,7 @@ function bindBackupControls(){
     const keepUser = state.currentUser;
     state = ensureStateShape({ ...seedData(), ...backup.snapshot, currentUser: keepUser, backups: state.backups });
     saveState('Backup restaurado');
-    toast('Backup restaurado.');
-    renderPage('config');
+    refreshConfigPage('Backup restaurado.');
   }));
 }
 function downloadBackupSnapshot(backup){

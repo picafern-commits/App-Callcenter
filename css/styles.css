@@ -3359,3 +3359,24 @@ body.scheme-night .shell-header{background:linear-gradient(180deg, rgba(4,12,22,
 .dashboard-mini-stats,.personal-stat{display:none!important;}
 .dashboard-hero{min-height:180px;align-items:center!important;}
 .dashboard-hero-copy p{margin-top:8px!important;}
+
+
+/* v2.2.5 - Config sem reset + Firebase auto sync */
+.firebase-status-line{
+  display:grid;
+  gap:4px;
+  padding:12px 14px;
+  margin:12px 0 14px;
+  border-radius:16px;
+  background:rgba(20,92,151,.07);
+  border:1px solid rgba(20,92,151,.10);
+}
+.firebase-status-line strong{color:var(--brand3);font-weight:950;}
+.firebase-status-line span{color:var(--muted);font-size:13px;font-weight:800;}
+body.theme-dark .firebase-status-line{
+  background:rgba(255,255,255,.04);
+  border-color:rgba(255,255,255,.08);
+}
+body.theme-dark .firebase-status-line strong{color:#f5f9fd;}
+body.theme-dark .firebase-status-line span{color:#a9c2d8;}
+.config-accordion{scroll-margin-top:18px;}
