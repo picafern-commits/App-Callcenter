@@ -1,4 +1,4 @@
-const APP_VERSION = '2.2.7';
+const APP_VERSION = '2.2.8';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -265,14 +265,9 @@ function restoreConfigAccordionState(){
   });
 }
 function scheduleFirebasePageRefresh(reason='firebase'){
-  // A Firebase deve sincronizar dados em segundo plano.
-  // Antes isto redesenhava a página a cada snapshot e parecia que a app dava refresh sozinha.
+  // Não faz refresh visual automático.
   if(!appIsVisible()) return;
-  applyTheme();
   updateFirebaseStatusBadge();
-  document.body.classList.add('firebase-synced-soft');
-  clearTimeout(firebaseRefreshTimer);
-  firebaseRefreshTimer = setTimeout(()=>document.body.classList.remove('firebase-synced-soft'), 700);
 }
 function updateFirebaseStatusBadge(){
   const badge = qs('#firebaseStatusBadge');
@@ -424,29 +419,11 @@ async function migrateLegacyCloudState(base){
   await saveFirebaseCollections();
 }
 function startFirebaseListeners(){
+  // v2.2.8: listeners realtime desativados.
+  // A app estava a receber snapshots da Firebase e parecia dar refresh sozinha.
+  // Agora: carrega dados ao entrar/sincronizar e grava automaticamente quando alteras.
   stopFirebaseListeners();
-  if (!firebaseReady || !firebaseAuth?.currentUser || !firebaseDb) return;
-
-  firebaseUnsubscribers.push(firebaseDb.collection(FIREBASE_META_COLLECTION).doc(FIREBASE_META_DOC).onSnapshot(doc => {
-    if (!doc.exists || !doc.data()?.settings) return;
-    state.settings = { ...state.settings, ...doc.data().settings, firebaseEnabled: true };
-    const localTheme = getLocalTheme();
-    if(localTheme) state.settings.theme = localTheme;
-    saveLocalOnly();
-    applyTheme();
-    scheduleFirebasePageRefresh('meta');
-  }));
-
-  Object.entries(FIREBASE_COLLECTIONS).forEach(([stateKey, collectionName]) => {
-    const unsubscribe = firebaseDb.collection(collectionName).onSnapshot(snapshot => {
-      state[stateKey] = snapshot.docs.map(doc => cleanFirebaseDoc({ id: doc.id, ...doc.data() }));
-      saveLocalOnly();
-      scheduleFirebasePageRefresh(collectionName);
-    }, err => {
-      console.warn(`Firebase listener failed for ${collectionName}`, err);
-    });
-    firebaseUnsubscribers.push(unsubscribe);
-  });
+  updateFirebaseStatusBadge();
 }
 function stopFirebaseListeners(){
   firebaseUnsubscribers.forEach(unsubscribe => {
@@ -2751,7 +2728,14 @@ function bindConfig(){
     refreshConfigPage(firebaseAuth.currentUser ? 'Firebase ligada automaticamente.' : 'Firebase pronta. Faz login com conta Firebase para sincronizar escrita.');
   });
   const syncBtn = qs('#syncFirebaseBtn');
-  if(syncBtn) syncBtn.addEventListener('click',async()=>{ if(!firebaseAuth?.currentUser) await autoConnectFirebaseForLocalSession(); await pushCloudState(); updateFirebaseStatusBadge(); toast(firebaseReady ? (cloudReadOnlyMode ? 'Firebase ligada em modo leitura. Entra com conta Firebase para gravar.' : 'Sincronizado com Firebase.') : 'Firebase indisponível.'); });
+  if(syncBtn) syncBtn.addEventListener('click',async()=>{
+    if(!firebaseAuth?.currentUser) await autoConnectFirebaseForLocalSession();
+    if(firebaseAuth?.currentUser) await loadCloudState({ readOnly: firebaseAuth.currentUser.isAnonymous });
+    if(!cloudReadOnlyMode) await pushCloudState();
+    updateFirebaseStatusBadge();
+    toast(firebaseReady ? (cloudReadOnlyMode ? 'Firebase ligada em modo leitura. Entra com conta Firebase para gravar.' : 'Sincronizado com Firebase.') : 'Firebase indisponível.');
+    refreshConfigPage('Sincronização manual concluída.');
+  });
   const exportBtn = qs('#exportJsonBtn');
   if(exportBtn) exportBtn.addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='autoparts-callcenter-export.json'; a.click(); URL.revokeObjectURL(a.href); });
   const resetBtn = qs('#resetDemoBtn');
