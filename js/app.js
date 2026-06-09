@@ -1,4 +1,4 @@
-const APP_VERSION = '2.2.2';
+const APP_VERSION = '2.2.3';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -959,7 +959,6 @@ function personalStat(label, value, note){
 function dashboard(){
   const visiblePages = pages.filter(p => p.id !== 'dashboard' && canOpenPage(p.id));
   const userName = currentDisplayName();
-  const stats = personalDashboardData();
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'Bom dia' : (hour < 19 ? 'Boa tarde' : 'Boa noite');
   return `
@@ -969,7 +968,6 @@ function dashboard(){
           <span class="hero-kicker">${greet}, ${esc(userName)}</span>
           <h1>Portal do Callcenter</h1>
           <p>Acede rapidamente às áreas principais da operação.</p>
-          <div class="dashboard-mini-stats">${personalStat('Pedidos abertos', stats.open, 'em curso')}${personalStat('Urgentes', stats.urgent, 'prioridade')}${personalStat('Orçamentos', stats.quoted, 'emitidos')}${personalStat('Margem', money(stats.margin), 'estimada')}</div>
         </div>
         <div class="dashboard-user-corner">
           <div class="dashboard-user-chip">

@@ -3354,3 +3354,8 @@ body.scheme-night .shell-header{background:linear-gradient(180deg, rgba(4,12,22,
 .header-brand{gap:10px!important;}
 .header-brand #companyMiniBadge{display:none!important;}
 .user-configs-page .user-setting-section{margin-bottom:16px;}
+
+/* v2.2.3 - Dashboard sem cards pequenos */
+.dashboard-mini-stats,.personal-stat{display:none!important;}
+.dashboard-hero{min-height:180px;align-items:center!important;}
+.dashboard-hero-copy p{margin-top:8px!important;}
