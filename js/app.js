@@ -1,4 +1,4 @@
-const APP_VERSION = '1.8.2';
+const APP_VERSION = '1.8.3';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
@@ -1174,12 +1174,14 @@ function suppliersTable(rows){
   if(!rows.length) return '<div class="empty">Sem fornecedores registados.</div>';
   return `<div class="clean-card-list supplier-card-list">${rows.map(s=>`
     <article class="clean-data-card supplier-data-card">
-      <div class="data-card-main">
-        <span class="data-card-code">${esc(supplierRef(s) || 'Sem código')}</span>
+      <div class="data-card-main supplier-name-box">
         <strong>${esc(supplierName(s) || '-')}</strong>
         <small>Fornecedor</small>
       </div>
-      <div class="actions data-card-actions">
+      <div class="supplier-code-box">
+        <span class="data-card-code">${esc(supplierRef(s) || 'Sem código')}</span>
+      </div>
+      <div class="actions data-card-actions supplier-actions-box">
         ${canEditOperational()?`<button class="btn small" data-edit-entity="supplier:${s.id}">Editar</button>`:'<span class="muted">Consulta</span>'}
         ${canDelete()?`<button class="btn danger small" data-delete-entity="supplier:${s.id}">Apagar</button>`:''}
       </div>

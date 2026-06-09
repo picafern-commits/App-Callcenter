@@ -1767,3 +1767,34 @@ body.theme-dark .data-card-code{
   .data-card-actions{justify-content:flex-start;}
   .mini-two-fields{grid-template-columns:1fr;}
 }
+
+
+/* v1.8.3 - Fornecedores: código ao centro */
+.supplier-data-card{
+  grid-template-columns:minmax(0,1fr) minmax(150px,220px) auto;
+  align-items:center;
+}
+.supplier-data-card .data-card-actions{
+  grid-column:auto;
+  justify-content:flex-end;
+  padding-top:0;
+}
+.supplier-code-box{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-width:0;
+}
+.supplier-code-box .data-card-code{
+  margin-inline:auto;
+  text-align:center;
+}
+.supplier-name-box{
+  min-width:0;
+}
+@media(max-width:760px){
+  .supplier-data-card{grid-template-columns:1fr;}
+  .supplier-code-box{justify-content:flex-start;}
+  .supplier-code-box .data-card-code{margin-inline:0;}
+  .supplier-data-card .data-card-actions{justify-content:flex-start;}
+}
