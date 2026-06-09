@@ -1,4 +1,4 @@
-const APP_VERSION = '1.5.4';
+const APP_VERSION = '1.5.5';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
@@ -79,7 +79,8 @@ function seedData() {
       githubUrl: '',
       firebaseEnabled: false,
       dailyBackupHour: '19:30',
-      theme: 'normal'
+      theme: 'normal',
+      spellcheckEnabled: true
     },
     currentUser: null,
     calls: [
@@ -560,6 +561,79 @@ function bindShell(){
   });
 }
 
+
+function spellcheckEnabled(){
+  return state.settings?.spellcheckEnabled !== false;
+}
+function mirrorCase(original, replacement){
+  if(!original) return replacement;
+  if(original === original.toUpperCase()) return replacement.toUpperCase();
+  if(original[0] === original[0].toUpperCase()) return replacement.charAt(0).toUpperCase() + replacement.slice(1);
+  return replacement;
+}
+function correctionPairs(){
+  return [
+    ['automaveis','automóveis'], ['automovel','automóvel'], ['pecas','peças'], ['orcamento','orçamento'], ['orcamentos','orçamentos'],
+    ['referencia','referência'], ['numero','número'], ['telemovel','telemóvel'], ['armazem','armazém'], ['seccao','secção'], ['seccoes','secções'], ['secssao','secção'], ['sessoes','secções'],
+    ['informacao','informação'], ['informacoes','informações'], ['configuracao','configuração'], ['configuracoes','configurações'], ['operacao','operação'], ['operacoes','operações'],
+    ['necessario','necessário'], ['necessaria','necessária'], ['disponivel','disponível'], ['possivel','possível'], ['proximo','próximo'], ['proxima','próxima'],
+    ['tambem','também'], ['apos','após'], ['ja','já'], ['nao','não'], ['estao','estão'], ['sao','são'], ['sera','será'], ['ate','até'], ['so','só'], ['voce','você'],
+    ['porfavor','por favor'], ['obrigadao','obrigadão']
+  ];
+}
+function smartCorrectText(text){
+  let output = String(text || '');
+  let changes = 0;
+  correctionPairs().forEach(([wrong,right])=>{
+    const re = new RegExp(`\\b${wrong}\\b`, 'gi');
+    output = output.replace(re, match => { changes++; return mirrorCase(match, right); });
+  });
+  const beforeSpaces = output;
+  output = output
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .replace(/([,.;:!?])([^\s\n])/g, '$1 $2')
+    .replace(/(^|[.!?]\s+)([a-záàâãéêíóôõúç])/g, (m, p1, p2) => p1 + p2.toUpperCase());
+  if(output !== beforeSpaces) changes++;
+  return { text: output, changes };
+}
+function correctElementText(el){
+  if(!el) return;
+  const original = el.value || '';
+  const corrected = smartCorrectText(original);
+  if(corrected.text === original) return toast('Não encontrei correções automáticas nesse texto.');
+  el.value = corrected.text;
+  el.dispatchEvent(new Event('input', { bubbles:true }));
+  el.focus();
+  toast('Texto corrigido. Confirma antes de guardar.');
+}
+function shouldShowCorrectButton(el){
+  const name = (el.getAttribute('name') || '').toLowerCase();
+  const placeholder = (el.getAttribute('placeholder') || '').toLowerCase();
+  if(el.tagName === 'TEXTAREA') return true;
+  return ['notas','observacoes','condicoes','descricao','mensagem','body','title','related','peca'].some(k => name.includes(k) || placeholder.includes(k));
+}
+function applySpellcheckEnhancements(root=document){
+  const enabled = spellcheckEnabled();
+  const fields = [...root.querySelectorAll('textarea, input')];
+  fields.forEach(el=>{
+    const type = (el.getAttribute('type') || 'text').toLowerCase();
+    if(['email','tel','number','date','time','password','checkbox','radio','file','hidden'].includes(type)) return;
+    el.spellcheck = enabled;
+    el.setAttribute('lang','pt-PT');
+    el.setAttribute('autocomplete', el.getAttribute('autocomplete') || 'off');
+    if(!enabled || el.dataset.spellEnhanced === '1' || el.readOnly || el.disabled || !shouldShowCorrectButton(el)) return;
+    el.dataset.spellEnhanced = '1';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `btn small spellcheck-btn${el.classList.contains('span3') ? ' span3' : ''}`;
+    btn.textContent = 'Corrigir texto';
+    btn.title = 'Aplicar correções automáticas simples em português';
+    btn.addEventListener('click',()=>correctElementText(el));
+    el.insertAdjacentElement('afterend', btn);
+  });
+}
+
 function renderPage(id){
   if(!canOpenPage(id)) {
     toast('Sem permissão para abrir esta página.');
@@ -573,7 +647,9 @@ function renderPage(id){
   const renderers = { dashboard, 'nova-chamada': novaChamada, pedidos, clientes, contactos, fornecedores, orcamentos, agenda, stock, relatorios, users, config };
   qs('#pageContent').innerHTML = renderers[id]();
   bindPage(id);
+  applySpellcheckEnhancements(qs('#pageContent'));
 }
+
 
 function currentAppUser(){
   const email = (state.currentUser?.email || firebaseAuth?.currentUser?.email || '').toLowerCase();
@@ -1106,7 +1182,7 @@ function topParts(){
   return `<div class="table-wrap"><table><thead><tr><th>Peça</th><th>Pedidos</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r[0])}</td><td>${r[1]}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function config(){
-  return `<div class="grid two"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="companyNif" placeholder="NIF" value="${esc(state.settings.companyNif || '')}"><input class="field span3" name="companyAddress" placeholder="Morada" value="${esc(state.settings.companyAddress || '')}"><input class="field" name="companyPhone" placeholder="Telefone empresa" value="${esc(state.settings.companyPhone || '')}"><input class="field" name="companyEmail" placeholder="Email empresa" value="${esc(state.settings.companyEmail || '')}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><select class="select" name="theme"><option value="normal" ${currentTheme()==='normal'?'selected':''}>Tema normal</option><option value="dark" ${currentTheme()==='dark'?'selected':''}>Darkmode</option></select><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>Firebase</h3><span class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">Dados separados no Firestore por página: clientes, fornecedores, orçamentos, pedidos, agenda, stock, utilizadores, diretório de contactos e configurações.</p><div class="actions"><button class="btn" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div></div>`;
+  return `<div class="grid two"><div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="companyNif" placeholder="NIF" value="${esc(state.settings.companyNif || '')}"><input class="field span3" name="companyAddress" placeholder="Morada" value="${esc(state.settings.companyAddress || '')}"><input class="field" name="companyPhone" placeholder="Telefone empresa" value="${esc(state.settings.companyPhone || '')}"><input class="field" name="companyEmail" placeholder="Email empresa" value="${esc(state.settings.companyEmail || '')}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><select class="select" name="theme"><option value="normal" ${currentTheme()==='normal'?'selected':''}>Tema normal</option><option value="dark" ${currentTheme()==='dark'?'selected':''}>Darkmode</option></select><label class="checkline span2 spellcheck-toggle"><input type="checkbox" name="spellcheckEnabled" ${spellcheckEnabled()?'checked':''}> Correção ortográfica ativa</label><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div><div class="card"><div class="card-head"><h3>Firebase</h3><span class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">Dados separados no Firestore por página: clientes, fornecedores, orçamentos, pedidos, agenda, stock, utilizadores, diretório de contactos e configurações.</p><div class="actions"><button class="btn" id="syncFirebaseBtn">Sincronizar agora</button><button class="btn" id="exportJsonBtn">Exportar JSON</button><button class="btn warn" id="resetDemoBtn">Reset demo</button></div></div></div>`;
 }
 
 function bindPage(id){
@@ -1364,12 +1440,12 @@ function bindFollowForm(){
   qs('#followForm').addEventListener('submit',e=>{ e.preventDefault(); state.followups.push({id:uid('AGE'),...Object.fromEntries(new FormData(e.target).entries())}); saveState(); renderPage('agenda'); toast('Follow-up guardado.'); });
 }
 function bindConfig(){
-  qs('#settingsForm').addEventListener('submit',e=>{ e.preventDefault(); const fd=new FormData(e.target); state.settings={ companyName:fd.get('companyName'), companyNif:fd.get('companyNif'), companyAddress:fd.get('companyAddress'), companyPhone:fd.get('companyPhone'), companyEmail:fd.get('companyEmail'), dailyBackupHour:fd.get('dailyBackupHour'), theme:fd.get('theme') || 'normal', githubUrl:fd.get('githubUrl'), firebaseEnabled:firebaseReady}; saveState(); applyTheme(); toast('Configurações guardadas.'); renderPage('config'); });
+  qs('#settingsForm').addEventListener('submit',e=>{ e.preventDefault(); const fd=new FormData(e.target); state.settings={ companyName:fd.get('companyName'), companyNif:fd.get('companyNif'), companyAddress:fd.get('companyAddress'), companyPhone:fd.get('companyPhone'), companyEmail:fd.get('companyEmail'), dailyBackupHour:fd.get('dailyBackupHour'), theme:fd.get('theme') || 'normal', spellcheckEnabled:fd.get('spellcheckEnabled')==='on', githubUrl:fd.get('githubUrl'), firebaseEnabled:firebaseReady}; saveState(); applyTheme(); toast('Configurações guardadas.'); renderPage('config'); });
   qs('#syncFirebaseBtn').addEventListener('click',async()=>{ await pushCloudState(); toast(firebaseReady ? 'Sincronizado com Firebase.' : 'Firebase indisponível.'); renderPage('config'); });
   qs('#exportJsonBtn').addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='autoparts-callcenter-export.json'; a.click(); URL.revokeObjectURL(a.href); });
   qs('#resetDemoBtn').addEventListener('click',()=>{ const currentUser = state.currentUser; localStorage.removeItem(STORAGE_KEY); state=seedData(); state.currentUser=currentUser; saveState(); toast('Demo reposta.'); setTimeout(()=>goPage('dashboard'), 250); });
 }
-function openModal(title, html){ qs('#modalRoot').innerHTML = `<div class="modal"><div class="modal-head"><h3>${title}</h3><button class="btn danger-soft small" id="closeModalBtn">Fechar</button></div>${html}</div>`; qs('#modalRoot').classList.remove('hidden'); qs('#closeModalBtn').addEventListener('click',closeModal); qsa('#modalRoot [data-client-email]').forEach(b=>b.addEventListener('click',()=>emailClient(b.dataset.clientEmail))); }
+function openModal(title, html){ qs('#modalRoot').innerHTML = `<div class="modal"><div class="modal-head"><h3>${title}</h3><button class="btn danger-soft small" id="closeModalBtn">Fechar</button></div>${html}</div>`; qs('#modalRoot').classList.remove('hidden'); qs('#closeModalBtn').addEventListener('click',closeModal); qsa('#modalRoot [data-client-email]').forEach(b=>b.addEventListener('click',()=>emailClient(b.dataset.clientEmail))); applySpellcheckEnhancements(qs('#modalRoot')); }
 function closeModal(){ qs('#modalRoot').classList.add('hidden'); qs('#modalRoot').innerHTML=''; }
 
 document.addEventListener('DOMContentLoaded', init);

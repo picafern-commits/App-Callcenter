@@ -800,3 +800,31 @@ body.theme-dark .toast{
 @media(max-width:1180px){
   .split-form-list{grid-template-columns:1fr !important;}
 }
+
+
+/* Sistema de correção ortográfica */
+.spellcheck-btn{
+  justify-self:start;
+  padding:7px 10px;
+  font-size:12px;
+  border-style:dashed;
+  color:var(--brand3);
+  background:linear-gradient(180deg,rgba(255,255,255,.82),rgba(234,243,251,.82));
+}
+.spellcheck-btn:hover{
+  border-color:var(--accent);
+  color:var(--brand);
+}
+.spellcheck-toggle{
+  align-self:center;
+  margin:0;
+  padding:10px 12px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:rgba(255,255,255,.58);
+  color:var(--brand3);
+  font-weight:900;
+}
+textarea[spellcheck="true"], input[spellcheck="true"]{
+  text-decoration-skip-ink:auto;
+}
