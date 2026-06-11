@@ -1,4 +1,4 @@
-const APP_VERSION = '2.4.5';
+const APP_VERSION = '2.4.6';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -3279,29 +3279,48 @@ function bindContactDirectory(){
     saveState(); renderPage('contactos'); toast('Secção apagada.');
   }));
 }
+function promiseTimeout(promise, ms=6500){
+  return Promise.race([
+    promise,
+    new Promise((_, reject)=>setTimeout(()=>reject(new Error('timeout')), ms))
+  ]);
+}
+async function approveUserSafely(user){
+  user.status = 'Ativo';
+  user.approvedAt = new Date().toISOString();
+  user.approvedBy = state.currentUser?.email || firebaseAuth?.currentUser?.email || '';
+  upsertAppUser(user);
+  saveLocalOnly();
+  try {
+    if(firebaseReady && firebaseAuth?.currentUser && !firebaseAuth.currentUser.isAnonymous && firebaseDb) {
+      await promiseTimeout(saveUserProfileToFirestore(user), 6500);
+      clearFirebaseDirty();
+      return { firebase:true };
+    }
+    markFirebaseDirty();
+    return { firebase:false };
+  } catch(err) {
+    console.warn('Approve user Firebase failed', err);
+    markFirebaseDirty();
+    return { firebase:false, error:err };
+  }
+}
+
 function bindUsersPage(){
   qsa('[data-approve-user]').forEach(btn=>btn.addEventListener('click', async ()=>{
     if(!isAdminMaster()) return toast('Só o Admin Master pode aprovar contas.');
     const user = (state.users || []).find(u=>u.id===btn.dataset.approveUser);
     if(!user) return;
+    const originalText = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'A aprovar...';
-    user.status = 'Ativo';
-    user.approvedAt = new Date().toISOString();
-    user.approvedBy = state.currentUser?.email || firebaseAuth?.currentUser?.email || '';
     try {
-      upsertAppUser(user);
-      saveState('Conta aprovada');
-      if(firebaseReady && firebaseAuth?.currentUser && !firebaseAuth.currentUser.isAnonymous) {
-        await saveUserProfileToFirestore(user);
-        await pushCloudState({ source:'approve-user' });
-      }
+      const result = await approveUserSafely(user);
       renderPage('users');
-      toast('Conta aprovada e gravada.');
-    } catch(err) {
-      console.warn('Approve user failed', err);
-      renderPage('users');
-      toast('Conta aprovada localmente, mas a Firebase não gravou. Confirma permissões.');
+      toast(result.firebase ? 'Conta aprovada e gravada na Firebase.' : 'Conta aprovada localmente. Firebase fica pendente para sincronizar.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText || 'Aprovar';
     }
   }));
   const form = qs('#createUserForm');
