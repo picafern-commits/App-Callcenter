@@ -3733,3 +3733,105 @@ body.theme-dark .route-destination-box b{color:var(--text)}
   .routes-filter-row{grid-template-columns:1fr 1fr}
   .route-data-card{grid-template-columns:1fr}
 }
+
+
+/* v2.3.7 - Diretório: botões com mais highlight e abrir/fechar tudo */
+.directory-control-bar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin:0 0 14px;
+  padding:12px 14px;
+  border-radius:18px;
+  background:linear-gradient(180deg, rgba(255,255,255,.72), rgba(247,251,255,.56));
+  border:1px solid rgba(255,255,255,.68);
+  box-shadow:0 12px 24px rgba(7,52,95,.10);
+}
+.directory-control-bar span{
+  color:var(--muted);
+  font-weight:900;
+  font-size:13px;
+}
+.directory-toggle-all-btn{
+  min-width:136px;
+  box-shadow:0 14px 26px rgba(7,52,95,.22)!important;
+}
+.section-chip{
+  background:linear-gradient(180deg, rgba(255,255,255,.96), rgba(237,247,255,.90))!important;
+  border:1px solid rgba(17,128,201,.30)!important;
+  box-shadow:0 10px 20px rgba(7,52,95,.12)!important;
+  color:var(--brand)!important;
+}
+.section-chip:hover{
+  transform:translateY(-2px);
+  box-shadow:0 16px 28px rgba(7,52,95,.18)!important;
+  border-color:rgba(245,124,31,.46)!important;
+}
+.section-chip b{
+  background:linear-gradient(135deg, rgba(245,124,31,.18), rgba(255,190,122,.24))!important;
+  color:#b65a10!important;
+}
+.section-chip.active{
+  background:linear-gradient(135deg, var(--accent), var(--accent2))!important;
+  color:white!important;
+  border-color:rgba(255,255,255,.34)!important;
+  box-shadow:0 16px 30px rgba(245,124,31,.30)!important;
+}
+.section-chip.active b{
+  background:rgba(255,255,255,.22)!important;
+  color:white!important;
+}
+.section-simple-actions .btn,
+.simple-contact-actions .btn,
+.simple-contact-info a,
+.mini-copy-btn{
+  box-shadow:0 8px 16px rgba(7,52,95,.13)!important;
+}
+.section-simple-actions .btn.ghost,
+.simple-contact-actions .btn.ghost{
+  background:linear-gradient(180deg, rgba(255,255,255,.96), rgba(237,247,255,.90))!important;
+  border-color:rgba(17,128,201,.26)!important;
+  color:var(--brand)!important;
+}
+.simple-contact-info a{
+  background:linear-gradient(180deg, rgba(255,255,255,.94), rgba(237,247,255,.88))!important;
+  border:1px solid rgba(17,128,201,.16);
+}
+.mini-copy-btn{
+  background:linear-gradient(135deg, rgba(245,124,31,.18), rgba(255,190,122,.22))!important;
+  border:1px solid rgba(245,124,31,.22)!important;
+}
+body.theme-dark .directory-control-bar{
+  background:linear-gradient(180deg, rgba(12,28,43,.92), rgba(9,22,35,.88));
+  border-color:rgba(255,255,255,.08);
+}
+body.theme-dark .section-chip{
+  background:linear-gradient(180deg, rgba(15,35,54,.96), rgba(10,24,38,.92))!important;
+  border-color:rgba(106,174,232,.18)!important;
+  color:#f5f9fd!important;
+}
+body.theme-dark .section-chip b{
+  background:rgba(245,124,31,.18)!important;
+  color:#ffc48f!important;
+}
+body.theme-dark .section-chip.active{
+  background:linear-gradient(135deg, #e96f17, #f7a64c)!important;
+  color:white!important;
+}
+body.theme-dark .section-simple-actions .btn.ghost,
+body.theme-dark .simple-contact-actions .btn.ghost,
+body.theme-dark .simple-contact-info a{
+  background:linear-gradient(180deg, rgba(15,35,54,.96), rgba(10,24,38,.92))!important;
+  border-color:rgba(255,255,255,.10)!important;
+  color:#f5f9fd!important;
+}
+@media(max-width:760px){
+  .directory-control-bar{
+    align-items:stretch;
+    flex-direction:column;
+  }
+  .directory-toggle-all-btn{
+    width:100%;
+  }
+}

@@ -1,4 +1,4 @@
-const APP_VERSION = '2.3.6';
+const APP_VERSION = '2.3.8';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -1327,8 +1327,25 @@ function normalizeContactDirectory(){
   state.contactGroups = (state.contactGroups || []).map(group => {
     const seccao = group.seccao || group.nome || 'Geral';
     const armazem = group.armazem || group.local || group.empresa || 'Geral';
-    return { ...group, armazem, seccao, nome: seccao, contactos: group.contactos || [] };
+    // Por defeito, ao carregar/resetar a app, todas as secções ficam colapsadas.
+    // O estado aberto só vive durante a sessão atual depois de clicares.
+    const runtimeOpen = window.__directoryOpenState && Object.prototype.hasOwnProperty.call(window.__directoryOpenState, group.id)
+      ? window.__directoryOpenState[group.id]
+      : false;
+    return { ...group, armazem, seccao, nome: seccao, aberto: runtimeOpen, contactos: group.contactos || [] };
   });
+}
+function setDirectoryRuntimeOpen(groupId, open){
+  window.__directoryOpenState = window.__directoryOpenState || {};
+  window.__directoryOpenState[groupId] = !!open;
+}
+function setAllDirectoryRuntimeOpen(open){
+  window.__directoryOpenState = window.__directoryOpenState || {};
+  (state.contactGroups || []).forEach(g=>{ if(g.id) window.__directoryOpenState[g.id] = !!open; g.aberto = !!open; });
+}
+function allDirectoryGroupsOpen(){
+  const groups = state.contactGroups || [];
+  return groups.length > 0 && groups.every(g => !!g.aberto);
 }
 function contactWarehouse(group){ return group.armazem || group.local || group.empresa || 'Geral'; }
 function contactSection(group){ return group.seccao || group.nome || 'Geral'; }
@@ -1406,10 +1423,14 @@ function contactGroupsView(groups){
   const grouped = groupedByWarehouse(groups);
   const warehouses = orderedWarehouses(Object.keys(grouped));
   const q = (qs('#contactSearch')?.value || '').trim();
-  return `<div class="directory-simple-view">${warehouses.map(armazem => {
+  const isAllOpen = allDirectoryGroupsOpen();
+  return `<div class="directory-control-bar">
+    <button class="btn primary directory-toggle-all-btn" id="toggleAllDirectoryBtn" type="button">${isAllOpen ? 'Fechar Tudo' : 'Abrir Tudo'}</button>
+    <span>${groups.length} secção(ões) no diretório</span>
+  </div>
+  <div class="directory-simple-view">${warehouses.map(armazem => {
     const sections = grouped[armazem].sort((a,b)=>contactSection(a).localeCompare(contactSection(b),'pt'));
     const total = sections.reduce((sum,g)=>sum + (g.contactos || []).length, 0);
-    const anyOpen = sections.some(g => g.aberto);
     return `<section class="warehouse-simple-card">
       <div class="warehouse-simple-head">
         <div class="warehouse-title-block">
@@ -1423,7 +1444,7 @@ function contactGroupsView(groups){
 
       <div class="section-chip-bar">
         ${sections.map(group => {
-          const opened = q ? true : (group.aberto || (!anyOpen && sections.length === 1));
+          const opened = q ? true : !!group.aberto;
           return `<button class="section-chip ${opened ? 'active' : ''}" type="button" data-toggle-contact-group="${group.id}">
             <span>${esc(contactSection(group))}</span>
             <b>${(group.contactos || []).length}</b>
@@ -1432,7 +1453,7 @@ function contactGroupsView(groups){
       </div>
 
       <div class="section-content-list">
-        ${sections.map(group => contactSectionView(group, q ? true : (!anyOpen && sections.length === 1))).join('')}
+        ${sections.map(group => contactSectionView(group, q ? true : false)).join('')}
       </div>
     </section>`;
   }).join('')}</div>`;
@@ -2762,6 +2783,7 @@ function openQuickContactModal(groupId){
       email:(data.email || '').trim()
     });
     group.aberto = true;
+    setDirectoryRuntimeOpen(group.id, true);
     saveState();
     if(closeAfter){
       closeModal();
@@ -2805,6 +2827,7 @@ function openEditContactModal(groupId, contactId){
     contact.telefone = (data.telefone || '').trim();
     contact.email = (data.email || '').trim();
     group.aberto = true;
+    setDirectoryRuntimeOpen(group.id, true);
     saveState();
     closeModal();
     renderPage('contactos');
@@ -2825,7 +2848,7 @@ function bindContactDirectory(){
     if(!armazem || !seccao || !data.nome?.trim()) return toast('Preenche armazém, secção e nome.');
     let group = (state.contactGroups || []).find(g => contactWarehouse(g).toLowerCase() === armazem.toLowerCase() && contactSection(g).toLowerCase() === seccao.toLowerCase());
     if(!group){
-      group = { id:uid('DIR'), armazem, seccao, nome:seccao, aberto:true, contactos:[] };
+      group = { id:uid('DIR'), armazem, seccao, nome:seccao, aberto:false, contactos:[] };
       state.contactGroups.push(group);
     }
     group.contactos = group.contactos || [];
@@ -2837,6 +2860,7 @@ function bindContactDirectory(){
       email:(data.email || '').trim()
     });
     group.aberto = true;
+    setDirectoryRuntimeOpen(group.id, true);
     saveState(); renderPage('contactos'); toast('Contacto adicionado.');
   });
 
@@ -2845,6 +2869,7 @@ function bindContactDirectory(){
     const group = (state.contactGroups || []).find(g=>g.id===btn.dataset.toggleContactGroup);
     if(!group) return;
     group.aberto = !group.aberto;
+    setDirectoryRuntimeOpen(group.id, group.aberto);
 
     // Toggle visual local, sem redesenhar a página.
     btn.classList.toggle('active', group.aberto);
@@ -2852,15 +2877,26 @@ function bindContactDirectory(){
     const panel = warehouse?.querySelector(`.directory-section-simple [data-add-contact-section="${group.id}"]`)?.closest('.directory-section-simple');
     if(panel) panel.classList.toggle('hidden', !group.aberto);
 
+    const allBtn = qs('#toggleAllDirectoryBtn');
+    if(allBtn) allBtn.textContent = allDirectoryGroupsOpen() ? 'Fechar Tudo' : 'Abrir Tudo';
+
     // Compatibilidade com layout antigo
     const section = btn.closest('.directory-section');
     const body = section?.querySelector('.section-body');
     const icon = btn.querySelector('.section-toggle-icon, i');
     if(body) body.classList.toggle('hidden', !group.aberto);
     if(icon) icon.textContent = group.aberto ? '−' : '+';
-
-    saveState();
   }));
+
+  const toggleAllDirectoryBtn = qs('#toggleAllDirectoryBtn');
+  if(toggleAllDirectoryBtn) toggleAllDirectoryBtn.addEventListener('click',()=>{
+    normalizeContactDirectory();
+    const nextOpen = !allDirectoryGroupsOpen();
+    setAllDirectoryRuntimeOpen(nextOpen);
+    qsa('.section-chip').forEach(btn=>btn.classList.toggle('active', nextOpen));
+    qsa('.directory-section-simple').forEach(panel=>panel.classList.toggle('hidden', !nextOpen));
+    toggleAllDirectoryBtn.textContent = nextOpen ? 'Fechar Tudo' : 'Abrir Tudo';
+  });
 
   qsa('[data-add-contact-section]').forEach(btn=>btn.addEventListener('click',()=>openQuickContactModal(btn.dataset.addContactSection)));
 
