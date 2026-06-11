@@ -3674,3 +3674,19 @@ body.theme-dark .section-simple-head span{
     justify-content:flex-start;
   }
 }
+
+
+/* v2.3.4 - Página Rotas baseada no Excel */
+.route-filter-bar{display:grid;grid-template-columns:1.6fr 1fr 1fr .8fr .8fr;gap:10px;margin-bottom:16px;}
+.routes-list{display:grid;gap:10px;}
+.route-card{display:grid;grid-template-columns:1.1fr 1.6fr .9fr .8fr .7fr auto;gap:12px;align-items:center;padding:15px;border-radius:18px;border:1px solid rgba(20,92,151,.08);background:rgba(255,255,255,.72);box-shadow:0 8px 18px rgba(7,52,95,.06);}
+.route-main strong,.route-destination b,.route-driver strong,.route-km strong{display:block;color:var(--brand3);font-size:15px;}
+.route-main small,.route-destination span,.route-driver span,.route-km span,.route-time span{display:block;color:var(--muted);font-weight:800;font-size:12px;margin-top:4px;}
+.route-km strong{display:inline-flex;margin-top:4px;padding:7px 10px;border-radius:999px;background:rgba(245,124,31,.12);color:#a24a05;}
+.route-actions{justify-content:flex-end;}
+.route-actions .btn{display:inline-flex;align-items:center;gap:7px;}
+body.theme-dark .route-card{background:linear-gradient(180deg, rgba(12,28,43,.92), rgba(9,22,35,.88));border-color:rgba(255,255,255,.08);}
+body.theme-dark .route-main strong,body.theme-dark .route-destination b,body.theme-dark .route-driver strong,body.theme-dark .route-km strong{color:var(--text);}
+body.theme-dark .route-km strong{background:rgba(245,124,31,.16);color:#ffc48f;}
+@media(max-width:1200px){.route-card{grid-template-columns:1fr 1fr}.route-actions{justify-content:flex-start}.route-filter-bar{grid-template-columns:1fr 1fr;}}
+@media(max-width:760px){.route-card,.route-filter-bar{grid-template-columns:1fr;}}

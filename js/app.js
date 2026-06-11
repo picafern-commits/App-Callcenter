@@ -1,4 +1,4 @@
-const APP_VERSION = '2.3.3';
+const APP_VERSION = '2.3.5';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -2038,7 +2038,7 @@ function excelPageRegistry(){
     contactos: {
       key:'contactGroups', title:'Diretório de Contactos', file:'diretorio-contactos', prefix:'DIR', edit:()=>canEditOperational(), flattened:true,
       fields:[
-        ['groupId','ID Secção'], ['contactId','ID Contacto'], ['armazem','Armazém'], ['seccao','Secção'], ['nome','Nome'], ['telemovel','Telemóvel'], ['telefone','Telefone'], ['email','Email']
+        ['groupId','ID Secção'], ['contactId','ID Contacto'], ['armazem','Armazém / Local'], ['seccao','Secção / Sessão'], ['nome','Nome Contacto'], ['telemovel','Telemóvel'], ['telefone','Telefone'], ['email','Email']
       ]
     },
     fornecedores: {
@@ -2280,14 +2280,63 @@ function splitCsvLine(line, delimiter){
   out.push(cur);
   return out.map(v=>v.trim());
 }
+function excelHeaderAliasesForPage(cfg){
+  const aliases = {};
+  (cfg.fields || []).forEach(([key,label])=>{
+    aliases[normalizeExcelHeader(key)] = key;
+    aliases[normalizeExcelHeader(label)] = key;
+  });
+
+  if(cfg.key === 'contactGroups'){
+    const add = (key, names)=>names.forEach(name=>aliases[normalizeExcelHeader(name)] = key);
+    add('armazem', ['Armazém','Armazem','Armazém / Local','Armazem / Local','Local','Localização','Localizacao','Loja','Unidade','Empresa','Grupo']);
+    add('seccao', ['Secção','Seccao','Sessão','Sessao','Secção/Sessão','Seccao/Sessao','Departamento','Zona','Área','Area','Tipo','Categoria']);
+    add('nome', ['Nome','Nome Contacto','Contacto','Pessoa','Responsável','Responsavel','Funcionário','Funcionario','Colaborador']);
+    add('telemovel', ['Telemóvel','Telemovel','Telemóvel Contacto','Telemovel Contacto','Tlm','Tlm.','Móvel','Movel','Mobile','Nº Telemóvel','N Telemovel']);
+    add('telefone', ['Telefone','Telefone Fixo','Fixo','Tel','Tel.','Número','Numero','Nº Telefone','N Telefone','Contacto Telefónico','Contacto Telefonico']);
+    add('email', ['Email','E-mail','Mail','Correio','Correio Eletrónico','Correio Eletronico']);
+    add('groupId', ['ID Secção','ID Seccao','ID Grupo','Grupo ID']);
+    add('contactId', ['ID Contacto','Contacto ID','ID Pessoa']);
+  }
+
+  return aliases;
+}
+function firstFilledValue(row, keys){
+  for(const key of keys){
+    const value = normalizeExcelValue(row?.[key]);
+    if(value) return value;
+  }
+  return '';
+}
+function normalizeImportedContactRow(raw){
+  const direct = raw || {};
+  const armazem = firstFilledValue(direct, ['armazem','local','localizacao','loja','unidade','empresa','grupo']) || 'Sem armazém';
+  const seccao = firstFilledValue(direct, ['seccao','sessao','departamento','zona','area','tipo','categoria']) || 'Geral';
+  const nome = firstFilledValue(direct, ['nome','contacto','pessoa','responsavel','funcionario','colaborador']);
+  const telemovel = firstFilledValue(direct, ['telemovel','tlm','movel','mobile']);
+  const telefone = firstFilledValue(direct, ['telefone','fixo','tel','numero']);
+  const email = firstFilledValue(direct, ['email','mail','correio']);
+  return {
+    groupId: direct.groupId || direct.idGrupo || direct.idSeccao || '',
+    contactId: direct.contactId || direct.idContacto || '',
+    armazem,
+    seccao,
+    nome,
+    telemovel,
+    telefone,
+    email
+  };
+}
+
 function normalizeImportedRows(rows, cfg){
-  const map = excelHeaderMap(cfg);
+  const map = excelHeaderAliasesForPage(cfg);
   return rows.map(row=>{
     const obj = {};
     Object.entries(row).forEach(([header,value])=>{
       const key = map[normalizeExcelHeader(header)];
       if(key) obj[key] = normalizeExcelValue(value);
     });
+    if(cfg.key === 'contactGroups') return normalizeImportedContactRow(obj);
     return obj;
   }).filter(row => Object.values(row).some(v => normalizeExcelValue(v) !== ''));
 }
@@ -2330,24 +2379,53 @@ function uniqueExcelMatch(pageId, existing, row){
 }
 function importContactRows(rows){
   state.contactGroups = state.contactGroups || [];
-  rows.forEach(row=>{
+  let imported = 0;
+  rows.forEach(rawRow=>{
+    const row = normalizeImportedContactRow(rawRow);
     const armazem = row.armazem || 'Sem armazém';
     const seccao = row.seccao || 'Geral';
-    let group = state.contactGroups.find(g => (row.groupId && g.id === row.groupId) || (normalizeText(g.armazem) === normalizeText(armazem) && normalizeText(g.seccao || g.nome) === normalizeText(seccao)));
+
+    // Evita mandar tudo para Geral por falta de mapeamento.
+    // Se não houver nome/contacto nem telefone/email, ignora a linha.
+    if(!row.nome && !row.telemovel && !row.telefone && !row.email) return;
+
+    let group = state.contactGroups.find(g =>
+      (row.groupId && g.id === row.groupId) ||
+      (normalizeText(g.armazem || g.local) === normalizeText(armazem) &&
+       normalizeText(g.seccao || g.nome) === normalizeText(seccao))
+    );
+
     if(!group){
       group = { id: row.groupId || uid('DIR'), armazem, seccao, nome:seccao, aberto:true, contactos:[] };
       state.contactGroups.push(group);
     }
+
     group.armazem = armazem;
     group.seccao = seccao;
     group.nome = seccao;
     group.contactos = group.contactos || [];
-    const contact = { id: row.contactId || uid('CNT'), nome: row.nome || '', telemovel: row.telemovel || '', telefone: row.telefone || '', email: row.email || '' };
-    const index = group.contactos.findIndex(c => (row.contactId && c.id === row.contactId) || (contact.email && c.email === contact.email) || (contact.nome && normalizeText(c.nome) === normalizeText(contact.nome)));
+
+    const contact = {
+      id: row.contactId || uid('CNT'),
+      nome: row.nome || '',
+      telemovel: row.telemovel || '',
+      telefone: row.telefone || '',
+      email: row.email || ''
+    };
+
+    const index = group.contactos.findIndex(c =>
+      (row.contactId && c.id === row.contactId) ||
+      (contact.email && normalizeText(c.email) === normalizeText(contact.email)) ||
+      (contact.nome && normalizeText(c.nome) === normalizeText(contact.nome) &&
+        (normalizeText(c.telemovel || c.telefone) === normalizeText(contact.telemovel || contact.telefone)))
+    );
+
     if(index >= 0) group.contactos[index] = { ...group.contactos[index], ...contact };
     else group.contactos.push(contact);
+    imported++;
   });
-  return rows.length;
+  normalizeContactDirectory();
+  return imported;
 }
 
 function bindPage(id){

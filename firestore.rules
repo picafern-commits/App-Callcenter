@@ -57,6 +57,13 @@ service cloud.firestore {
       allow delete: if canManage();
     }
 
+
+    match /rotas/{document} {
+      allow read: if signedIn();
+      allow create, update: if canOperate();
+      allow delete: if canManage();
+    }
+
     match /orcamentos/{document} {
       allow read: if signedIn();
       allow create, update: if canOperate();
