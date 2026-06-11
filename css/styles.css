@@ -3690,3 +3690,46 @@ body.theme-dark .route-main strong,body.theme-dark .route-destination b,body.the
 body.theme-dark .route-km strong{background:rgba(245,124,31,.16);color:#ffc48f;}
 @media(max-width:1200px){.route-card{grid-template-columns:1fr 1fr}.route-actions{justify-content:flex-start}.route-filter-bar{grid-template-columns:1fr 1fr;}}
 @media(max-width:760px){.route-card,.route-filter-bar{grid-template-columns:1fr;}}
+
+
+/* v2.3.6 - Página Rotas */
+.routes-filter-row{
+  display:grid;
+  grid-template-columns:1.4fr .9fr .9fr .7fr .7fr;
+  gap:10px;
+  margin:14px 0 16px;
+}
+.routes-card-list{gap:12px!important}
+.route-data-card{
+  display:grid!important;
+  grid-template-columns:minmax(150px,1.1fr) minmax(220px,1.6fr) minmax(140px,.8fr) minmax(100px,.55fr) auto;
+  gap:14px;
+  align-items:center;
+}
+.route-destination-box{
+  display:grid;
+  gap:5px;
+  min-width:0;
+}
+.route-destination-box b{
+  color:var(--brand3);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.route-destination-box span,
+.route-driver-box small{
+  color:var(--muted);
+  font-weight:800;
+  font-size:12px;
+}
+.route-driver-box{
+  display:grid;
+  gap:6px;
+  justify-items:start;
+}
+body.theme-dark .route-destination-box b{color:var(--text)}
+@media(max-width:1180px){
+  .routes-filter-row{grid-template-columns:1fr 1fr}
+  .route-data-card{grid-template-columns:1fr}
+}
