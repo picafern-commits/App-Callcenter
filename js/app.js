@@ -42,6 +42,8 @@ let cloudSaveInProgress = false;
 let cloudSavePending = false;
 let lastCloudSaveAt = 0;
 let firebaseLoadedKeys = new Set();
+let userPresenceTimer = null;
+const USER_SESSION_ID = `sess-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
 const CONFIG_OPEN_KEY = 'bragalis_config_open_sections_v1';
 function isElectronApp(){
   return new URLSearchParams(window.location.search).get('electron') === '1' || navigator.userAgent.toLowerCase().includes('electron');
@@ -276,6 +278,68 @@ function updateFirebaseStatusBadge(){
     badge.className = `badge ${cls}`;
   }
 }
+
+function currentUserId(){
+  const profileId = currentUserRecord()?.id;
+  if(profileId) return profileId;
+  const authUid = firebaseAuth?.currentUser?.uid;
+  if(authUid) return authUid;
+  return '';
+}
+function onlineCutoffMs(){
+  return Date.now() - 2 * 60 * 1000;
+}
+function isUserOnline(user){
+  if(user?.online !== true) return false;
+  const raw = user.lastSeen || user.lastSeenAt || '';
+  const time = raw ? Date.parse(raw) : 0;
+  return Number.isFinite(time) && time >= onlineCutoffMs();
+}
+function userPresenceLabel(user){
+  if(isUserOnline(user)) return user.currentPage ? `Online · ${pageTitleById(user.currentPage)}` : 'Online';
+  if(user?.lastSeen) {
+    const date = new Date(user.lastSeen);
+    if(!Number.isNaN(date.getTime())) return `Visto ${date.toLocaleString('pt-PT')}`;
+  }
+  return 'Offline';
+}
+function pageTitleById(id){
+  return pages.find(p=>p.id===id)?.title || id || '-';
+}
+async function updateUserPresence(online=true){
+  if(!firebaseReady || !firebaseDb || !firebaseAuth?.currentUser || firebaseAuth.currentUser.isAnonymous) return false;
+  const uid = currentUserId();
+  if(!uid) return false;
+  const nowIso = new Date().toISOString();
+  const payload = {
+    online: !!online,
+    lastSeen: nowIso,
+    currentPage: online ? (currentPage || getDefaultPage()) : '',
+    sessionId: USER_SESSION_ID,
+    userAgent: navigator.userAgent || '',
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  try {
+    await firebaseDb.collection(FIREBASE_COLLECTIONS.users).doc(uid).set(payload, { merge:true });
+    const local = (state.users || []).find(u=>u.id === uid || String(u.email || '').toLowerCase() === String(firebaseAuth.currentUser.email || '').toLowerCase());
+    if(local) Object.assign(local, { ...payload, updatedAt: nowIso });
+    return true;
+  } catch(err) {
+    console.warn('Presence update failed', err);
+    return false;
+  }
+}
+function startUserPresence(){
+  stopUserPresence(false);
+  updateUserPresence(true);
+  userPresenceTimer = setInterval(()=>updateUserPresence(true), 45000);
+}
+function stopUserPresence(markOffline=true){
+  if(userPresenceTimer) clearInterval(userPresenceTimer);
+  userPresenceTimer = null;
+  if(markOffline) updateUserPresence(false);
+}
+window.addEventListener('beforeunload', ()=>{ stopUserPresence(true); });
 
 function saveState(action='Alteração guardada'){
   if(!hasWritableFirebaseSession()){
@@ -765,6 +829,7 @@ function showApp(){
   ensureBrandFavicon();
   checkAutoBackup();
   syncCurrentUserName();
+  startUserPresence();
   renderPage(currentPage);
 }
 
@@ -940,7 +1005,7 @@ async function login(){
 async function signupFromLogin(){
   if(!firebaseReady) return toast('Firebase indisponível. Tenta novamente com internet.');
   const nome = qs('#signupName').value.trim();
-  const email = qs('#signupEmail').value.trim();
+  const email = qs('#signupEmail').value.trim().toLowerCase();
   const password = qs('#signupPassword').value;
   const confirm = qs('#signupPasswordConfirm').value;
   if(!nome || !email || !password) return toast('Preenche nome, email e password.');
@@ -984,6 +1049,8 @@ function buildNav(){
 
 async function logoutCurrentUser(){
   stopFirebaseListeners();
+  await updateUserPresence(false);
+  stopUserPresence(false);
   clearStoredSession();
   if (firebaseReady && firebaseAuth?.currentUser) await firebaseAuth.signOut();
   state.currentUser = null;
@@ -1083,6 +1150,7 @@ function renderPage(id){
     id = 'dashboard';
   }
   currentPage = id;
+  updateUserPresence(true);
   qs('#appShell')?.classList.toggle('dashboard-mode', id === 'dashboard');
   applyTheme();
   updateGlobalSearchVisibility(id);
@@ -1642,6 +1710,7 @@ function users(){
   const firebaseSessionOk = Boolean(firebaseReady && firebaseUser && !firebaseUser.isAnonymous);
   const fbStatus = firebaseStatus();
   const statusBadge = `<span class="badge ${firebaseSessionOk ? 'green' : (firebaseReady ? 'orange' : 'orange')}">${esc(fbStatus)}</span>`;
+  const onlineUsers = (state.users || []).filter(isUserOnline).length;
   return `<div class="grid two users-page">
     <div class="card user-create-card">
       <div class="card-head">
@@ -1687,7 +1756,7 @@ function users(){
       <div class="card-head">
         <div>
           <h3>Utilizadores</h3>
-          <span class="muted">${state.users.length} registos criados na app.</span>
+          <span class="muted">${state.users.length} registos criados na app · ${onlineUsers} online.</span>
         </div>
         ${firebaseReady ? '<span class="badge green">Firebase pronto</span>' : '<span class="badge orange">Firebase offline</span>'}
       </div>
@@ -1734,7 +1803,7 @@ function canExportExcel(){ return isAdminMaster(); }
 function usersTable(rows){
   if(!rows.length) return '<div class="empty">Sem utilizadores.</div>';
   const actions = isAdminMaster();
-  return `<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Email</th><th>Role</th><th>Estado</th>${actions?'<th>Ações</th>':''}</tr></thead><tbody>${rows.map(u=>`<tr><td><strong>${esc(u.nome || '-')}</strong></td><td>${esc(u.email || '-')}</td><td>${badge(u.role || '-')}</td><td>${badge(u.status || '-')}</td>${actions?`<td><div class="actions">${u.status==='Pendente'?`<button class="btn success small" data-approve-user="${u.id}">Aprovar</button>`:''}<button class="btn small" data-edit-entity="user:${u.id}">Editar</button><button class="btn danger small" data-delete-entity="user:${u.id}">Apagar</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`;
+  return `<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Email</th><th>Role</th><th>Estado</th><th>Online</th>${actions?'<th>Ações</th>':''}</tr></thead><tbody>${rows.map(u=>`<tr class="${isUserOnline(u)?'user-online-row':''}"><td><strong>${esc(u.nome || '-')}</strong></td><td>${esc(u.email || '-')}</td><td>${badge(u.role || '-')}</td><td>${badge(u.status || '-')}</td><td><span class="badge ${isUserOnline(u)?'green':'blue'}">${esc(userPresenceLabel(u))}</span></td>${actions?`<td><div class="actions">${u.status==='Pendente'?`<button class="btn success small" data-approve-user="${u.id}">Aprovar</button>`:''}<button class="btn small" data-edit-entity="user:${u.id}">Editar</button><button class="btn danger small" data-delete-entity="user:${u.id}">Apagar</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`;
 }
 function entityPage(title, formId, fields, rows, cols, type){
   return `<div class="grid two"><div class="card"><div class="card-head"><h3>Adicionar ${title}</h3></div><form id="${formId}" class="form-grid">${fields.map(f=>`<input class="field ${f[0]==='notas'?'span3':''}" name="${f[0]}" placeholder="${f[1]}">`).join('')}<div class="span3"><button class="btn primary" type="submit">Guardar</button></div></form></div><div class="card"><div class="card-head"><h3>Lista</h3><span class="muted">${rows.length} registos</span></div>${entityTable(rows, cols, type)}</div></div>`;

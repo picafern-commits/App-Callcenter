@@ -59,6 +59,22 @@ service cloud.firestore {
       );
     }
 
+    function ownPresenceUpdate(document) {
+      return signedIn()
+        && (
+          document == request.auth.uid
+          || (resource.data.email == request.auth.token.email)
+        )
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'online',
+          'lastSeen',
+          'currentPage',
+          'sessionId',
+          'userAgent',
+          'updatedAt'
+        ]);
+    }
+
     match /meta/{document} {
       allow read: if signedIn();
       allow write: if canManage();
@@ -67,7 +83,8 @@ service cloud.firestore {
     match /utilizadores/{document} {
       allow read: if signedIn();
       allow create: if (signedIn() && document == request.auth.uid) || masterEmail() || (isActive() && role() == 'Admin Master');
-      allow update, delete: if masterEmail() || (isActive() && role() == 'Admin Master');
+      allow update: if masterEmail() || (isActive() && role() == 'Admin Master') || ownPresenceUpdate(document);
+      allow delete: if masterEmail() || (isActive() && role() == 'Admin Master');
     }
 
     match /clientes/{document} {

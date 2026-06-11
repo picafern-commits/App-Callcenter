@@ -4221,3 +4221,6 @@ body.theme-dark .route-deliver-summary{
 body.theme-dark .route-deliver-summary strong{
   color:var(--text);
 }
+.user-online-row td{
+  background: rgba(25, 135, 84, .08);
+}
