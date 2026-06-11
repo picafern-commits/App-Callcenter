@@ -1,4 +1,4 @@
-const APP_VERSION = '2.3.1';
+const APP_VERSION = '2.3.2';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -225,7 +225,7 @@ function clearStoredSession(){
 function restoreStoredSession(){
   const stored = getStoredSession();
   if(stored?.email) {
-    state.currentUser = { email: stored.email, name: stored.name || String(stored.email).split('@')[0] };
+    state.currentUser = { email: stored.email, name: stored.name || userNameFromEmail(stored.email) || String(stored.email).split('@')[0], nome: stored.name || userNameFromEmail(stored.email) || String(stored.email).split('@')[0] };
     saveLocalOnly();
     showApp();
     return true;
@@ -452,8 +452,8 @@ async function loadCloudState(options = {}){
 
     const authEmail = authUser.email || '';
     const nextCurrentUser = authEmail
-      ? { email: authEmail, name: authEmail.split('@')[0] }
-      : (previousUser || { email:'local@electron.app', name:'Local' });
+      ? { email: authEmail, name: previousUser?.name || authEmail.split('@')[0], nome: previousUser?.nome || previousUser?.name || authEmail.split('@')[0] }
+      : (previousUser || { email:'local@electron.app', name:'Local', nome:'Local' });
 
     state = { ...base, currentUser: nextCurrentUser };
 
@@ -488,6 +488,7 @@ async function loadCloudState(options = {}){
     }
 
     cloudReadOnlyMode = !!authUser.isAnonymous || !!options.readOnly;
+    syncCurrentUserName();
     saveLocalOnly();
     startFirebaseListeners();
     updateFirebaseStatusBadge();
@@ -707,7 +708,7 @@ function showApp(){
   ensureGlobalSearchBox();
   ensureBrandFavicon();
   checkAutoBackup();
-  if(qs('#userBadge')) qs('#userBadge').textContent = state.currentUser?.name || 'Admin';
+  syncCurrentUserName();
   renderPage(currentPage);
 }
 
@@ -745,13 +746,14 @@ async function init(){
         if(user.isAnonymous) {
           await loadCloudState({ readOnly:true });
           const stored = getStoredSession();
-          if(stored?.email && !state.currentUser?.email) state.currentUser = { email: stored.email, name: stored.name || String(stored.email).split('@')[0] };
+          if(stored?.email && !state.currentUser?.email) state.currentUser = { email: stored.email, name: stored.name || userNameFromEmail(stored.email) || String(stored.email).split('@')[0], nome: stored.name || userNameFromEmail(stored.email) || String(stored.email).split('@')[0] };
           if(stored?.email && !appIsVisible() && !isLoginPage()) showApp();
           return;
         }
         await loadCloudState();
         if (pendingSignupUser && pendingSignupUser.email?.toLowerCase() === user.email?.toLowerCase()) {
           upsertAppUser({ ...pendingSignupUser, id:user.uid });
+          syncCurrentUserName();
           pendingSignupUser = null;
           saveLocalOnly();
         }
@@ -763,14 +765,15 @@ async function init(){
           qs('#loginScreen').classList.remove('hidden');
           return;
         }
-        setStoredSession(state.currentUser || { email:user.email, name:(user.email || 'Admin').split('@')[0] });
+        syncCurrentUserName();
+        setStoredSession(state.currentUser || { email:user.email, name:preferredUserName((user.email || 'Admin').split('@')[0]) });
         showApp();
         await flushPendingCloudSave();
         toast('Firebase ligado. Autosave ativo.');
       } else {
         const stored = getStoredSession();
         if(stored?.email) {
-          state.currentUser = { email: stored.email, name: stored.name || String(stored.email).split('@')[0] };
+          state.currentUser = { email: stored.email, name: stored.name || userNameFromEmail(stored.email) || String(stored.email).split('@')[0], nome: stored.name || userNameFromEmail(stored.email) || String(stored.email).split('@')[0] };
           saveLocalOnly();
           if(!appIsVisible()) showApp();
           autoConnectFirebaseForLocalSession();
@@ -1060,15 +1063,36 @@ function renderPage(id){
 }
 
 
+function userNameFromEmail(email){
+  const clean = String(email || '').toLowerCase();
+  if(!clean) return '';
+  const user = (state.users || []).find(u => String(u.email || '').toLowerCase() === clean);
+  return user?.nome || user?.name || '';
+}
+function preferredUserName(fallback='Utilizador'){
+  const authEmail = firebaseAuth?.currentUser?.email || '';
+  const sessionEmail = state.currentUser?.email || authEmail || '';
+  const fromUsers = userNameFromEmail(sessionEmail);
+  const raw = fromUsers || state.currentUser?.nome || state.currentUser?.name || firebaseAuth?.currentUser?.displayName || fallback;
+  const clean = String(raw || '').trim();
+  if(!clean || clean.includes('@')) return String(sessionEmail || fallback).split('@')[0] || fallback;
+  return clean;
+}
+function syncCurrentUserName(){
+  const email = state.currentUser?.email || firebaseAuth?.currentUser?.email || '';
+  if(!email) return;
+  const name = preferredUserName(String(email).split('@')[0]);
+  state.currentUser = { ...(state.currentUser || {}), email, name, nome:name };
+  const badge = qs('#userBadge');
+  if(badge) badge.textContent = name;
+}
 function currentAppUser(){
   const email = (state.currentUser?.email || firebaseAuth?.currentUser?.email || '').toLowerCase();
   return (state.users || []).find(u => (u.email || '').toLowerCase() === email) || null;
 }
 function currentDisplayName(){
-  const appUser = currentAppUser();
-  const raw = appUser?.nome || state.currentUser?.name || state.currentUser?.email || firebaseAuth?.currentUser?.email || 'Utilizador';
-  const first = String(raw).split('@')[0].split(' ')[0].trim();
-  return first || 'Utilizador';
+  const full = preferredUserName('Utilizador');
+  return String(full || 'Utilizador').split(' ')[0].trim() || 'Utilizador';
 }
 function normalizeText(v){
   return String(v || '').trim().toLowerCase();
@@ -2709,6 +2733,8 @@ function upsertAppUser(user){
   const index = state.users.findIndex(u => (u.email || '').toLowerCase() === (user.email || '').toLowerCase() || u.id === user.id);
   if(index >= 0) state.users[index] = { ...state.users[index], ...user };
   else state.users.push(user);
+  const currentEmail = String(state.currentUser?.email || firebaseAuth?.currentUser?.email || '').toLowerCase();
+  if(currentEmail && currentEmail === String(user.email || '').toLowerCase()) syncCurrentUserName();
 }
 function bindEntities(){
   const map = { client:[state.clients,'clients'], supplier:[state.suppliers,'suppliers'], stock:[state.stock,'stock'], user:[state.users,'users'], follow:[state.followups,'followups'] };
