@@ -1,4 +1,4 @@
-const APP_VERSION = '2.4.6';
+const APP_VERSION = '2.4.8';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -229,12 +229,10 @@ function restoreStoredSession(){
   if(stored?.email) {
     state.currentUser = { email: stored.email, name: stored.name || userNameFromEmail(stored.email) || String(stored.email).split('@')[0], nome: stored.name || userNameFromEmail(stored.email) || String(stored.email).split('@')[0] };
     saveLocalOnly();
-    showApp();
     return true;
   }
   if(state.currentUser?.email) {
     setStoredSession(state.currentUser);
-    showApp();
     return true;
   }
   return false;
@@ -279,7 +277,7 @@ function updateFirebaseStatusBadge(){
   if(badge){
     const status = firebaseStatus();
     badge.textContent = status;
-    const cls = status.includes('pendente') ? 'orange' : (status.includes('guardar') ? 'blue' : (firebaseReady ? 'green' : 'orange'));
+    const cls = status.includes('ligado') ? 'green' : (status.includes('guardar') ? 'blue' : 'orange');
     badge.className = `badge ${cls}`;
   }
 }
@@ -307,11 +305,12 @@ function addAuditLog(action, page=currentPage, details=''){
 function saveLocalOnly(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 function appIsVisible(){ return !qs('#appShell')?.classList.contains('hidden'); }
 function firebaseStatus(){
-  if (!firebaseReady) return 'Modo local';
-  if(firebaseAuth?.currentUser?.isAnonymous || cloudReadOnlyMode) return 'Firebase leitura';
+  if (!firebaseReady) return 'Firebase offline';
+  if(!firebaseAuth?.currentUser) return 'Sem login Firebase';
+  if(firebaseAuth.currentUser.isAnonymous || cloudReadOnlyMode) return 'Firebase leitura';
   if(cloudSaveInProgress) return 'Firebase a guardar';
   if(localStorage.getItem('bragalis_firebase_dirty_v1') === '1' || cloudSavePending) return 'Firebase pendente';
-  return firebaseAuth?.currentUser ? 'Firebase ligado' : 'Firebase pronto';
+  return 'Firebase ligado';
 }
 function hasWritableFirebaseSession(){
   return Boolean(firebaseReady && firebaseAuth?.currentUser && firebaseDb && !firebaseAuth.currentUser.isAnonymous && !cloudReadOnlyMode);
@@ -573,6 +572,10 @@ async function initFirebase(){
 }
 function uid(prefix){ return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6).toUpperCase()}`; }
 function today(){ return new Date().toISOString().slice(0,10); }
+function currentTimeHM(){
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
 function money(v){ return Number(v || 0).toLocaleString('pt-PT',{style:'currency',currency:'EUR'}); }
 function esc(v){ return String(v ?? '').replace(/[&<>'"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m])); }
 function toast(msg){ const el = qs('#toast'); el.textContent = msg; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'),2600); }
@@ -805,16 +808,11 @@ async function init(){
         await flushPendingCloudSave();
         toast('Firebase ligado. Autosave ativo.');
       } else {
-        const stored = getStoredSession();
-        if(stored?.email) {
-          state.currentUser = { email: stored.email, name: stored.name || userNameFromEmail(stored.email) || String(stored.email).split('@')[0], nome: stored.name || userNameFromEmail(stored.email) || String(stored.email).split('@')[0] };
-          saveLocalOnly();
-          if(!appIsVisible()) showApp();
-          autoConnectFirebaseForLocalSession();
-          return;
-        }
+        // Sem user Firebase real, não abrimos a app em modo local.
+        // Isto evita gravar alterações só no browser/Electron sem sincronizar.
         state.currentUser = null;
         saveLocalOnly();
+        updateFirebaseStatusBadge();
         if(!isLoginPage()) { redirectToLogin(); return; }
         qs('#appShell')?.classList.add('hidden');
         document.body.classList.remove('auth-boot');
@@ -824,8 +822,12 @@ async function init(){
     return;
   }
 
-  if(state.currentUser || hasLocalSession) showApp();
-  else {
+  // Só deixamos a app abrir sem Firebase se a biblioteca Firebase nem sequer carregou.
+  // Mesmo assim, mostra aviso para não parecer sincronizada.
+  if(state.currentUser || hasLocalSession) {
+    showApp();
+    toast('Firebase indisponível. App em modo local temporário.');
+  } else {
     if(!isLoginPage()) { redirectToLogin(); return; }
     document.body.classList.remove('auth-boot');
   }
@@ -1966,11 +1968,13 @@ function routesTable(rows){
       <div class="route-driver-box">
         <span class="badge blue">${esc(r.condutor || 'Sem condutor')}</span>
         <small>${esc(r.horaInicio || '-')} → ${esc(r.horaFim || '-')}</small>
+        ${r.entregue || r.dataEntrega ? `<small class="route-delivered-note">Entregue: ${esc(formatDatePt(r.dataEntrega))} ${esc(r.horaEntrega || '')}</small>` : '<small class="route-pending-note">Por entregar</small>'}
       </div>
       <div class="card-code-center">
         <span class="data-card-code big-visible-code">${routeKm(r)} km</span>
       </div>
       <div class="actions data-card-actions">
+        ${canEditOperational() && !(r.entregue || r.dataEntrega) ? `<button class="btn success small" data-deliver-route="${r.id}">Entregar</button>` : ''}
         ${canEditOperational()?`<button class="btn small ghost" data-edit-route="${r.id}">${ICONS.edit}<span>Editar</span></button>`:'<span class="muted">Consulta</span>'}
         ${canDelete()?`<button class="btn danger small" data-delete-route="${r.id}">Apagar</button>`:''}
       </div>
@@ -2034,7 +2038,7 @@ function normalizeRouteData(data){
     ...data,
     viatura:String(data.viatura || '').trim(),
     matricula:String(data.matricula || vehicle?.matricula || '').trim(),
-    data: parseExcelDateValue(data.data),
+    data: parseExcelDateValue(data.data) || today(),
     pedidoPor:String(data.pedidoPor || '').trim(),
     destino:String(data.destino || '').trim(),
     periodo:String(data.periodo || '').trim(),
@@ -2045,6 +2049,9 @@ function normalizeRouteData(data){
     kmFim: fim,
     horaFim: parseExcelTimeValue(data.horaFim),
     kmPercorridos: parseKmValue(data.kmPercorridos) || (ini && fim && fim >= ini ? fim - ini : 0),
+    dataEntrega: parseExcelDateValue(data.dataEntrega),
+    horaEntrega: parseExcelTimeValue(data.horaEntrega),
+    entregue: data.entregue === true || data.entregue === 'true' || !!data.dataEntrega,
     observacoes:String(data.observacoes || '').trim()
   };
 }
@@ -2093,6 +2100,7 @@ function bindRouteActions(){
     saveState(); renderPage('rotas'); toast('Rota apagada.');
   }));
   qsa('[data-edit-route]').forEach(btn=>btn.addEventListener('click',()=>openRouteModal(btn.dataset.editRoute)));
+  qsa('[data-deliver-route]').forEach(btn=>btn.addEventListener('click',()=>openDeliverRouteModal(btn.dataset.deliverRoute)));
 }
 function bindVehicleActions(){
   qsa('[data-delete-vehicle]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -2120,6 +2128,42 @@ function openVehicleModal(id){
   });
 }
 
+function openDeliverRouteModal(id){
+  const r = (state.routes || []).find(x=>x.id===id);
+  if(!r) return;
+  if(!canEditOperational()) return toast('Sem permissão para entregar rotas.');
+  openModal('Entregar rota', `<div class="route-deliver-summary">
+    <strong>${esc(r.viatura || '-')} · ${esc(r.matricula || '')}</strong>
+    <span>${esc(r.destino || '-')} · ${esc(formatDatePt(r.data))}</span>
+  </div>
+  <form id="deliverRouteForm" class="form-grid">
+    <input class="field" name="dataEntrega" type="date" value="${esc(r.dataEntrega || today())}" required>
+    <input class="field" name="horaEntrega" type="time" value="${esc(r.horaEntrega || currentTimeHM())}" required>
+    <textarea class="span3" name="observacoesEntrega" placeholder="Observações de entrega">${esc(r.observacoesEntrega || '')}</textarea>
+    <div class="span3 actions">
+      <button class="btn ghost" type="button" id="autoDeliverRouteBtn">Automático agora</button>
+      <button class="btn success" type="submit">Confirmar entrega</button>
+    </div>
+  </form>`);
+  qs('#autoDeliverRouteBtn')?.addEventListener('click',()=>{
+    const form = qs('#deliverRouteForm');
+    form.elements.dataEntrega.value = today();
+    form.elements.horaEntrega.value = currentTimeHM();
+  });
+  qs('#deliverRouteForm')?.addEventListener('submit',e=>{
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    r.entregue = true;
+    r.dataEntrega = parseExcelDateValue(data.dataEntrega) || today();
+    r.horaEntrega = parseExcelTimeValue(data.horaEntrega) || currentTimeHM();
+    r.observacoesEntrega = String(data.observacoesEntrega || '').trim();
+    saveState('Rota entregue');
+    closeModal();
+    renderPage('rotas');
+    toast('Rota marcada como entregue.');
+  });
+}
+
 function openRouteModal(id){
   const r = (state.routes || []).find(x=>x.id===id);
   if(!r) return;
@@ -2136,7 +2180,11 @@ function openRouteModal(id){
     <input class="field" name="kmFim" type="number" placeholder="KM fim" value="${esc(r.kmFim||'')}">
     <input class="field" name="horaInicio" placeholder="Hora início" value="${esc(r.horaInicio||'')}">
     <input class="field" name="horaFim" placeholder="Hora fim" value="${esc(r.horaFim||'')}">
+    <input class="field" name="dataEntrega" type="date" value="${esc(r.dataEntrega||'')}" title="Data de entrega">
+    <input class="field" name="horaEntrega" type="time" value="${esc(r.horaEntrega||'')}" title="Hora de entrega">
+    <label class="checkline"><input type="checkbox" name="entregue" ${r.entregue || r.dataEntrega ? 'checked' : ''}> Entregue</label>
     <textarea class="span3" name="observacoes" placeholder="Observações">${esc(r.observacoes||'')}</textarea>
+    <textarea class="span3" name="observacoesEntrega" placeholder="Observações de entrega">${esc(r.observacoesEntrega||'')}</textarea>
     <div class="span3"><button class="btn primary">Guardar alterações</button></div>
   </form>`);
   const editVehicleSelect = qs('#editRouteVehicleSelect');
@@ -2477,7 +2525,7 @@ function excelPageRegistry(){
     rotas: {
       key:'routes', title:'Rotas', file:'rotas', prefix:'ROT', edit:()=>canEditOperational(),
       fields:[
-        ['id','ID'], ['viatura','Viatura'], ['matricula','Matrícula'], ['data','Data'], ['pedidoPor','Pedido por'], ['destino','Destino / Serviço'], ['periodo','Período'], ['carga','Carga'], ['condutor','Condutor'], ['kmInicio','KM Início'], ['horaInicio','Hora Início'], ['kmFim','KM Fim'], ['horaFim','Hora Fim'], ['kmPercorridos','KM Percorridos'], ['observacoes','Observações']
+        ['id','ID'], ['viatura','Viatura'], ['matricula','Matrícula'], ['data','Data'], ['pedidoPor','Pedido por'], ['destino','Destino / Serviço'], ['periodo','Período'], ['carga','Carga'], ['condutor','Condutor'], ['kmInicio','KM Início'], ['horaInicio','Hora Início'], ['kmFim','KM Fim'], ['horaFim','Hora Fim'], ['kmPercorridos','KM Percorridos'], ['entregue','Entregue'], ['dataEntrega','Data Entrega'], ['horaEntrega','Hora Entrega'], ['observacoes','Observações'], ['observacoesEntrega','Observações Entrega']
       ]
     },
     viaturas: {
@@ -2757,6 +2805,10 @@ function excelHeaderAliasesForPage(cfg){
     add('horaFim', ['Hora Fim','Hora final','Hora Final','Fim','Chegada','Hora chegada']);
     add('kmPercorridos', ['KM Percorridos','Km percorridos','Quilómetros','Quilometros','Distância','Distancia','Total KM']);
     add('observacoes', ['Observações','Observacoes','Obs','Notas','Nota']);
+    add('entregue', ['Entregue','Estado Entrega','Status Entrega']);
+    add('dataEntrega', ['Data Entrega','Data de Entrega','Entregue em','Data Final Entrega']);
+    add('horaEntrega', ['Hora Entrega','Hora de Entrega','Hora Final Entrega']);
+    add('observacoesEntrega', ['Observações Entrega','Obs Entrega','Notas Entrega']);
   }
 
   return aliases;
@@ -2850,7 +2902,11 @@ function normalizeImportedRouteRow(raw){
     kmFim,
     horaFim: parseExcelTimeValue(r.horaFim),
     kmPercorridos,
-    observacoes: normalizeExcelValue(r.observacoes)
+    entregue: String(r.entregue || '').toLowerCase().includes('sim') || String(r.entregue || '').toLowerCase().includes('true') || !!r.dataEntrega,
+    dataEntrega: parseExcelDateValue(r.dataEntrega),
+    horaEntrega: parseExcelTimeValue(r.horaEntrega),
+    observacoes: normalizeExcelValue(r.observacoes),
+    observacoesEntrega: normalizeExcelValue(r.observacoesEntrega)
   };
 }
 

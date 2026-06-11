@@ -4175,3 +4175,49 @@ body.theme-dark .danger-confirm-box code{
     width:100%;
   }
 }
+
+
+/* v2.4.7 - Rotas entrega */
+.route-delivered-note{
+  color:#047857!important;
+  font-weight:950!important;
+}
+.route-pending-note{
+  color:#b65a10!important;
+  font-weight:950!important;
+}
+.route-deliver-summary{
+  padding:14px 16px;
+  border-radius:16px;
+  background:rgba(17,128,201,.07);
+  border:1px solid rgba(17,128,201,.12);
+  margin-bottom:14px;
+  display:grid;
+  gap:4px;
+}
+.route-deliver-summary strong{
+  color:var(--brand3);
+  font-size:18px;
+}
+.route-deliver-summary span{
+  color:var(--muted);
+  font-weight:850;
+}
+.btn.success{
+  background:linear-gradient(135deg,#059669,#10b981)!important;
+  color:white!important;
+  border-color:rgba(255,255,255,.12)!important;
+}
+body.theme-dark .route-delivered-note{
+  color:#86efac!important;
+}
+body.theme-dark .route-pending-note{
+  color:#ffc48f!important;
+}
+body.theme-dark .route-deliver-summary{
+  background:rgba(255,255,255,.05);
+  border-color:rgba(255,255,255,.08);
+}
+body.theme-dark .route-deliver-summary strong{
+  color:var(--text);
+}
