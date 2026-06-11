@@ -41,6 +41,7 @@ let firebaseRefreshTimer = null;
 let cloudSaveInProgress = false;
 let cloudSavePending = false;
 let lastCloudSaveAt = 0;
+let firebaseLoadedKeys = new Set();
 const CONFIG_OPEN_KEY = 'bragalis_config_open_sections_v1';
 function isElectronApp(){
   return new URLSearchParams(window.location.search).get('electron') === '1' || navigator.userAgent.toLowerCase().includes('electron');
@@ -417,7 +418,8 @@ async function saveFirebaseCollections(){
   for (const [stateKey, collectionName] of Object.entries(FIREBASE_COLLECTIONS)) {
     if (!canSyncCollectionKey(stateKey)) continue;
     try {
-      await syncCollection(collectionName, state[stateKey] || [], isAdminMaster() || canSyncCollectionKey(stateKey));
+      const allowDelete = (isAdminMaster() || canSyncCollectionKey(stateKey)) && firebaseLoadedKeys.has(stateKey);
+      await syncCollection(collectionName, state[stateKey] || [], allowDelete);
     } catch(err) {
       errors.push([collectionName, err]);
       console.warn(`Firebase save failed for ${collectionName}`, err);
@@ -485,6 +487,7 @@ async function loadCloudState(options = {}){
 
     let loadedRows = 0;
     let loadedCollections = 0;
+    firebaseLoadedKeys = new Set();
     const entries = Object.entries(FIREBASE_COLLECTIONS)
       .filter(([stateKey]) => canLoadCollectionKey(stateKey))
       .filter(([stateKey]) => !['auditLogs','backups'].includes(stateKey) || options.full === true);
@@ -495,6 +498,7 @@ async function loadCloudState(options = {}){
     results.forEach(([stateKey, result])=>{
       if(result.ok && Array.isArray(result.rows)) {
         state[stateKey] = result.rows;
+        firebaseLoadedKeys.add(stateKey);
         loadedRows += result.rows.length;
         loadedCollections++;
       } else {
@@ -519,8 +523,12 @@ async function loadCloudState(options = {}){
   }
 }
 function cleanFirebaseDoc(doc){
-  const { updatedAt, updatedBy, createdBy, ...data } = doc;
-  return data;
+  const normalizeDate = value => value?.toDate ? value.toDate().toISOString() : value;
+  return {
+    ...doc,
+    createdAt: normalizeDate(doc.createdAt),
+    updatedAt: normalizeDate(doc.updatedAt)
+  };
 }
 async function migrateLegacyCloudState(base){
   const legacy = await firebaseDb.collection(FIREBASE_LEGACY_STATE_COLLECTION).doc(FIREBASE_LEGACY_STATE_DOC).get();
@@ -674,23 +682,30 @@ function permissionDefaults(){
 function fullPermissionDefaults(){
   return { view:true, add:true, edit:true, delete:true };
 }
+function roleDefaultPermissions(role){
+  const normalized = String(role || '').toLowerCase();
+  if(normalized === 'admin master' || normalized === 'admin') return fullPermissionDefaults();
+  if(normalized === 'supervisor') return { view:true, add:true, edit:true, delete:false };
+  return { view:true, add:true, edit:false, delete:false };
+}
 function normalizeUserPermissions(user){
   const managed = managedPageList();
   const source = user?.permissions || {};
   const hasNewPermissions = Object.keys(source || {}).length > 0;
   const oldPageAccess = user?.pageAccess || {};
   const oldActionAccess = user?.actionAccess || {};
+  const roleDefault = roleDefaultPermissions(user?.role || 'Operador');
   const migrated = {};
   managed.forEach(p=>{
     const existing = source[p.id] || {};
-    const oldView = hasOwn(oldPageAccess, p.id) ? oldPageAccess[p.id] === true : true;
+    const oldView = hasOwn(oldPageAccess, p.id) ? oldPageAccess[p.id] === true : roleDefault.view;
     migrated[p.id] = {
       // Se ainda não houver permissões gravadas para este user, deixa a página visível.
       // Depois de guardares permissões, o campo view passa a mandar.
       view: hasOwn(existing,'view') ? existing.view === true : (hasNewPermissions ? false : oldView),
-      add: hasOwn(existing,'add') ? existing.add === true : oldActionAccess.add === true,
-      edit: hasOwn(existing,'edit') ? existing.edit === true : oldActionAccess.edit === true,
-      delete: hasOwn(existing,'delete') ? existing.delete === true : oldActionAccess.delete === true
+      add: hasOwn(existing,'add') ? existing.add === true : (hasOwn(oldActionAccess,'add') ? oldActionAccess.add === true : roleDefault.add),
+      edit: hasOwn(existing,'edit') ? existing.edit === true : (hasOwn(oldActionAccess,'edit') ? oldActionAccess.edit === true : roleDefault.edit),
+      delete: hasOwn(existing,'delete') ? existing.delete === true : (hasOwn(oldActionAccess,'delete') ? oldActionAccess.delete === true : roleDefault.delete)
     };
   });
   return migrated;
@@ -913,12 +928,14 @@ async function login(){
       await firebaseAuth.signInWithEmailAndPassword(email, password);
       return;
     } catch (err) {
-      console.warn('Firebase login failed; using local fallback when possible', err);
-      await finishLocalLogin(email, 'Firebase falhou. Entrei em modo local.');
-      return;
+      console.warn('Firebase login failed', err);
+      if(err.code === 'auth/user-not-found') return toast('Conta Firebase não encontrada. Cria a conta ou pede ao Admin Master.');
+      if(err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') return toast('Email ou password incorretos.');
+      if(err.code === 'auth/too-many-requests') return toast('Muitas tentativas. Aguarda e tenta novamente.');
+      return toast('Login Firebase falhou. Confirma email/password e Firebase Auth.');
     }
   }
-  await finishLocalLogin(email);
+  toast('Firebase offline. A app precisa de Firebase para entrar.');
 }
 async function signupFromLogin(){
   if(!firebaseReady) return toast('Firebase indisponível. Tenta novamente com internet.');
@@ -2497,7 +2514,7 @@ function excelPageRegistry(){
     contactos: {
       key:'contactGroups', title:'Diretório de Contactos', file:'diretorio-contactos', prefix:'DIR', edit:()=>canEditOperational(), flattened:true,
       fields:[
-        ['groupId','ID Secção'], ['contactId','ID Contacto'], ['armazem','Armazém / Local'], ['seccao','Secção / Sessão'], ['nome','Nome Contacto'], ['telemovel','Telemóvel'], ['telefone','Telefone'], ['email','Email']
+        ['groupId','ID Secção'], ['contactId','ID Contacto'], ['armazem','Armazém / Local'], ['seccao','Secção / Sessão'], ['nome','Nome Contacto'], ['extensao','Extensão'], ['telemovel','Telemóvel'], ['telefone','Telefone'], ['email','Email'], ['local','Local / Empresa']
       ]
     },
     fornecedores: {
@@ -2607,7 +2624,7 @@ function excelRowsForPage(pageId, template=false){
 function excelTemplateRow(cfg, pageId){
   const samples = {
     clientes:{ id:'', codigoCliente:'CLI-001', nome:'Nome do Cliente', telefone:'912345678', email:'cliente@email.pt', notas:'Notas do cliente' },
-    contactos:{ groupId:'', contactId:'', armazem:'Armazém Lisboa', seccao:'Peças', nome:'Nome Contacto', telemovel:'912345678', telefone:'213000000', email:'contacto@email.pt' },
+    contactos:{ groupId:'', contactId:'', armazem:'Armazém Lisboa', seccao:'Peças', nome:'Nome Contacto', extensao:'51037', telemovel:'912345678', telefone:'213000000', email:'contacto@email.pt', local:'Lisboa' },
     fornecedores:{ id:'', nomeMarca:'Nome Fornecedor', codigoFicha:'FOR-001' },
     rotas:{ id:'', viatura:'Toyota Prius', matricula:'05-QR-43', data:today(), pedidoPor:'Nome', destino:'Destino / Serviço', periodo:'Tarde', carga:'sem carga', condutor:'Condutor', kmInicio:'100000', horaInicio:'09:00', kmFim:'100025', horaFim:'10:00', kmPercorridos:'25', observacoes:'' },
     viaturas:{ id:'', viatura:'Toyota Prius', matricula:'05-QR-43', marca:'Toyota', modelo:'Prius', observacoes:'' },
@@ -2624,9 +2641,11 @@ function flattenContactGroups(){
     armazem:g.armazem || g.local || '',
     seccao:g.seccao || g.nome || '',
     nome:c.nome || '',
+    extensao:c.extensao || '',
     telemovel:c.telemovel || '',
     telefone:c.telefone || '',
-    email:c.email || ''
+    email:c.email || '',
+    local:c.local || ''
   })));
 }
 function safeSheetName(name){
@@ -2692,16 +2711,17 @@ async function importPageExcel(pageId, file){
   const cfg = excelConfigForPage(pageId);
   if(!cfg) return toast('Esta página não tem importação Excel.');
   if(!canImportExcel() || !cfg.edit || !cfg.edit()) return toast('Sem permissão para importar nesta página.');
+  if(!hasWritableFirebaseSession()) return toast('Importação bloqueada: entra com Firebase para gravar dados.');
   try {
     const rows = await readExcelRows(file);
     if(!rows.length) return toast('O ficheiro não tem linhas para importar.');
     const normalized = normalizeImportedRows(rows, cfg);
     const count = applyImportedRows(pageId, cfg, normalized);
-    saveState();
+    const saved = saveState(`Importação Excel: ${cfg.title}`);
     renderPage(pageId);
     const total = cfg.single ? 1 : ((Array.isArray(state[cfg.key]) ? state[cfg.key].length : Object.keys(state[cfg.key]||{}).length));
     const extra = pageId === 'fornecedores' ? ` · lista atual: ${total} registo(s)` : '';
-    toast(`${count} linha(s) importada(s) do Excel${extra}.`);
+    toast(saved ? `${count} linha(s) importada(s) do Excel${extra}.` : `${count} linha(s) lida(s), mas não foram gravadas: Firebase sem sessão de escrita.`);
   } catch(err){
     console.error(err);
     toast(err?.message || 'Não consegui importar esse ficheiro Excel.');
@@ -2709,17 +2729,17 @@ async function importPageExcel(pageId, file){
 }
 async function readExcelRows(file){
   const ext = (file.name.split('.').pop() || '').toLowerCase();
-  if(!window.XLSX) await loadExcelLibrary();
-  if(window.XLSX){
-    const buffer = await file.arrayBuffer();
-    const wb = XLSX.read(buffer, { type:'array', cellDates:true });
-    const first = wb.SheetNames[0];
-    if(!first) return [];
-    return XLSX.utils.sheet_to_json(wb.Sheets[first], { defval:'', raw:false });
-  }
   if(['csv','tsv','txt'].includes(ext)){
     const text = await file.text();
     return parseDelimitedText(text, ext === 'tsv' ? '\t' : guessDelimiter(text));
+  }
+  if(!window.XLSX) await loadExcelLibrary();
+  if(window.XLSX){
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type:'array', cellDates:true, raw:false });
+    const first = wb.SheetNames[0];
+    if(!first) return [];
+    return XLSX.utils.sheet_to_json(wb.Sheets[first], { defval:'', raw:false });
   }
   throw new Error('Para importar .xlsx/.xls, a biblioteca Excel precisa de estar carregada. Em GitHub Pages com internet isto funciona automaticamente. Podes também importar CSV.');
 }
@@ -2765,11 +2785,39 @@ function excelHeaderAliasesForPage(cfg){
     add('armazem', ['Armazém','Armazem','Armazém / Local','Armazem / Local','Local','Localização','Localizacao','Loja','Unidade','Empresa','Grupo']);
     add('seccao', ['Secção','Seccao','Sessão','Sessao','Secção/Sessão','Seccao/Sessao','Departamento','Zona','Área','Area','Tipo','Categoria']);
     add('nome', ['Nome','Nome Contacto','Contacto','Pessoa','Responsável','Responsavel','Funcionário','Funcionario','Colaborador']);
+    add('extensao', ['Extensão','Extensao','Ext.','Ext','Ramal','Código Interno','Codigo Interno']);
     add('telemovel', ['Telemóvel','Telemovel','Telemóvel Contacto','Telemovel Contacto','Tlm','Tlm.','Móvel','Movel','Mobile','Nº Telemóvel','N Telemovel']);
     add('telefone', ['Telefone','Telefone Fixo','Fixo','Tel','Tel.','Número','Numero','Nº Telefone','N Telefone','Contacto Telefónico','Contacto Telefonico']);
     add('email', ['Email','E-mail','Mail','Correio','Correio Eletrónico','Correio Eletronico']);
+    add('local', ['Local Contacto','Local / Empresa','Empresa Contacto','Empresa','Localidade','Filial']);
     add('groupId', ['ID Secção','ID Seccao','ID Grupo','Grupo ID']);
     add('contactId', ['ID Contacto','Contacto ID','ID Pessoa']);
+  }
+
+  if(cfg.key === 'clients'){
+    const add = (key, names)=>names.forEach(name=>aliases[normalizeExcelHeader(name)] = key);
+    add('codigoCliente', ['Código Cliente','Codigo Cliente','Cod Cliente','Cliente Código','Cliente Codigo','Nº Cliente','Numero Cliente']);
+    add('nome', ['Nome Cliente','Cliente','Nome']);
+    add('telefone', ['Telefone','Telemóvel','Telemovel','Contacto','Contacto Telefónico','Contacto Telefonico']);
+    add('email', ['Email','E-mail','Mail']);
+    add('notas', ['Notas','Observações','Observacoes','Obs']);
+  }
+
+  if(cfg.key === 'suppliers'){
+    const add = (key, names)=>names.forEach(name=>aliases[normalizeExcelHeader(name)] = key);
+    add('nomeMarca', ['Nome Marca','Nome da Marca','Marca','Fornecedor','Nome Fornecedor','Nome do Fornecedor','Empresa']);
+    add('codigoFicha', ['Código Ficha','Codigo Ficha','Código de Ficha','Codigo de Ficha','Nº Ficha','Numero Ficha','Referência','Referencia','Número Referência','Numero Referencia']);
+  }
+
+  if(cfg.key === 'quotes'){
+    const add = (key, names)=>names.forEach(name=>aliases[normalizeExcelHeader(name)] = key);
+    add('cliente', ['Cliente','Nome Cliente','Nome do Cliente']);
+    add('codigoCliente', ['Código Cliente','Codigo Cliente','Cod Cliente']);
+    add('peca', ['Peça','Peca','Artigo','Descrição','Descricao']);
+    add('referencia', ['Referência','Referencia','Ref']);
+    add('quantidade', ['Quantidade','Qtd','Qt']);
+    add('precoUnitario', ['Preço Unitário','Preco Unitario','Preço','Preco','Valor Unitário','Valor Unitario']);
+    add('total', ['Total','Valor Total']);
   }
 
 
@@ -2809,18 +2857,22 @@ function normalizeImportedContactRow(raw){
   const armazem = firstFilledValue(direct, ['armazem','local','localizacao','loja','unidade','empresa','grupo']) || 'Sem armazém';
   const seccao = firstFilledValue(direct, ['seccao','sessao','departamento','zona','area','tipo','categoria']) || 'Geral';
   const nome = firstFilledValue(direct, ['nome','contacto','pessoa','responsavel','funcionario','colaborador']);
+  const extensao = firstFilledValue(direct, ['extensao','ramal','ext']);
   const telemovel = firstFilledValue(direct, ['telemovel','tlm','movel','mobile']);
   const telefone = firstFilledValue(direct, ['telefone','fixo','tel','numero']);
   const email = firstFilledValue(direct, ['email','mail','correio']);
+  const local = firstFilledValue(direct, ['local','empresa','localidade','filial']) || armazem;
   return {
     groupId: direct.groupId || direct.idGrupo || direct.idSeccao || '',
     contactId: direct.contactId || direct.idContacto || '',
     armazem,
     seccao,
     nome,
+    extensao,
     telemovel,
     telefone,
-    email
+    email,
+    local
   };
 }
 
@@ -2987,9 +3039,11 @@ function importContactRows(rows){
     const contact = {
       id: row.contactId || uid('CNT'),
       nome: row.nome || '',
+      extensao: row.extensao || '',
       telemovel: row.telemovel || '',
       telefone: row.telefone || '',
-      email: row.email || ''
+      email: row.email || '',
+      local: row.local || armazem
     };
 
     const index = group.contactos.findIndex(c =>
