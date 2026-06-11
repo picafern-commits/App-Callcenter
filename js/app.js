@@ -1,4 +1,4 @@
-const APP_VERSION = '2.3.2';
+const APP_VERSION = '2.3.3';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -1398,54 +1398,70 @@ function contactGroupsView(groups){
   if(!groups.length) return '<div class="empty">Sem contactos encontrados.</div>';
   const grouped = groupedByWarehouse(groups);
   const warehouses = orderedWarehouses(Object.keys(grouped));
-  return `<div class="warehouse-directory">${warehouses.map(armazem => {
+  const q = (qs('#contactSearch')?.value || '').trim();
+  return `<div class="directory-simple-view">${warehouses.map(armazem => {
     const sections = grouped[armazem].sort((a,b)=>contactSection(a).localeCompare(contactSection(b),'pt'));
     const total = sections.reduce((sum,g)=>sum + (g.contactos || []).length, 0);
-    return `<section class="warehouse-block">
-      <div class="warehouse-head">
-        <div>
-          <strong>${esc(armazem)}</strong>
-          <span>${sections.length} secções · ${total} contactos</span>
+    const anyOpen = sections.some(g => g.aberto);
+    return `<section class="warehouse-simple-card">
+      <div class="warehouse-simple-head">
+        <div class="warehouse-title-block">
+          <span class="warehouse-dot"></span>
+          <div>
+            <strong>${esc(armazem)}</strong>
+            <small>${total} contacto(s) · ${sections.length} secção(ões)</small>
+          </div>
         </div>
       </div>
-      <div class="section-list">
-        ${sections.map(group => contactSectionView(group)).join('')}
+
+      <div class="section-chip-bar">
+        ${sections.map(group => {
+          const opened = q ? true : (group.aberto || (!anyOpen && sections.length === 1));
+          return `<button class="section-chip ${opened ? 'active' : ''}" type="button" data-toggle-contact-group="${group.id}">
+            <span>${esc(contactSection(group))}</span>
+            <b>${(group.contactos || []).length}</b>
+          </button>`;
+        }).join('')}
+      </div>
+
+      <div class="section-content-list">
+        ${sections.map(group => contactSectionView(group, q ? true : (!anyOpen && sections.length === 1))).join('')}
       </div>
     </section>`;
   }).join('')}</div>`;
 }
-function contactSectionView(group){
+function contactSectionView(group, forceOpen=false){
   const rows = group.contactos || [];
-  return `<div class="directory-section premium">
-    <button class="section-toggle premium" data-toggle-contact-group="${group.id}">
-      <span class="section-toggle-copy"><b>${esc(contactSection(group))}</b><small>${rows.length} contacto(s)</small></span>
-      <span class="section-toggle-icon">${group.aberto ? '−' : '+'}</span>
-    </button>
-    <div class="section-body ${group.aberto ? '' : 'hidden'}">
-      <div class="section-actions chips-row">
-        <span class="info-chip">${rows.length} contacto(s)</span>
-        ${canEditOperational()?`<button class="btn small ghost" data-add-contact-section="${group.id}">+ Contacto</button><button class="btn small" data-edit-contact-section="${group.id}">Editar secção</button>`:''}
+  const opened = forceOpen || group.aberto;
+  return `<div class="directory-section-simple ${opened ? '' : 'hidden'}">
+    <div class="section-simple-head">
+      <div>
+        <strong>${esc(contactSection(group))}</strong>
+        <span>${rows.length} contacto(s)</span>
+      </div>
+      <div class="section-simple-actions">
+        ${canEditOperational()?`<button class="btn small ghost" data-add-contact-section="${group.id}">+ Contacto</button><button class="btn small ghost" data-edit-contact-section="${group.id}">${ICONS.edit}<span>Secção</span></button>`:''}
         ${canDelete()?`<button class="btn danger small" data-delete-contact-group="${group.id}">Apagar</button>`:''}
       </div>
-      ${contactsCards(group)}
     </div>
+    ${contactsCards(group)}
   </div>`;
 }
 function contactsCards(group){
   const rows = group.contactos || [];
   if(!rows.length) return '<div class="empty compact-empty">Sem contactos nesta secção.</div>';
-  return `<div class="contact-card-grid premium">${rows.map(c=>`
-    <article class="contact-card premium">
-      <div class="contact-main">
+  return `<div class="simple-contact-list">${rows.map(c=>`
+    <article class="simple-contact-row">
+      <div class="simple-contact-identity">
         <strong>${esc(c.nome || '-')}</strong>
         <span>${esc(c.email || 'Sem email')}</span>
       </div>
-      <div class="contact-lines premium">
-        ${c.telemovel ? `<a href="tel:${esc(c.telemovel)}"><i>${ICONS.mobile}</i><span>${esc(c.telemovel)}</span></a><button class="mini-copy-btn" type="button" data-copy="${esc(c.telemovel)}">${ICONS.copy}</button>` : '<span><i>'+ICONS.mobile+'</i><span>Sem telemóvel</span></span>'}
-        ${c.telefone ? `<a href="tel:${esc(c.telefone)}"><i>${ICONS.phone}</i><span>${esc(c.telefone)}</span></a><button class="mini-copy-btn" type="button" data-copy="${esc(c.telefone)}">${ICONS.copy}</button>` : '<span><i>'+ICONS.phone+'</i><span>Sem telefone</span></span>'}
+      <div class="simple-contact-info">
+        ${c.telemovel ? `<a href="tel:${esc(c.telemovel)}">${ICONS.mobile}<span>${esc(c.telemovel)}</span></a><button class="mini-copy-btn" type="button" data-copy="${esc(c.telemovel)}">${ICONS.copy}</button>` : ''}
+        ${c.telefone ? `<a href="tel:${esc(c.telefone)}">${ICONS.phone}<span>${esc(c.telefone)}</span></a><button class="mini-copy-btn" type="button" data-copy="${esc(c.telefone)}">${ICONS.copy}</button>` : ''}
+        ${c.email ? `<a href="mailto:${esc(c.email)}">${ICONS.email}<span>Email</span></a><button class="mini-copy-btn" type="button" data-copy="${esc(c.email)}">${ICONS.copy}</button>` : ''}
       </div>
-      <div class="contact-actions premium">
-        ${c.email ? `<a class="btn small ghost" href="mailto:${esc(c.email)}">${ICONS.email}<span>Email</span></a><button class="mini-copy-btn" type="button" data-copy="${esc(c.email)}">${ICONS.copy}</button>` : ''}
+      <div class="simple-contact-actions">
         ${canEditOperational()?`<button class="btn small ghost" type="button" data-edit-contact="${group.id}:${c.id}">${ICONS.edit}<span>Editar</span></button>`:''}
         ${canDelete()?`<button class="btn danger small" data-delete-contact="${group.id}:${c.id}">Apagar</button>`:''}
       </div>
@@ -2577,8 +2593,13 @@ function bindContactDirectory(){
     if(!group) return;
     group.aberto = !group.aberto;
 
-    // Não redesenhar a página toda ao abrir/fechar uma secção.
-    // Isto evita o efeito de desaparecer tudo e voltar a aparecer já aberto.
+    // Toggle visual local, sem redesenhar a página.
+    btn.classList.toggle('active', group.aberto);
+    const warehouse = btn.closest('.warehouse-simple-card');
+    const panel = warehouse?.querySelector(`.directory-section-simple [data-add-contact-section="${group.id}"]`)?.closest('.directory-section-simple');
+    if(panel) panel.classList.toggle('hidden', !group.aberto);
+
+    // Compatibilidade com layout antigo
     const section = btn.closest('.directory-section');
     const body = section?.querySelector('.section-body');
     const icon = btn.querySelector('.section-toggle-icon, i');
