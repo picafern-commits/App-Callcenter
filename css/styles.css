@@ -3420,3 +3420,25 @@ body.theme-dark .user-create-help strong{
 body.firebase-synced-soft #firebaseStatusBadge{
   box-shadow:0 0 0 4px rgba(7,148,85,.10);
 }
+
+
+/* v2.3.0 - remover piscar/ecrã branco */
+body.page-changing-soft #pageContent{
+  opacity:.98;
+}
+body.page-loading .page-skeleton{
+  display:none!important;
+}
+
+
+/* v2.3.1 - Firebase autosave */
+.badge.orange#firebaseStatusBadge,
+#firebaseStatusBadge.badge.orange{
+  box-shadow:0 0 0 4px rgba(245,124,31,.10);
+}
+#firebaseStatusBadge.badge.blue{
+  color:#0b5cab;
+  background:#eef6ff;
+  border-color:#b2ddff;
+  box-shadow:0 0 0 4px rgba(17,128,201,.10);
+}

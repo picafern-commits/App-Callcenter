@@ -87,6 +87,17 @@ service cloud.firestore {
       allow delete: if canManage();
     }
 
+
+    match /auditoria/{document} {
+      allow read: if canManage();
+      allow create, update: if canOperate();
+      allow delete: if canManage();
+    }
+
+    match /backups/{document} {
+      allow read, write: if canManage();
+    }
+
     match /appState/{document} {
       allow read: if signedIn();
       allow write: if canManage();

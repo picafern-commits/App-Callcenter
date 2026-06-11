@@ -1,4 +1,4 @@
-const APP_VERSION = '2.2.8';
+const APP_VERSION = '2.3.1';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -36,6 +36,9 @@ let firebaseUnsubscribers = [];
 let pendingSignupUser = null;
 let cloudReadOnlyMode = false;
 let firebaseRefreshTimer = null;
+let cloudSaveInProgress = false;
+let cloudSavePending = false;
+let lastCloudSaveAt = 0;
 const CONFIG_OPEN_KEY = 'autoparts_config_open_sections_v1';
 function isElectronApp(){
   return new URLSearchParams(window.location.search).get('electron') === '1' || navigator.userAgent.toLowerCase().includes('electron');
@@ -272,8 +275,10 @@ function scheduleFirebasePageRefresh(reason='firebase'){
 function updateFirebaseStatusBadge(){
   const badge = qs('#firebaseStatusBadge');
   if(badge){
-    badge.textContent = firebaseStatus();
-    badge.className = `badge ${firebaseReady ? 'green' : 'orange'}`;
+    const status = firebaseStatus();
+    badge.textContent = status;
+    const cls = status.includes('pendente') ? 'orange' : (status.includes('guardar') ? 'blue' : (firebaseReady ? 'green' : 'orange'));
+    badge.className = `badge ${cls}`;
   }
 }
 
@@ -302,39 +307,112 @@ function appIsVisible(){ return !qs('#appShell')?.classList.contains('hidden'); 
 function firebaseStatus(){
   if (!firebaseReady) return 'Modo local';
   if(firebaseAuth?.currentUser?.isAnonymous || cloudReadOnlyMode) return 'Firebase leitura';
+  if(cloudSaveInProgress) return 'Firebase a guardar';
+  if(localStorage.getItem('autoparts_firebase_dirty_v1') === '1' || cloudSavePending) return 'Firebase pendente';
   return firebaseAuth?.currentUser ? 'Firebase ligado' : 'Firebase pronto';
 }
-function scheduleCloudSave(){
-  if (!firebaseReady || !firebaseAuth?.currentUser || !firebaseDb || cloudReadOnlyMode) return;
-  clearTimeout(cloudSaveTimer);
-  cloudSaveTimer = setTimeout(pushCloudState, 450);
+function hasWritableFirebaseSession(){
+  return Boolean(firebaseReady && firebaseAuth?.currentUser && firebaseDb && !firebaseAuth.currentUser.isAnonymous && !cloudReadOnlyMode);
 }
-async function pushCloudState(){
-  if (!firebaseReady || !firebaseAuth?.currentUser || !firebaseDb || cloudReadOnlyMode) return;
-  try {
-    await saveFirebaseCollections();
-    updateFirebaseStatusBadge();
-  } catch (err) {
-    console.warn('Firebase save failed', err);
-    toast('Guardado localmente. Firebase sem permissões.');
+function markFirebaseDirty(){
+  cloudSavePending = true;
+  try { localStorage.setItem('autoparts_firebase_dirty_v1', '1'); } catch {}
+}
+function clearFirebaseDirty(){
+  cloudSavePending = false;
+  try { localStorage.removeItem('autoparts_firebase_dirty_v1'); } catch {}
+}
+function scheduleCloudSave(){
+  markFirebaseDirty();
+  clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(()=>pushCloudState({ source:'autosave' }), 650);
+}
+async function flushPendingCloudSave(){
+  if((localStorage.getItem('autoparts_firebase_dirty_v1') === '1' || cloudSavePending) && hasWritableFirebaseSession()) {
+    await pushCloudState({ source:'flush' });
   }
 }
+async function pushCloudState(options = {}){
+  if (!hasWritableFirebaseSession()) {
+    updateFirebaseStatusBadge();
+    return false;
+  }
+  if (cloudSaveInProgress) {
+    markFirebaseDirty();
+    return false;
+  }
+  cloudSaveInProgress = true;
+  updateFirebaseStatusBadge();
+  try {
+    await saveFirebaseCollections();
+    lastCloudSaveAt = Date.now();
+    clearFirebaseDirty();
+    updateFirebaseStatusBadge();
+    return true;
+  } catch (err) {
+    markFirebaseDirty();
+    console.warn('Firebase save failed', err);
+    const code = err?.code ? ` (${err.code})` : '';
+    if(options.source !== 'autosave') toast(`Guardado localmente. Firebase não gravou${code}.`);
+    return false;
+  } finally {
+    cloudSaveInProgress = false;
+  }
+}
+function canSyncCollectionKey(stateKey){
+  if(stateKey === 'users') return hasPermission('manageUsers');
+  if(stateKey === 'auditLogs' || stateKey === 'backups') return hasPermission('manageSettings');
+  return hasPermission('createOperational') || hasPermission('editAll') || canAction('add') || canAction('edit') || isAdminMaster();
+}
+function canLoadCollectionKey(stateKey){
+  // Coleções administrativas podem estar bloqueadas nas rules.
+  // A app não deve falhar toda só porque auditoria/backups não estão acessíveis.
+  return true;
+}
+async function safeLoadCollection(stateKey, collectionName){
+  try {
+    const snap = await firebaseDb.collection(collectionName).get();
+    return { ok:true, rows:snap.docs.map(doc => cleanFirebaseDoc({ id: doc.id, ...doc.data() })) };
+  } catch(err) {
+    console.warn(`Firebase read ignored for ${collectionName}`, err);
+    return { ok:false, rows:null, error:err };
+  }
+}
+
 async function saveFirebaseCollections(){
+  if (!firebaseReady || !firebaseAuth?.currentUser || !firebaseDb || cloudReadOnlyMode) return;
+
+  const errors = [];
   const metaRef = firebaseDb.collection(FIREBASE_META_COLLECTION).doc(FIREBASE_META_DOC);
   if (hasPermission('manageSettings')) {
-    await metaRef.set({
-      settings: state.settings || {},
-      appVersion: APP_VERSION,
-      dataModel: 'collections-v2',
-      collections: FIREBASE_COLLECTIONS,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      updatedBy: firebaseAuth.currentUser?.email || ''
-    }, { merge: true });
+    try {
+      await metaRef.set({
+        settings: state.settings || {},
+        appVersion: APP_VERSION,
+        dataModel: 'collections-v2',
+        collections: FIREBASE_COLLECTIONS,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedBy: firebaseAuth.currentUser?.email || ''
+      }, { merge: true });
+    } catch(err) {
+      errors.push(['meta', err]);
+      console.warn('Firebase meta save failed', err);
+    }
   }
 
   for (const [stateKey, collectionName] of Object.entries(FIREBASE_COLLECTIONS)) {
-    if (stateKey === 'users' && !hasPermission('manageUsers')) continue;
-    await syncCollection(collectionName, state[stateKey] || [], canDelete());
+    if (!canSyncCollectionKey(stateKey)) continue;
+    try {
+      await syncCollection(collectionName, state[stateKey] || [], canDelete());
+    } catch(err) {
+      errors.push([collectionName, err]);
+      console.warn(`Firebase save failed for ${collectionName}`, err);
+    }
+  }
+
+  if(errors.length) {
+    const important = errors.filter(([name]) => !['auditoria','backups'].includes(name));
+    if(important.length) throw errors[0][1];
   }
 }
 async function syncCollection(collectionName, rows, allowDelete=false){
@@ -369,25 +447,40 @@ async function loadCloudState(options = {}){
   try {
     const authUser = firebaseAuth.currentUser;
     const previousUser = state.currentUser;
+    const previousLocal = { ...state };
     const base = seedData();
-    const metaSnap = await firebaseDb.collection(FIREBASE_META_COLLECTION).doc(FIREBASE_META_DOC).get();
+
     const authEmail = authUser.email || '';
     const nextCurrentUser = authEmail
       ? { email: authEmail, name: authEmail.split('@')[0] }
       : (previousUser || { email:'local@electron.app', name:'Local' });
+
     state = { ...base, currentUser: nextCurrentUser };
 
-    if (metaSnap.exists && metaSnap.data()?.settings) {
-      state.settings = { ...base.settings, ...metaSnap.data().settings, firebaseEnabled: true };
-      const localTheme = getLocalTheme();
-      if(localTheme) state.settings.theme = localTheme;
+    try {
+      const metaSnap = await firebaseDb.collection(FIREBASE_META_COLLECTION).doc(FIREBASE_META_DOC).get();
+      if (metaSnap.exists && metaSnap.data()?.settings) {
+        state.settings = { ...base.settings, ...metaSnap.data().settings, firebaseEnabled: true };
+        const localTheme = getLocalTheme();
+        if(localTheme) state.settings.theme = localTheme;
+      }
+    } catch(metaErr) {
+      console.warn('Firebase meta read ignored', metaErr);
+      state.settings = { ...base.settings, ...(previousLocal.settings || {}), firebaseEnabled: true };
     }
 
     let loadedRows = 0;
+    let loadedCollections = 0;
     for (const [stateKey, collectionName] of Object.entries(FIREBASE_COLLECTIONS)) {
-      const snap = await firebaseDb.collection(collectionName).get();
-      state[stateKey] = snap.docs.map(doc => cleanFirebaseDoc({ id: doc.id, ...doc.data() }));
-      loadedRows += state[stateKey].length;
+      if(!canLoadCollectionKey(stateKey)) continue;
+      const result = await safeLoadCollection(stateKey, collectionName);
+      if(result.ok && Array.isArray(result.rows)) {
+        state[stateKey] = result.rows;
+        loadedRows += result.rows.length;
+        loadedCollections++;
+      } else {
+        state[stateKey] = Array.isArray(previousLocal[stateKey]) ? previousLocal[stateKey] : (base[stateKey] || []);
+      }
     }
 
     if (!loadedRows && !authUser.isAnonymous) {
@@ -397,9 +490,12 @@ async function loadCloudState(options = {}){
     cloudReadOnlyMode = !!authUser.isAnonymous || !!options.readOnly;
     saveLocalOnly();
     startFirebaseListeners();
+    updateFirebaseStatusBadge();
+    await flushPendingCloudSave();
+    console.log(`Firebase load ok: ${loadedCollections} coleções, ${loadedRows} registos.`);
   } catch (err) {
     console.warn('Firebase load failed', err);
-    toast('Firebase sem permissões. A usar dados locais.');
+    toast('Firebase ligou, mas não conseguiu carregar dados. Confirma rules/permissões.');
   }
 }
 function cleanFirebaseDoc(doc){
@@ -576,7 +672,12 @@ function pageSkeleton(id){
   const meta = pages.find(p=>p.id===id) || pages[0];
   return `<div class="page-skeleton"><div class="skeleton-head"><div class="skeleton-chip"></div><div class="skeleton-title"></div><div class="skeleton-line"></div></div><div class="skeleton-grid"><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div></div><div class="skeleton-footer"></div></div>`;
 }
-function goPage(id){ setPendingPageLoader(id); document.body.classList.add('page-changing'); const shell = qs('#pageContent'); if(shell) shell.innerHTML = pageSkeleton(id); window.location.href = pageUrl(id); }
+function goPage(id){
+  // Não limpar a página antes de navegar: evitava-se o refresh, mas causava ecrã branco por milésimos.
+  setPendingPageLoader(id);
+  document.body.classList.add('page-changing-soft');
+  window.location.href = pageUrl(id);
+}
 function canOpenPage(id){
   if(id === 'dashboard' || id === 'configs-user') return true;
   if(isAdminMaster()) return true;
@@ -664,7 +765,8 @@ async function init(){
         }
         setStoredSession(state.currentUser || { email:user.email, name:(user.email || 'Admin').split('@')[0] });
         showApp();
-        toast('Firebase ligado.');
+        await flushPendingCloudSave();
+        toast('Firebase ligado. Autosave ativo.');
       } else {
         const stored = getStoredSession();
         if(stored?.email) {
@@ -948,20 +1050,13 @@ function renderPage(id){
   qs('#pageSubtitle').textContent = meta.subtitle;
   qsa('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.page===id));
   const renderers = { dashboard, 'nova-chamada': novaChamada, pedidos, clientes, contactos, fornecedores, orcamentos, agenda, stock, relatorios, users, 'configs-user': configsUser, config };
+  const pageBody = renderers[id]();
   const content = qs('#pageContent');
-  if(content){
-    content.innerHTML = pageSkeleton(id);
-    document.body.classList.add('page-loading');
-  }
-  const paint = ()=>{
-    const pageBody = renderers[id]();
-    qs('#pageContent').innerHTML = `${excelToolbar(id)}${pageBody}`;
-    bindPage(id);
-    applySpellcheckEnhancements(qs('#pageContent'));
-    document.body.classList.remove('page-loading','page-changing');
-    clearPendingPageLoader();
-  };
-  window.requestAnimationFrame(()=>setTimeout(paint, 90));
+  if(content) content.innerHTML = `${excelToolbar(id)}${pageBody}`;
+  bindPage(id);
+  applySpellcheckEnhancements(qs('#pageContent'));
+  document.body.classList.remove('page-loading','page-changing','page-changing-soft');
+  clearPendingPageLoader();
 }
 
 
@@ -2730,8 +2825,8 @@ function bindConfig(){
   const syncBtn = qs('#syncFirebaseBtn');
   if(syncBtn) syncBtn.addEventListener('click',async()=>{
     if(!firebaseAuth?.currentUser) await autoConnectFirebaseForLocalSession();
+    if(firebaseAuth?.currentUser && !firebaseAuth.currentUser.isAnonymous && !cloudReadOnlyMode) await pushCloudState();
     if(firebaseAuth?.currentUser) await loadCloudState({ readOnly: firebaseAuth.currentUser.isAnonymous });
-    if(!cloudReadOnlyMode) await pushCloudState();
     updateFirebaseStatusBadge();
     toast(firebaseReady ? (cloudReadOnlyMode ? 'Firebase ligada em modo leitura. Entra com conta Firebase para gravar.' : 'Sincronizado com Firebase.') : 'Firebase indisponível.');
     refreshConfigPage('Sincronização manual concluída.');
@@ -2994,6 +3089,11 @@ function openTvMode(){
 }
 
 
+window.addEventListener('beforeunload', ()=>{
+  if(hasWritableFirebaseSession() && (cloudSavePending || localStorage.getItem('autoparts_firebase_dirty_v1') === '1')) {
+    pushCloudState({ source:'beforeunload' });
+  }
+});
 document.addEventListener('DOMContentLoaded', init);
 
 window.addEventListener('resize', () => { if(currentResolution && currentResolution() === 'auto') applyTheme(); });
