@@ -1,4 +1,4 @@
-const APP_VERSION = '2.4.3';
+const APP_VERSION = '2.4.1';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -122,16 +122,6 @@ function seedData() {
       theme: 'normal',
       resolution: 'auto',
       spellcheckEnabled: true,
-      operatorPageAccess: {
-        clientes: true,
-        contactos: true,
-        fornecedores: true,
-        rotas: true,
-        orcamentos: true
-      },
-      operatorActionAccess: {
-        view: true, add: false, edit: false, delete: false
-      },
       backupEnabled: true,
       lastAutoBackupDate: ''
     },
@@ -202,11 +192,13 @@ function loadState() {
 function ensureStateShape(appState){
   const base = seedData();
   appState.settings = { ...base.settings, ...(appState.settings || {}) };
-  appState.settings.operatorPageAccess = { ...base.settings.operatorPageAccess, ...(appState.settings.operatorPageAccess || {}) };
-  appState.settings.operatorActionAccess = { ...base.settings.operatorActionAccess, ...(appState.settings.operatorActionAccess || {}) };
   appState.auditLogs = Array.isArray(appState.auditLogs) ? appState.auditLogs : [];
   appState.backups = Array.isArray(appState.backups) ? appState.backups : [];
-  appState.users = (appState.users || []).map(u => ({ pageAccess:{}, actionAccess:{}, status:'Ativo', role:'Operador', ...u }));
+  appState.users = (appState.users || []).map(u => {
+    const next = { pageAccess:{}, actionAccess:{}, permissions:{}, status:'Ativo', role:'Operador', ...u };
+    next.permissions = normalizeUserPermissions(next);
+    return next;
+  });
   appState.contactGroups = Array.isArray(appState.contactGroups) ? appState.contactGroups : [];
   appState.suppliers = Array.isArray(appState.suppliers) ? appState.suppliers : [];
   appState.routes = Array.isArray(appState.routes) ? appState.routes : [];
@@ -655,11 +647,29 @@ function toggleTheme(){
 function managedPageList(){
   return pages.filter(p => !['dashboard','users','config','configs-user'].includes(p.id));
 }
-function defaultOperatorPageAccess(){
-  return managedPageList().reduce((acc,p)=>{ acc[p.id] = true; return acc; }, {});
+function permissionDefaults(){
+  return { view:false, add:false, edit:false, delete:false };
 }
-function operatorPageAccess(){
-  return { ...defaultOperatorPageAccess(), ...(state.settings?.operatorPageAccess || {}) };
+function fullPermissionDefaults(){
+  return { view:true, add:true, edit:true, delete:true };
+}
+function normalizeUserPermissions(user){
+  const managed = managedPageList();
+  const source = user?.permissions || {};
+  const oldPageAccess = user?.pageAccess || {};
+  const oldActionAccess = user?.actionAccess || {};
+  const migrated = {};
+  managed.forEach(p=>{
+    const existing = source[p.id] || {};
+    const oldView = hasOwn(oldPageAccess, p.id) ? oldPageAccess[p.id] === true : true;
+    migrated[p.id] = {
+      view: hasOwn(existing,'view') ? existing.view === true : oldView,
+      add: hasOwn(existing,'add') ? existing.add === true : oldActionAccess.add === true,
+      edit: hasOwn(existing,'edit') ? existing.edit === true : oldActionAccess.edit === true,
+      delete: hasOwn(existing,'delete') ? existing.delete === true : oldActionAccess.delete === true
+    };
+  });
+  return migrated;
 }
 function currentUserRecordSafe(){
   return currentUserRecord ? currentUserRecord() : null;
@@ -667,14 +677,14 @@ function currentUserRecordSafe(){
 function hasOwn(obj, key){
   return Object.prototype.hasOwnProperty.call(obj || {}, key);
 }
-function userPageOverride(user, pageId){
-  const access = user?.pageAccess || {};
-  return hasOwn(access, pageId) ? access[pageId] === true : null;
+function userPagePermissions(user, pageId){
+  if(!user) return permissionDefaults();
+  if((user.role || '') === 'Admin Master') return fullPermissionDefaults();
+  user.permissions = normalizeUserPermissions(user);
+  return { ...permissionDefaults(), ...(user.permissions?.[pageId] || {}) };
 }
 function userCanOpenManagedPage(user, pageId){
-  const override = userPageOverride(user, pageId);
-  if(override !== null) return override;
-  return operatorPageAccess()[pageId] !== false;
+  return userPagePermissions(user, pageId).view === true;
 }
 function pageUrl(id){ return pageFiles[id] || 'index.html'; }
 function setPendingPageLoader(target){ try{ sessionStorage.setItem('apcc_pending_page', target || currentPage || ''); }catch{} }
@@ -692,14 +702,11 @@ function goPage(id){
 function canOpenPage(id){
   if(id === 'dashboard' || id === 'configs-user') return true;
   if(isAdminMaster()) return true;
-  if(id === 'users') return hasPermission('manageUsers') || hasPermission('approveUsers');
-  if(id === 'config') return hasPermission('manageSettings');
+  if(id === 'users') return isAdminMaster();
+  if(id === 'config') return isAdminMaster();
   const managedIds = managedPageList().map(p=>p.id);
-  if(managedIds.includes(id)) {
-    if(currentRole() === 'Operador') return userCanOpenManagedPage(currentUserRecord(), id);
-    return true;
-  }
-  return hasPermission('manageSettings');
+  if(managedIds.includes(id)) return userCanOpenManagedPage(currentUserRecord(), id);
+  return isAdminMaster();
 }
 function getDefaultPage(){
   if (window.DEFAULT_PAGE) return window.DEFAULT_PAGE;
@@ -933,6 +940,7 @@ async function signupFromLogin(){
       status:signupStatus,
       pageAccess:{},
       actionAccess:{},
+      permissions: normalizeUserPermissions({ pageAccess:{}, actionAccess:{} }),
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy:isMasterSignup ? 'signup-admin-master' : 'signup-login'
     }, { merge:true });
@@ -1690,22 +1698,18 @@ function userIsActive(){
   if(isAdminMasterEmail()) return true;
   return user?.status === 'Ativo';
 }
-function actionAccessDefaults(){ return { view:true, add:false, edit:false, delete:false }; }
-function currentUserActionAccess(){
+function actionAccessDefaults(){ return { view:false, add:false, edit:false, delete:false }; }
+function currentUserActionAccess(pageId=currentPage){
   if(isAdminMaster()) return { view:true, add:true, edit:true, delete:true };
-  const base = { ...actionAccessDefaults(), ...(state.settings?.operatorActionAccess || {}) };
-  const user = currentUserRecord();
-  const specific = user?.actionAccess || {};
-  return { ...base, ...specific };
+  return userPagePermissions(currentUserRecord(), pageId);
 }
-function canAction(action){
+function canAction(action, pageId=currentPage){
   if(isAdminMaster()) return true;
-  const access = currentUserActionAccess();
-  return access[action] === true;
+  return currentUserActionAccess(pageId)[action] === true;
 }
-function canEditOperational(){ return hasPermission('editAll') || hasPermission('createOperational') || canAction('add') || canAction('edit'); }
-function canCreateOperational(){ return hasPermission('editAll') || hasPermission('createOperational') || canAction('add'); }
-function canDelete(){ return hasPermission('deleteAll') || canAction('delete'); }
+function canEditOperational(pageId=currentPage){ return canAction('add', pageId) || canAction('edit', pageId); }
+function canCreateOperational(pageId=currentPage){ return canAction('add', pageId); }
+function canDelete(pageId=currentPage){ return canAction('delete', pageId); }
 function canImportExcel(){ return isAdminMaster(); }
 function canExportExcel(){ return isAdminMaster(); }
 function usersTable(rows){
@@ -1846,7 +1850,7 @@ function rotas(){
   const drivers = uniqueSorted(all.map(r=>r.condutor));
   const totalKm = rows.reduce((sum,r)=>sum + routeKm(r), 0);
   const addCard = canEdit ? `<div class="routes-left-column">
-    <div class="card compact-form-card clean-side-card route-create-card">
+    <div class="card compact-form-card clean-side-card">
       <div class="card-head clean-card-head"><div><h3>Nova rota</h3><span class="muted">Escolhe a viatura e a matrícula entra sozinha</span></div></div>
       <form id="routeForm" class="simple-stack-form route-form">
         <select class="select" name="viatura" id="routeVehicleSelect" required>
@@ -1870,12 +1874,16 @@ function rotas(){
       </form>
     </div>
 
-    <div class="card compact-form-card clean-side-card vehicle-actions-card">
-      <div class="card-head clean-card-head"><div><h3>Viaturas</h3><span class="muted">${routeVehicles().length} ficha(s) guardada(s)</span></div></div>
-      <div class="vehicle-clean-actions">
-        <button class="btn primary full" id="addVehicleBtn" type="button">Adicionar Viatura</button>
-        <button class="btn ghost full" id="vehicleListBtn" type="button">Ver lista de viaturas</button>
-      </div>
+    <div class="card compact-form-card clean-side-card vehicle-file-card">
+      <div class="card-head clean-card-head"><div><h3>Ficha viatura</h3><span class="muted">Criar viatura para usar no select</span></div></div>
+      <form id="vehicleForm" class="simple-stack-form vehicle-form">
+        <input class="field" name="viatura" placeholder="Nome da viatura" required>
+        <input class="field" name="matricula" placeholder="Matrícula" required>
+        <div class="mini-two-fields"><input class="field" name="marca" placeholder="Marca"><input class="field" name="modelo" placeholder="Modelo"></div>
+        <textarea name="observacoes" placeholder="Observações"></textarea>
+        <button class="btn primary full" type="submit">Guardar viatura</button>
+      </form>
+      ${vehiclesMiniTable()}
     </div>
   </div>` : '';
   return `<div class="grid ${canEdit ? 'two split-form-list clean-page-layout routes-layout' : 'single-list'} routes-page clean-module-page">
@@ -1904,12 +1912,6 @@ function routeKm(r){
   const fim = Number(r.kmFim || 0);
   return ini && fim && fim >= ini ? fim - ini : 0;
 }
-function routeSortStamp(r){
-  const date = normalizeDateValue(r?.data) || '0000-00-00';
-  const time = normalizeTimeValue(r?.horaFim || r?.horaInicio || '') || '00:00';
-  return `${date}T${time}`;
-}
-
 function filterRoutes(){
   const q = (qs('#routeSearch')?.value || '').toLowerCase();
   const vehicle = qs('#routeVehicleFilter')?.value || '';
@@ -1924,38 +1926,30 @@ function filterRoutes(){
     if(from && String(r.data||'') < from) return false;
     if(to && String(r.data||'') > to) return false;
     return true;
-  }).sort((a,b)=>
-    routeSortStamp(b).localeCompare(routeSortStamp(a)) ||
-    String(a.viatura||'').localeCompare(String(b.viatura||''),'pt',{sensitivity:'base',numeric:true})
-  );
+  }).sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')) || String(a.viatura||'').localeCompare(String(b.viatura||''),'pt',{sensitivity:'base'}));
 }
 function routesTable(rows){
   if(!rows.length) return '<div class="empty">Sem rotas encontradas.</div>';
   return `<div class="clean-card-list routes-card-list">${rows.map(r=>`
-    <article class="clean-data-card route-data-card full-route-card">
-      <div class="route-card-top">
-        <div class="data-card-main route-vehicle-title">
-          <strong>${esc(r.viatura || '-')}</strong>
-          <small>${esc(r.matricula || 'Sem matrícula')} · ${esc(formatDatePt(r.data))}</small>
-        </div>
-        <div class="card-code-center">
-          <span class="data-card-code big-visible-code">${routeKm(r)} km</span>
-        </div>
-        <div class="actions data-card-actions">
-          ${canEditOperational()?`<button class="btn small ghost" data-edit-route="${r.id}">${ICONS.edit}<span>Editar</span></button>`:'<span class="muted">Consulta</span>'}
-          ${canDelete()?`<button class="btn danger small" data-delete-route="${r.id}">Apagar</button>`:''}
-        </div>
+    <article class="clean-data-card route-data-card">
+      <div class="data-card-main">
+        <strong>${esc(r.viatura || '-')}</strong>
+        <small>${esc(r.matricula || '')} · ${esc(formatDatePt(r.data))}</small>
       </div>
-      <div class="route-card-details">
-        <span><b>Destino</b>${esc(r.destino || '-')}</span>
-        <span><b>Pedido por</b>${esc(r.pedidoPor || '-')}</span>
-        <span><b>Condutor</b>${esc(r.condutor || '-')}</span>
-        <span><b>Período</b>${esc(r.periodo || '-')}</span>
-        <span><b>Carga</b>${esc(r.carga || '-')}</span>
-        <span><b>Horas</b>${esc(r.horaInicio || '-')} → ${esc(r.horaFim || '-')}</span>
-        <span><b>KM inicial</b>${esc(r.kmInicio || '-')}</span>
-        <span><b>KM final</b>${esc(r.kmFim || '-')}</span>
-        ${r.observacoes ? `<span class="route-note"><b>Obs.</b>${esc(r.observacoes)}</span>` : ''}
+      <div class="route-destination-box">
+        <b>${esc(r.destino || '-')}</b>
+        <span>${esc(r.pedidoPor || '-')} · ${esc(r.periodo || '-')} · ${esc(r.carga || '-')}</span>
+      </div>
+      <div class="route-driver-box">
+        <span class="badge blue">${esc(r.condutor || 'Sem condutor')}</span>
+        <small>${esc(r.horaInicio || '-')} → ${esc(r.horaFim || '-')}</small>
+      </div>
+      <div class="card-code-center">
+        <span class="data-card-code big-visible-code">${routeKm(r)} km</span>
+      </div>
+      <div class="actions data-card-actions">
+        ${canEditOperational()?`<button class="btn small ghost" data-edit-route="${r.id}">${ICONS.edit}<span>Editar</span></button>`:'<span class="muted">Consulta</span>'}
+        ${canDelete()?`<button class="btn danger small" data-delete-route="${r.id}">Apagar</button>`:''}
       </div>
     </article>`).join('')}</div>`;
 }
@@ -1989,29 +1983,43 @@ function bindRoutes(){
     saveState(); renderPage('rotas'); toast('Rota guardada.');
   });
 
-  qs('#addVehicleBtn')?.addEventListener('click',()=>openVehicleModal());
-  qs('#vehicleListBtn')?.addEventListener('click',()=>openVehicleListModal());
+  const vehicleForm = qs('#vehicleForm');
+  if(vehicleForm) vehicleForm.addEventListener('submit',e=>{
+    e.preventDefault();
+    if(!canEditOperational()) return toast('Sem permissão para guardar viaturas.');
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    state.vehicles = Array.isArray(state.vehicles) ? state.vehicles : [];
+    const cleanName = String(data.viatura || '').trim();
+    const existing = state.vehicles.find(v=>normalizeText(v.viatura)===normalizeText(cleanName) || (data.matricula && normalizeText(v.matricula)===normalizeText(data.matricula)));
+    const payload = { id: existing?.id || uid('VEI'), viatura:cleanName, matricula:String(data.matricula||'').trim(), marca:String(data.marca||'').trim(), modelo:String(data.modelo||'').trim(), observacoes:String(data.observacoes||'').trim() };
+    if(existing) Object.assign(existing, payload);
+    else state.vehicles.push(payload);
+    saveState(); renderPage('rotas'); toast('Viatura guardada.');
+  });
 
   bindRouteActions();
   bindVehicleActions();
 }
 function normalizeRouteData(data){
-  const ini = Number(data.kmInicio || 0);
-  const fim = Number(data.kmFim || 0);
+  const ini = parseKmValue(data.kmInicio);
+  const fim = parseKmValue(data.kmFim);
   const vehicle = vehicleByName(data.viatura);
   return {
     ...data,
-    data: normalizeDateValue(data.data),
-    horaInicio: normalizeTimeValue(data.horaInicio),
-    horaFim: normalizeTimeValue(data.horaFim),
     viatura:String(data.viatura || '').trim(),
     matricula:String(data.matricula || vehicle?.matricula || '').trim(),
+    data: parseExcelDateValue(data.data),
     pedidoPor:String(data.pedidoPor || '').trim(),
     destino:String(data.destino || '').trim(),
+    periodo:String(data.periodo || '').trim(),
+    carga:String(data.carga || '').trim(),
     condutor:String(data.condutor || '').trim(),
     kmInicio: ini,
+    horaInicio: parseExcelTimeValue(data.horaInicio),
     kmFim: fim,
-    kmPercorridos: Number(data.kmPercorridos || (ini && fim && fim >= ini ? fim - ini : 0))
+    horaFim: parseExcelTimeValue(data.horaFim),
+    kmPercorridos: parseKmValue(data.kmPercorridos) || (ini && fim && fim >= ini ? fim - ini : 0),
+    observacoes:String(data.observacoes || '').trim()
   };
 }
 function bindRouteActions(){
@@ -2026,58 +2034,25 @@ function bindVehicleActions(){
   qsa('[data-delete-vehicle]').forEach(btn=>btn.addEventListener('click',()=>{
     if(!canDelete()) return toast('Sem permissão para apagar.');
     state.vehicles = (state.vehicles || []).filter(v=>v.id!==btn.dataset.deleteVehicle);
-    saveState();
-    closeModal();
-    renderPage('rotas');
-    toast('Viatura apagada.');
+    saveState(); renderPage('rotas'); toast('Viatura apagada.');
   }));
   qsa('[data-edit-vehicle]').forEach(btn=>btn.addEventListener('click',()=>openVehicleModal(btn.dataset.editVehicle)));
 }
-function openVehicleListModal(){
-  openModal('Lista de viaturas', `<div class="vehicle-list-modal">
-    <div class="modal-actions-clean">
-      ${canEditOperational()?`<button class="btn primary" type="button" id="modalAddVehicleBtn">Adicionar Viatura</button>`:''}
-    </div>
-    ${vehiclesMiniTable()}
-  </div>`);
-  qs('#modalAddVehicleBtn')?.addEventListener('click',()=>openVehicleModal());
-  bindVehicleActions();
-}
-function vehicleFormHtml(v={}){
-  return `<form id="editVehicleForm" class="form-grid">
+function openVehicleModal(id){
+  const v = (state.vehicles || []).find(x=>x.id===id);
+  if(!v) return;
+  openModal('Editar viatura', `<form id="editVehicleForm" class="form-grid">
     <input class="field" name="viatura" placeholder="Nome da viatura" value="${esc(v.viatura||'')}" required>
     <input class="field" name="matricula" placeholder="Matrícula" value="${esc(v.matricula||'')}" required>
     <input class="field" name="marca" placeholder="Marca" value="${esc(v.marca||'')}">
     <input class="field" name="modelo" placeholder="Modelo" value="${esc(v.modelo||'')}">
     <textarea class="span3" name="observacoes" placeholder="Observações">${esc(v.observacoes||'')}</textarea>
     <div class="span3"><button class="btn primary">Guardar viatura</button></div>
-  </form>`;
-}
-function openVehicleModal(id=''){
-  const existing = id ? (state.vehicles || []).find(x=>x.id===id) : null;
-  openModal(existing ? 'Editar viatura' : 'Adicionar viatura', vehicleFormHtml(existing || {}));
+  </form>`);
   qs('#editVehicleForm').addEventListener('submit',e=>{
     e.preventDefault();
-    const data = Object.fromEntries(new FormData(e.target).entries());
-    state.vehicles = Array.isArray(state.vehicles) ? state.vehicles : [];
-    const cleanName = String(data.viatura || '').trim();
-    const cleanPlate = String(data.matricula || '').trim();
-    const duplicate = state.vehicles.find(v => v.id !== id && (normalizeText(v.viatura) === normalizeText(cleanName) || (cleanPlate && normalizeText(v.matricula) === normalizeText(cleanPlate))));
-    const payload = {
-      id: existing?.id || duplicate?.id || uid('VEI'),
-      viatura: cleanName,
-      matricula: cleanPlate,
-      marca: String(data.marca || '').trim(),
-      modelo: String(data.modelo || '').trim(),
-      observacoes: String(data.observacoes || '').trim()
-    };
-    if(existing) Object.assign(existing, payload);
-    else if(duplicate) Object.assign(duplicate, payload);
-    else state.vehicles.push(payload);
-    saveState();
-    closeModal();
-    renderPage('rotas');
-    toast(existing ? 'Viatura atualizada.' : 'Viatura adicionada.');
+    Object.assign(v, Object.fromEntries(new FormData(e.target).entries()));
+    saveState(); closeModal(); renderPage('rotas'); toast('Viatura atualizada.');
   });
 }
 
@@ -2134,37 +2109,51 @@ function topParts(){
 }
 function permissionsSettingsCard(){
   if(!isAdminMaster()) return '';
-  const globalAccess = operatorPageAccess();
   const managed = managedPageList();
-  const operators = (state.users || []).filter(u => (u.role || 'Operador') !== 'Admin Master');
-  return `<div class="card permissions-card span-all">
+  const users = (state.users || []).filter(u => (u.role || 'Operador') !== 'Admin Master');
+  const actions = [
+    ['view','Ver'],
+    ['add','Adicionar'],
+    ['edit','Editar'],
+    ['delete','Apagar']
+  ];
+  return `<div class="card permissions-card span-all unified-permissions-card">
     <div class="card-head">
-      <h3>Permissões dos operadores</h3>
-      <span class="muted">Ativar páginas por regra geral ou por utilizador específico.</span>
+      <div>
+        <h3>Permissões por utilizador</h3>
+        <span class="muted">Sistema único: escolhe o utilizador e define Ver / Adicionar / Editar / Apagar por página.</span>
+      </div>
     </div>
-    <form id="permissionsForm" class="permissions-form">
-      <div class="permission-block">
-        <h4>Páginas visíveis para Operadores</h4>
-        <p class="muted">Esta é a regra geral. Se desligar uma página aqui, podes voltar a dar acesso só a determinados utilizadores na zona abaixo.</p>
-        <div class="permission-grid">
-          ${managed.map(p=>`<label class="permission-check"><input type="checkbox" name="operatorPage:${p.id}" ${globalAccess[p.id] !== false ? 'checked' : ''}> <span>${p.icon} ${esc(p.title)}</span></label>`).join('')}
-        </div>
-      </div>
-      <div class="permission-block">
-        <h4>Acesso específico por utilizador</h4>
-        <p class="muted">Aqui defines exatamente o que cada utilizador pode abrir. Estas permissões específicas têm prioridade sobre a regra geral.</p>
-        ${operators.length ? `<div class="permission-users">
-          ${operators.map(u=>`<div class="permission-user-row">
-            <div class="permission-user-info">
+    <form id="permissionsForm" class="permissions-form unified-permissions-form">
+      ${users.length ? users.map((u,idx)=>{
+        u.permissions = normalizeUserPermissions(u);
+        return `<details class="user-permission-accordion" ${idx===0?'open':''}>
+          <summary>
+            <div class="permission-user-summary">
               <strong>${esc(u.nome || u.email || '-')}</strong>
-              <span>${esc(u.email || '')} · ${esc(u.role || 'Operador')}</span>
+              <span>${esc(u.email || '')} · ${esc(u.role || 'Operador')} · ${esc(u.status || 'Ativo')}</span>
             </div>
-            <div class="permission-grid user-specific-grid">
-              ${managed.map(p=>`<label class="permission-check compact"><input type="checkbox" name="userPage:${u.id}:${p.id}" ${userCanOpenManagedPage(u,p.id) ? 'checked' : ''}> <span>${p.icon} ${esc(p.title)}</span></label>`).join('')}
-            </div>
-          </div>`).join('')}
-        </div>` : '<div class="empty compact">Ainda não tens operadores criados.</div>'}
-      </div>
+            <b>Permissões</b>
+          </summary>
+          <div class="user-permission-pages">
+            ${managed.map(p=>{
+              const perm = userPagePermissions(u,p.id);
+              return `<div class="page-permission-row">
+                <div class="page-permission-title">
+                  <span class="page-permission-icon">${p.icon}</span>
+                  <div><strong>${esc(p.title)}</strong><small>${esc(p.subtitle || '')}</small></div>
+                </div>
+                <div class="page-permission-actions">
+                  ${actions.map(([key,label])=>`<label class="permission-pill ${key==='delete'?'danger-pill':''}">
+                    <input type="checkbox" name="perm:${u.id}:${p.id}:${key}" ${perm[key]===true?'checked':''}>
+                    <span>${esc(label)}</span>
+                  </label>`).join('')}
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </details>`;
+      }).join('') : '<div class="empty compact">Ainda não tens utilizadores criados.</div>'}
       <div class="actions"><button class="btn primary" type="submit">Guardar permissões</button></div>
     </form>
   </div>`;
@@ -2384,7 +2373,7 @@ function config(){
     configAccordion('Geral', 'Empresa, GitHub e correção ortográfica.', generalSettingsCard(), {open:true, icon:'🏢'}),
     configAccordion('Firebase / Sincronização', 'Sincronizar e exportar dados.', firebaseSettingsCard(), {icon:'☁️'}),
     configAccordion('Diretório', 'Ordem dos armazéns e organização do diretório.', warehouseOrderSettingsCard(), {icon:'📇'}),
-    configAccordion('Utilizadores e permissões', 'Páginas visíveis, permissões finas e acessos por utilizador.', `${permissionsSettingsCard()}${actionPermissionsCard()}`, {icon:'🛡️'}),
+    configAccordion('Utilizadores e permissões', 'Permissões por utilizador, página e ação.', permissionsSettingsCard(), {icon:'🛡️'}),
     configAccordion('Auditoria', 'Histórico de ações só para Admin Master.', auditCard(), {icon:'📜'}),
     configAccordion('Backups', 'Criar, exportar e restaurar backups.', backupCard(), {icon:'💾'}),
     configAccordion('Produção / Electron', 'Checklist, produção limpa e setup final.', `${productionReadyCard()}${productionCleanCard()}${electronSetupCard()}`, {icon:'🚀'}),
@@ -2485,49 +2474,6 @@ function normalizeExcelValue(v){
   if(v instanceof Date) return v.toISOString().slice(0,10);
   return String(v).trim();
 }
-function excelSerialDateToIso(value){
-  const num = Number(value);
-  if(!Number.isFinite(num) || num < 25000 || num > 80000) return '';
-  const base = new Date(Date.UTC(1899, 11, 30));
-  base.setUTCDate(base.getUTCDate() + Math.floor(num));
-  return base.toISOString().slice(0,10);
-}
-function normalizeDateValue(value){
-  if(value === null || value === undefined || value === '') return '';
-  if(value instanceof Date) return value.toISOString().slice(0,10);
-  if(typeof value === 'number') return excelSerialDateToIso(value) || '';
-  const raw = String(value).trim();
-  if(!raw) return '';
-  if(/^\d+(\.\d+)?$/.test(raw)){
-    const serial = excelSerialDateToIso(raw);
-    if(serial) return serial;
-  }
-  const iso = raw.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
-  if(iso) return `${iso[1]}-${String(iso[2]).padStart(2,'0')}-${String(iso[3]).padStart(2,'0')}`;
-  const pt = raw.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})$/);
-  if(pt){
-    const year = pt[3].length === 2 ? `20${pt[3]}` : pt[3];
-    return `${year}-${String(pt[2]).padStart(2,'0')}-${String(pt[1]).padStart(2,'0')}`;
-  }
-  return raw;
-}
-function normalizeTimeValue(value){
-  if(value === null || value === undefined || value === '') return '';
-  if(typeof value === 'number' && value >= 0 && value < 1){
-    const total = Math.round(value * 24 * 60);
-    const h = Math.floor(total / 60);
-    const m = total % 60;
-    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-  }
-  const raw = String(value).trim().replace(/\s+/g,'');
-  if(!raw) return '';
-  const hText = raw.match(/^(\d{1,2})[hH](\d{1,2})?$/);
-  if(hText) return `${String(hText[1]).padStart(2,'0')}:${String(hText[2] || '00').padStart(2,'0')}`;
-  const hm = raw.match(/^(\d{1,2}):(\d{1,2})[hH]?$/);
-  if(hm) return `${String(hm[1]).padStart(2,'0')}:${String(hm[2]).padStart(2,'0')}`;
-  return raw;
-}
-
 function normalizeExcelHeader(v){
   return normalizeExcelValue(v)
     .toLowerCase()
@@ -2645,7 +2591,7 @@ async function importPageExcel(pageId, file){
   if(!cfg) return toast('Esta página não tem importação Excel.');
   if(!canImportExcel() || !cfg.edit || !cfg.edit()) return toast('Sem permissão para importar nesta página.');
   try {
-    const rows = await readExcelRows(file, pageId);
+    const rows = await readExcelRows(file);
     if(!rows.length) return toast('O ficheiro não tem linhas para importar.');
     const normalized = normalizeImportedRows(rows, cfg);
     const count = applyImportedRows(pageId, cfg, normalized);
@@ -2659,7 +2605,7 @@ async function importPageExcel(pageId, file){
     toast(err?.message || 'Não consegui importar esse ficheiro Excel.');
   }
 }
-async function readExcelRows(file, pageId=''){
+async function readExcelRows(file){
   const ext = (file.name.split('.').pop() || '').toLowerCase();
   if(!window.XLSX) await loadExcelLibrary();
   if(window.XLSX){
@@ -2667,34 +2613,7 @@ async function readExcelRows(file, pageId=''){
     const wb = XLSX.read(buffer, { type:'array', cellDates:true });
     const first = wb.SheetNames[0];
     if(!first) return [];
-    const sheet = wb.Sheets[first];
-
-    // A folha de Rotas que enviaste não tem cabeçalhos: começa logo com dados.
-    // Aqui detetamos esse formato e mapeamos colunas A:M manualmente.
-    if(pageId === 'rotas'){
-      const rawRows = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'', raw:true });
-      const firstRow = rawRows.find(r => (r || []).some(v => normalizeExcelValue(v) !== '')) || [];
-      const looksHeaderless = firstRow.length >= 10 && !String(firstRow[0] || '').toLowerCase().includes('viatura') && !String(firstRow[2] || '').toLowerCase().includes('data');
-      if(looksHeaderless){
-        return rawRows.map(r => ({
-          'Viatura': r[0] ?? '',
-          'Matrícula': r[1] ?? '',
-          'Data': r[2] ?? '',
-          'Pedido por': r[3] ?? '',
-          'Destino / Serviço': r[4] ?? '',
-          'Período': r[5] ?? '',
-          'Carga': r[6] ?? '',
-          'Condutor': r[7] ?? '',
-          'KM Início': r[8] ?? '',
-          'Hora Início': r[9] ?? '',
-          'KM Fim': r[10] ?? '',
-          'Hora Fim': r[11] ?? '',
-          'Observações': r[12] ?? ''
-        })).filter(row => Object.values(row).some(v => normalizeExcelValue(v) !== ''));
-      }
-    }
-
-    return XLSX.utils.sheet_to_json(sheet, { defval:'', raw:true, cellDates:true });
+    return XLSX.utils.sheet_to_json(wb.Sheets[first], { defval:'', raw:false });
   }
   if(['csv','tsv','txt'].includes(ext)){
     const text = await file.text();
@@ -2739,24 +2658,6 @@ function excelHeaderAliasesForPage(cfg){
     aliases[normalizeExcelHeader(label)] = key;
   });
 
-  if(cfg.key === 'routes'){
-    const add = (key, names)=>names.forEach(name=>aliases[normalizeExcelHeader(name)] = key);
-    add('viatura', ['Viatura','Veículo','Veiculo','Carro','Carrinha']);
-    add('matricula', ['Matrícula','Matricula','Matrícula Viatura','Matricula Viatura']);
-    add('data', ['Data','Dia','Data Serviço','Data Servico']);
-    add('pedidoPor', ['Pedido por','Pedido Por','Quem pediu','Solicitado por','Requerente']);
-    add('destino', ['Destino / Serviço','Destino','Serviço','Servico','Cliente','Local']);
-    add('periodo', ['Período','Periodo','Turno','Manhã/Tarde','Manha/Tarde']);
-    add('carga', ['Carga','Mercadoria','Paletes']);
-    add('condutor', ['Condutor','Motorista','Pessoa']);
-    add('kmInicio', ['KM Início','KM Inicio','Km Inicial','Kilómetros Início','Kms Inicial']);
-    add('horaInicio', ['Hora Início','Hora Inicio','Início','Inicio','Hora Inicial']);
-    add('kmFim', ['KM Fim','Km Final','Kilómetros Fim','Kms Final']);
-    add('horaFim', ['Hora Fim','Fim','Hora Final']);
-    add('kmPercorridos', ['KM Percorridos','Km Percorrido','Kms','Total KM']);
-    add('observacoes', ['Observações','Observacoes','Obs','Notas']);
-  }
-
   if(cfg.key === 'contactGroups'){
     const add = (key, names)=>names.forEach(name=>aliases[normalizeExcelHeader(name)] = key);
     add('armazem', ['Armazém','Armazem','Armazém / Local','Armazem / Local','Local','Localização','Localizacao','Loja','Unidade','Empresa','Grupo']);
@@ -2767,6 +2668,25 @@ function excelHeaderAliasesForPage(cfg){
     add('email', ['Email','E-mail','Mail','Correio','Correio Eletrónico','Correio Eletronico']);
     add('groupId', ['ID Secção','ID Seccao','ID Grupo','Grupo ID']);
     add('contactId', ['ID Contacto','Contacto ID','ID Pessoa']);
+  }
+
+
+  if(cfg.key === 'routes'){
+    const add = (key, names)=>names.forEach(name=>aliases[normalizeExcelHeader(name)] = key);
+    add('viatura', ['Viatura','Carro','Veículo','Veiculo','Automóvel','Automovel','Carrinha','Camião','Camiao']);
+    add('matricula', ['Matrícula','Matricula','Matricula Viatura','Matrícula Viatura','Placa']);
+    add('data', ['Data','Dia','Data Serviço','Data Servico','Data Rota']);
+    add('pedidoPor', ['Pedido por','Pedido Por','Solicitado por','Solicitado Por','Quem pediu','Quem Pediu','Pediu','Requisitante','Responsável','Responsavel']);
+    add('destino', ['Destino','Destino / Serviço','Destino / Servico','Serviço','Servico','Cliente','Local','Localização','Localizacao','Entrega','Recolha']);
+    add('periodo', ['Período','Periodo','Turno','Manhã','Manha','M/T','M T']);
+    add('carga', ['Carga','Mercadoria','Paletes','Palete','Descrição carga','Descricao carga']);
+    add('condutor', ['Condutor','Motorista','Motorista/Condutor','Entregue por','Pessoa']);
+    add('kmInicio', ['KM Início','KM Inicio','Km inicial','Km Inicial','KM Inicial','Kilómetros Início','Kilometros Inicio','Contador inicial','Contador Inicial','KM Saída','KM Saida']);
+    add('horaInicio', ['Hora Início','Hora Inicio','Hora inicial','Hora Inicial','Hora saída','Hora Saida','Início','Inicio']);
+    add('kmFim', ['KM Fim','Km final','Km Final','KM Final','Kilómetros Fim','Kilometros Fim','Contador final','Contador Final','KM Chegada']);
+    add('horaFim', ['Hora Fim','Hora final','Hora Final','Fim','Chegada','Hora chegada']);
+    add('kmPercorridos', ['KM Percorridos','Km percorridos','Quilómetros','Quilometros','Distância','Distancia','Total KM']);
+    add('observacoes', ['Observações','Observacoes','Obs','Notas','Nota']);
   }
 
   return aliases;
@@ -2798,18 +2718,82 @@ function normalizeImportedContactRow(raw){
   };
 }
 
+function parseExcelDateValue(value){
+  if(value === null || value === undefined || value === '') return '';
+  if(typeof value === 'number' && value > 30000) {
+    const date = new Date(Date.UTC(1899, 11, 30));
+    date.setUTCDate(date.getUTCDate() + Math.floor(value));
+    return date.toISOString().slice(0,10);
+  }
+  const raw = String(value || '').trim();
+  if(!raw) return '';
+  const iso = raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if(iso) return `${iso[1]}-${String(iso[2]).padStart(2,'0')}-${String(iso[3]).padStart(2,'0')}`;
+  const pt = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
+  if(pt) {
+    const year = String(pt[3]).length === 2 ? `20${pt[3]}` : pt[3];
+    return `${year}-${String(pt[2]).padStart(2,'0')}-${String(pt[1]).padStart(2,'0')}`;
+  }
+  return raw;
+}
+function parseExcelTimeValue(value){
+  if(value === null || value === undefined || value === '') return '';
+  if(typeof value === 'number') {
+    if(value >= 0 && value < 1) {
+      const total = Math.round(value * 24 * 60);
+      const h = Math.floor(total / 60);
+      const m = total % 60;
+      return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+    }
+    return String(value);
+  }
+  let raw = String(value || '').trim();
+  if(!raw) return '';
+  raw = raw.replace(/\s+/g,'').replace(/H/g,'h');
+  raw = raw.replace(/^(\d{1,2})h(\d{1,2})$/, (_,h,m)=>`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+  raw = raw.replace(/^(\d{1,2})h$/, (_,h)=>`${String(h).padStart(2,'0')}:00`);
+  raw = raw.replace(/^(\d{1,2}):(\d{1,2})h?$/, (_,h,m)=>`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+  return raw;
+}
+function parseKmValue(value){
+  const clean = String(value ?? '').replace(/\s+/g,'').replace(',','.').replace(/[^\d.-]/g,'');
+  const n = Number(clean);
+  return Number.isFinite(n) ? Math.round(n) : 0;
+}
+function normalizeImportedRouteRow(raw){
+  const r = raw || {};
+  const kmInicio = parseKmValue(r.kmInicio);
+  const kmFim = parseKmValue(r.kmFim);
+  const kmPercorridos = parseKmValue(r.kmPercorridos) || (kmInicio && kmFim && kmFim >= kmInicio ? kmFim - kmInicio : 0);
+  return {
+    id: r.id || '',
+    viatura: normalizeExcelValue(r.viatura),
+    matricula: normalizeExcelValue(r.matricula),
+    data: parseExcelDateValue(r.data),
+    pedidoPor: normalizeExcelValue(r.pedidoPor),
+    destino: normalizeExcelValue(r.destino),
+    periodo: normalizeExcelValue(r.periodo),
+    carga: normalizeExcelValue(r.carga),
+    condutor: normalizeExcelValue(r.condutor),
+    kmInicio,
+    horaInicio: parseExcelTimeValue(r.horaInicio),
+    kmFim,
+    horaFim: parseExcelTimeValue(r.horaFim),
+    kmPercorridos,
+    observacoes: normalizeExcelValue(r.observacoes)
+  };
+}
+
 function normalizeImportedRows(rows, cfg){
   const map = excelHeaderAliasesForPage(cfg);
   return rows.map(row=>{
     const obj = {};
     Object.entries(row).forEach(([header,value])=>{
       const key = map[normalizeExcelHeader(header)];
-      if(!key) return;
-      if(cfg.key === 'routes' && key === 'data') obj[key] = normalizeDateValue(value);
-      else if(cfg.key === 'routes' && (key === 'horaInicio' || key === 'horaFim')) obj[key] = normalizeTimeValue(value);
-      else obj[key] = normalizeExcelValue(value);
+      if(key) obj[key] = normalizeExcelValue(value);
     });
     if(cfg.key === 'contactGroups') return normalizeImportedContactRow(obj);
+    if(cfg.key === 'routes') return normalizeImportedRouteRow(obj);
     return obj;
   }).filter(row => Object.values(row).some(v => normalizeExcelValue(v) !== ''));
 }
@@ -2821,8 +2805,11 @@ function applyImportedRows(pageId, cfg, rows){
   }
   const target = state[cfg.key] = state[cfg.key] || [];
   rows.forEach(row=>{
+    if(pageId === 'rotas') {
+      row = normalizeRouteData(row);
+      if(!row.viatura && !row.matricula && !row.destino && !row.condutor) return;
+    }
     if(!row.id) row.id = uid(cfg.prefix || 'ROW');
-    if(pageId === 'rotas') row = normalizeRouteData(row);
     if(pageId === 'orcamentos'){
       row.quantidade = Number(row.quantidade || 0);
       row.precoUnitario = Number(String(row.precoUnitario || '0').replace(',','.'));
@@ -2832,9 +2819,10 @@ function applyImportedRows(pageId, cfg, rows){
     const index = target.findIndex(existing => (row.id && existing.id === row.id) || uniqueExcelMatch(pageId, existing, row));
     if(index >= 0) target[index] = { ...target[index], ...row };
     else target.push(row);
+    if(pageId === 'rotas') upsertVehicleFromRoute(row);
   });
   if(pageId === 'fornecedores') sortSuppliersState();
-  return rows.length;
+  return pageId === 'rotas' ? rows.filter(r => r.viatura || r.matricula || r.destino || r.condutor).length : rows.length;
 }
 function uniqueExcelMatch(pageId, existing, row){
   if(pageId === 'clientes') return row.email && existing.email === row.email || row.telefone && existing.telefone === row.telefone || row.codigoCliente && existing.codigoCliente === row.codigoCliente;
@@ -2846,6 +2834,13 @@ function uniqueExcelMatch(pageId, existing, row){
     if(rowCode && exCode) return rowCode === exCode && rowName === exName;
     if(rowName) return rowName === exName;
     return false;
+  }
+  if(pageId === 'rotas') {
+    return row.data && row.matricula && row.destino &&
+      normalizeText(existing.data) === normalizeText(row.data) &&
+      normalizeText(existing.matricula) === normalizeText(row.matricula) &&
+      normalizeText(existing.destino) === normalizeText(row.destino) &&
+      normalizeText(existing.horaInicio) === normalizeText(row.horaInicio);
   }
   if(pageId === 'users') return row.email && existing.email === row.email;
   if(pageId === 'orcamentos') return false;
@@ -3345,7 +3340,7 @@ function openEntityReadModal(type,id){
   const [key] = map[type] || [];
   const item = key ? state[key].find(x=>x.id===id) : null;
   if(!item) return;
-  const fields = Object.entries(item).filter(([k])=>!['id','pageAccess','actionAccess'].includes(k));
+  const fields = Object.entries(item).filter(([k])=>!['id','pageAccess','actionAccess','permissions'].includes(k));
   openModal('Detalhe do registo', `<div class="detail-grid">${fields.map(([k,v])=>`<div><small>${esc(k)}</small><strong>${esc(v || '-')}</strong></div>`).join('')}</div>`);
 }
 function bindFollowForm(){
@@ -3392,16 +3387,25 @@ function bindConfig(){
     if(!isAdminMaster()) return toast('Só o Admin Master pode alterar permissões.');
     const fd = new FormData(e.target);
     const managed = managedPageList();
-    const globalAccess = {};
-    managed.forEach(p=>{ globalAccess[p.id] = fd.get(`operatorPage:${p.id}`) === 'on'; });
-    state.settings = { ...(state.settings || {}), operatorPageAccess: globalAccess };
+    const actions = ['view','add','edit','delete'];
     (state.users || []).forEach(u=>{
       if((u.role || 'Operador') === 'Admin Master') return;
-      const userAccess = {};
-      managed.forEach(p=>{ userAccess[p.id] = fd.get(`userPage:${u.id}:${p.id}`) === 'on'; });
-      u.pageAccess = userAccess;
+      u.permissions = {};
+      managed.forEach(p=>{
+        u.permissions[p.id] = {};
+        actions.forEach(action=>{
+          u.permissions[p.id][action] = fd.get(`perm:${u.id}:${p.id}:${action}`) === 'on';
+        });
+      });
+      // Limpeza do sistema antigo para não haver duas permissões concorrentes.
+      u.pageAccess = {};
+      u.actionAccess = {};
     });
-    saveState();
+    if(state.settings){
+      delete state.settings.operatorPageAccess;
+      delete state.settings.operatorActionAccess;
+    }
+    saveState('Permissões por utilizador atualizadas');
     buildNav();
     refreshConfigPage('Permissões guardadas.');
   });
@@ -3562,48 +3566,8 @@ function copyText(value){
     const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('Copiado.');
   });
 }
-function actionPermissionsCard(){
-  if(!isAdminMaster()) return '';
-  const access = currentUserActionAccess();
-  const base = { ...actionAccessDefaults(), ...(state.settings?.operatorActionAccess || {}) };
-  const users = (state.users || []).filter(u => (u.role || 'Operador') !== 'Admin Master');
-  const actions = [
-    ['add','Adicionar'],['edit','Editar'],['delete','Apagar']
-  ];
-  return `<div class="card permissions-card span-all"><div class="card-head"><h3>Permissões finas</h3><span class="muted">Controla ações para operadores e exceções por utilizador.</span></div>
-    <form id="actionPermissionsForm" class="permissions-form">
-      <div class="permission-block"><h4>Regra geral para Operadores</h4><div class="permission-grid">
-        ${actions.map(([key,label])=>`<label class="permission-check"><input type="checkbox" name="operatorAction:${key}" ${base[key]===true?'checked':''}> <span>${esc(label)}</span></label>`).join('')}
-      </div></div>
-      <div class="permission-block"><h4>Acesso específico por utilizador</h4><div class="permission-users">
-        ${users.map(u=>`<div class="permission-user-row"><div class="permission-user-info"><strong>${esc(u.nome || u.email || '-')}</strong><span>${esc(u.email || '')}</span></div><div class="permission-grid user-specific-grid">
-          ${actions.map(([key,label])=>`<label class="permission-check compact"><input type="checkbox" name="userAction:${u.id}:${key}" ${u.actionAccess?.[key]===true?'checked':''}> <span>${esc(label)}</span></label>`).join('')}
-        </div></div>`).join('') || '<div class="empty compact">Sem utilizadores.</div>'}
-      </div></div>
-      <div class="actions"><button class="btn primary" type="submit">Guardar permissões finas</button></div>
-    </form></div>`;
-}
-function bindActionPermissions(){
-  const form = qs('#actionPermissionsForm');
-  if(!form) return;
-  form.addEventListener('submit', e=>{
-    e.preventDefault();
-    const fd = new FormData(form);
-    state.settings.operatorActionAccess = actionAccessDefaults();
-    ['add','edit','delete'].forEach(key=>{
-      state.settings.operatorActionAccess[key] = fd.get(`operatorAction:${key}`) === 'on';
-    });
-    (state.users || []).forEach(u=>{
-      if((u.role || 'Operador') === 'Admin Master') return;
-      u.actionAccess = u.actionAccess || {};
-      ['add','edit','delete'].forEach(key=>{
-        u.actionAccess[key] = fd.get(`userAction:${u.id}:${key}`) === 'on';
-      });
-    });
-    saveState('Permissões finas atualizadas');
-    refreshConfigPage('Permissões finas guardadas.');
-  });
-}
+function actionPermissionsCard(){ return ''; }
+function bindActionPermissions(){ /* Sistema antigo removido: permissões agora são por utilizador e página. */ }
 function auditCard(){
   if(!isAdminMaster()) return '';
   const rows = (state.auditLogs || []).slice(0,80);

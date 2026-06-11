@@ -1,6 +1,6 @@
 {
   "name": "autoparts-callcenter",
-  "version": "2.4.3",
+  "version": "2.4.1",
   "description": "App Callcenter Bragalis com visual premium e Electron com ícone e fundo de marca",
   "main": "electron/main.js",
   "scripts": {
