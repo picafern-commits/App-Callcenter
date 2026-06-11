@@ -58,6 +58,12 @@ service cloud.firestore {
     }
 
 
+    match /viaturas/{document} {
+      allow read: if signedIn();
+      allow create, update: if canOperate();
+      allow delete: if canManage();
+    }
+
     match /rotas/{document} {
       allow read: if signedIn();
       allow create, update: if canOperate();
