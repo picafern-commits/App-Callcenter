@@ -1,4 +1,4 @@
-const APP_VERSION = '2.4.8';
+const APP_VERSION = '2.4.9';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -485,9 +485,14 @@ async function loadCloudState(options = {}){
 
     let loadedRows = 0;
     let loadedCollections = 0;
-    for (const [stateKey, collectionName] of Object.entries(FIREBASE_COLLECTIONS)) {
-      if(!canLoadCollectionKey(stateKey)) continue;
+    const entries = Object.entries(FIREBASE_COLLECTIONS)
+      .filter(([stateKey]) => canLoadCollectionKey(stateKey))
+      .filter(([stateKey]) => !['auditLogs','backups'].includes(stateKey) || options.full === true);
+    const results = await Promise.all(entries.map(async ([stateKey, collectionName]) => {
       const result = await safeLoadCollection(stateKey, collectionName);
+      return [stateKey, result];
+    }));
+    results.forEach(([stateKey, result])=>{
       if(result.ok && Array.isArray(result.rows)) {
         state[stateKey] = result.rows;
         loadedRows += result.rows.length;
@@ -495,7 +500,7 @@ async function loadCloudState(options = {}){
       } else {
         state[stateKey] = Array.isArray(previousLocal[stateKey]) ? previousLocal[stateKey] : (base[stateKey] || []);
       }
-    }
+    });
 
     if (!loadedRows && !authUser.isAnonymous) {
       await migrateLegacyCloudState(base);
@@ -507,7 +512,7 @@ async function loadCloudState(options = {}){
     saveLocalOnly();
     startFirebaseListeners();
     updateFirebaseStatusBadge();
-    await flushPendingCloudSave();
+    if(options.flush === true) await flushPendingCloudSave();
     console.log(`Firebase load ok: ${loadedCollections} coleções, ${loadedRows} registos.`);
   } catch (err) {
     console.warn('Firebase load failed', err);
@@ -3464,6 +3469,33 @@ async function saveUserProfileToFirestore(user){
   await firebaseDb.collection(FIREBASE_COLLECTIONS.users).doc(user.id).set(payload, { merge:true });
   return true;
 }
+async function saveAllUserPermissionsToFirestore(users){
+  if(!firebaseReady || !firebaseDb || !firebaseAuth?.currentUser || firebaseAuth.currentUser.isAnonymous) return false;
+  const editableUsers = (users || []).filter(u => (u.role || 'Operador') !== 'Admin Master');
+  let batch = firebaseDb.batch();
+  let ops = 0;
+  editableUsers.forEach(user=>{
+    user.permissions = normalizeUserPermissions(user);
+    user.pageAccess = {};
+    user.actionAccess = {};
+    const ref = firebaseDb.collection(FIREBASE_COLLECTIONS.users).doc(user.id);
+    batch.set(ref, {
+      ...user,
+      email:String(user.email || '').toLowerCase(),
+      permissions:user.permissions,
+      pageAccess:{},
+      actionAccess:{},
+      permissionsUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      permissionsUpdatedBy: state.currentUser?.email || firebaseAuth.currentUser?.email || '',
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: state.currentUser?.email || firebaseAuth.currentUser?.email || ''
+    }, { merge:true });
+    ops++;
+  });
+  if(ops) await promiseTimeout(batch.commit(), 9000);
+  return true;
+}
+
 async function findExistingFirebaseUserProfile(email){
   if(!firebaseReady || !firebaseDb || !email) return null;
   try {
@@ -3547,9 +3579,13 @@ function bindConfig(){
     saveState(); applyTheme(); refreshConfigPage('Configurações guardadas.');
   });
   const permissionsForm = qs('#permissionsForm');
-  if(permissionsForm) permissionsForm.addEventListener('submit', e=>{
+  if(permissionsForm) permissionsForm.addEventListener('submit', async e=>{
     e.preventDefault();
     if(!isAdminMaster()) return toast('Só o Admin Master pode alterar permissões.');
+    const saveBtn = permissionsForm.querySelector('button[type="submit"]');
+    const oldText = saveBtn?.textContent || 'Guardar permissões';
+    if(saveBtn){ saveBtn.disabled = true; saveBtn.textContent = 'A guardar...'; }
+
     const fd = new FormData(e.target);
     const managed = managedPageList();
     const actions = ['view','add','edit','delete'];
@@ -3562,7 +3598,6 @@ function bindConfig(){
           u.permissions[p.id][action] = fd.get(`perm:${u.id}:${p.id}:${action}`) === 'on';
         });
       });
-      // Limpeza do sistema antigo para não haver duas permissões concorrentes.
       u.pageAccess = {};
       u.actionAccess = {};
     });
@@ -3570,15 +3605,20 @@ function bindConfig(){
       delete state.settings.operatorPageAccess;
       delete state.settings.operatorActionAccess;
     }
-    saveState('Permissões por utilizador atualizadas');
-    if(firebaseReady && firebaseAuth?.currentUser && !firebaseAuth.currentUser.isAnonymous){
-      (state.users || []).forEach(u=>{
-        if((u.role || 'Operador') !== 'Admin Master') saveUserProfileToFirestore(u).catch(err=>console.warn('Permissões user Firebase falharam', err));
-      });
-      pushCloudState({ source:'permissions-save' });
+
+    saveLocalOnly();
+    let firebaseSaved = false;
+    try {
+      firebaseSaved = await saveAllUserPermissionsToFirestore(state.users || []);
+      clearFirebaseDirty();
+    } catch(err) {
+      console.warn('Permissões Firebase falharam', err);
+      markFirebaseDirty();
     }
+
+    if(saveBtn){ saveBtn.disabled = false; saveBtn.textContent = oldText; }
     buildNav();
-    refreshConfigPage('Permissões guardadas.');
+    refreshConfigPage(firebaseSaved ? 'Permissões guardadas na Firebase.' : 'Permissões guardadas localmente. Firebase pendente.');
   });
   qsa('[data-user-perm-preset]').forEach(btn=>btn.addEventListener('click',()=>{
     const [userId, preset] = btn.dataset.userPermPreset.split(':');
