@@ -3908,3 +3908,136 @@ body.theme-dark .vehicle-mini-row span{color:var(--muted)}
     width:max-content;
   }
 }
+
+
+/* v2.4.2 - Rotas: viaturas em modais e cards completos */
+.vehicle-actions-card{
+  position:sticky;
+  top:12px;
+}
+.vehicle-clean-actions{
+  display:grid;
+  gap:10px;
+}
+.modal-actions-clean{
+  display:flex;
+  justify-content:flex-end;
+  margin-bottom:14px;
+}
+.vehicle-list-modal{
+  display:grid;
+  gap:12px;
+}
+.vehicle-list-modal .vehicle-mini-list{
+  max-height:62vh;
+}
+.full-route-card{
+  display:grid!important;
+  grid-template-columns:1fr!important;
+  gap:13px!important;
+  align-items:stretch!important;
+}
+.route-card-top{
+  display:grid;
+  grid-template-columns:minmax(180px,1fr) auto auto;
+  gap:14px;
+  align-items:center;
+}
+.route-vehicle-title strong{
+  font-size:20px!important;
+}
+.route-card-details{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:9px;
+}
+.route-card-details span{
+  display:grid;
+  gap:4px;
+  min-height:52px;
+  padding:10px 12px;
+  border-radius:14px;
+  background:rgba(20,92,151,.06);
+  border:1px solid rgba(20,92,151,.08);
+  color:var(--brand3);
+  font-weight:850;
+  overflow:hidden;
+}
+.route-card-details span b{
+  color:var(--muted);
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  font-weight:950;
+}
+.route-card-details .route-note{
+  grid-column:1 / -1;
+}
+body.theme-dark .route-card-details span{
+  background:rgba(255,255,255,.045);
+  border-color:rgba(255,255,255,.08);
+  color:var(--text);
+}
+body.theme-dark .route-card-details span b{
+  color:var(--muted);
+}
+@media(max-width:1180px){
+  .route-card-top{
+    grid-template-columns:1fr;
+  }
+  .route-card-details{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@media(max-width:680px){
+  .route-card-details{
+    grid-template-columns:1fr;
+  }
+  .vehicle-actions-card{
+    position:static;
+  }
+}
+
+
+/* v2.4.3 - Corrigir select/dropdown em dark mode */
+body.theme-dark select,
+body.theme-dark .select{
+  color:#f5f9fd!important;
+  background-color:#0f2336!important;
+  background-image:none!important;
+  border-color:rgba(255,255,255,.14)!important;
+}
+
+body.theme-dark select option,
+body.theme-dark .select option{
+  color:#0f2336!important;
+  background:#ffffff!important;
+}
+
+body.theme-dark select optgroup,
+body.theme-dark .select optgroup{
+  color:#0f2336!important;
+  background:#ffffff!important;
+}
+
+/* Firefox/Chromium fallback para menus nativos */
+html.theme-dark select,
+html.theme-dark .select{
+  color:#f5f9fd!important;
+  background-color:#0f2336!important;
+}
+html.theme-dark select option,
+html.theme-dark .select option{
+  color:#0f2336!important;
+  background:#ffffff!important;
+}
+
+/* Campos normais mantêm contraste no dark */
+body.theme-dark input,
+body.theme-dark textarea{
+  color:#f5f9fd!important;
+}
+body.theme-dark input::placeholder,
+body.theme-dark textarea::placeholder{
+  color:#8fa9bf!important;
+}

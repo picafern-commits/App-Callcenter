@@ -1,4 +1,4 @@
-const APP_VERSION = '2.4.1';
+const APP_VERSION = '2.4.3';
 const STORAGE_KEY = 'autoparts_callcenter_v1';
 const SESSION_KEY = 'autoparts_callcenter_session';
 const THEME_KEY = 'autoparts_user_theme_v1';
@@ -1846,7 +1846,7 @@ function rotas(){
   const drivers = uniqueSorted(all.map(r=>r.condutor));
   const totalKm = rows.reduce((sum,r)=>sum + routeKm(r), 0);
   const addCard = canEdit ? `<div class="routes-left-column">
-    <div class="card compact-form-card clean-side-card">
+    <div class="card compact-form-card clean-side-card route-create-card">
       <div class="card-head clean-card-head"><div><h3>Nova rota</h3><span class="muted">Escolhe a viatura e a matrícula entra sozinha</span></div></div>
       <form id="routeForm" class="simple-stack-form route-form">
         <select class="select" name="viatura" id="routeVehicleSelect" required>
@@ -1870,16 +1870,12 @@ function rotas(){
       </form>
     </div>
 
-    <div class="card compact-form-card clean-side-card vehicle-file-card">
-      <div class="card-head clean-card-head"><div><h3>Ficha viatura</h3><span class="muted">Criar viatura para usar no select</span></div></div>
-      <form id="vehicleForm" class="simple-stack-form vehicle-form">
-        <input class="field" name="viatura" placeholder="Nome da viatura" required>
-        <input class="field" name="matricula" placeholder="Matrícula" required>
-        <div class="mini-two-fields"><input class="field" name="marca" placeholder="Marca"><input class="field" name="modelo" placeholder="Modelo"></div>
-        <textarea name="observacoes" placeholder="Observações"></textarea>
-        <button class="btn primary full" type="submit">Guardar viatura</button>
-      </form>
-      ${vehiclesMiniTable()}
+    <div class="card compact-form-card clean-side-card vehicle-actions-card">
+      <div class="card-head clean-card-head"><div><h3>Viaturas</h3><span class="muted">${routeVehicles().length} ficha(s) guardada(s)</span></div></div>
+      <div class="vehicle-clean-actions">
+        <button class="btn primary full" id="addVehicleBtn" type="button">Adicionar Viatura</button>
+        <button class="btn ghost full" id="vehicleListBtn" type="button">Ver lista de viaturas</button>
+      </div>
     </div>
   </div>` : '';
   return `<div class="grid ${canEdit ? 'two split-form-list clean-page-layout routes-layout' : 'single-list'} routes-page clean-module-page">
@@ -1936,25 +1932,30 @@ function filterRoutes(){
 function routesTable(rows){
   if(!rows.length) return '<div class="empty">Sem rotas encontradas.</div>';
   return `<div class="clean-card-list routes-card-list">${rows.map(r=>`
-    <article class="clean-data-card route-data-card">
-      <div class="data-card-main">
-        <strong>${esc(r.viatura || '-')}</strong>
-        <small>${esc(r.matricula || '')} · ${esc(formatDatePt(r.data))}</small>
+    <article class="clean-data-card route-data-card full-route-card">
+      <div class="route-card-top">
+        <div class="data-card-main route-vehicle-title">
+          <strong>${esc(r.viatura || '-')}</strong>
+          <small>${esc(r.matricula || 'Sem matrícula')} · ${esc(formatDatePt(r.data))}</small>
+        </div>
+        <div class="card-code-center">
+          <span class="data-card-code big-visible-code">${routeKm(r)} km</span>
+        </div>
+        <div class="actions data-card-actions">
+          ${canEditOperational()?`<button class="btn small ghost" data-edit-route="${r.id}">${ICONS.edit}<span>Editar</span></button>`:'<span class="muted">Consulta</span>'}
+          ${canDelete()?`<button class="btn danger small" data-delete-route="${r.id}">Apagar</button>`:''}
+        </div>
       </div>
-      <div class="route-destination-box">
-        <b>${esc(r.destino || '-')}</b>
-        <span>${esc(r.pedidoPor || '-')} · ${esc(r.periodo || '-')} · ${esc(r.carga || '-')}</span>
-      </div>
-      <div class="route-driver-box">
-        <span class="badge blue">${esc(r.condutor || 'Sem condutor')}</span>
-        <small>${esc(r.horaInicio || '-')} → ${esc(r.horaFim || '-')}</small>
-      </div>
-      <div class="card-code-center">
-        <span class="data-card-code big-visible-code">${routeKm(r)} km</span>
-      </div>
-      <div class="actions data-card-actions">
-        ${canEditOperational()?`<button class="btn small ghost" data-edit-route="${r.id}">${ICONS.edit}<span>Editar</span></button>`:'<span class="muted">Consulta</span>'}
-        ${canDelete()?`<button class="btn danger small" data-delete-route="${r.id}">Apagar</button>`:''}
+      <div class="route-card-details">
+        <span><b>Destino</b>${esc(r.destino || '-')}</span>
+        <span><b>Pedido por</b>${esc(r.pedidoPor || '-')}</span>
+        <span><b>Condutor</b>${esc(r.condutor || '-')}</span>
+        <span><b>Período</b>${esc(r.periodo || '-')}</span>
+        <span><b>Carga</b>${esc(r.carga || '-')}</span>
+        <span><b>Horas</b>${esc(r.horaInicio || '-')} → ${esc(r.horaFim || '-')}</span>
+        <span><b>KM inicial</b>${esc(r.kmInicio || '-')}</span>
+        <span><b>KM final</b>${esc(r.kmFim || '-')}</span>
+        ${r.observacoes ? `<span class="route-note"><b>Obs.</b>${esc(r.observacoes)}</span>` : ''}
       </div>
     </article>`).join('')}</div>`;
 }
@@ -1988,19 +1989,8 @@ function bindRoutes(){
     saveState(); renderPage('rotas'); toast('Rota guardada.');
   });
 
-  const vehicleForm = qs('#vehicleForm');
-  if(vehicleForm) vehicleForm.addEventListener('submit',e=>{
-    e.preventDefault();
-    if(!canEditOperational()) return toast('Sem permissão para guardar viaturas.');
-    const data = Object.fromEntries(new FormData(e.target).entries());
-    state.vehicles = Array.isArray(state.vehicles) ? state.vehicles : [];
-    const cleanName = String(data.viatura || '').trim();
-    const existing = state.vehicles.find(v=>normalizeText(v.viatura)===normalizeText(cleanName) || (data.matricula && normalizeText(v.matricula)===normalizeText(data.matricula)));
-    const payload = { id: existing?.id || uid('VEI'), viatura:cleanName, matricula:String(data.matricula||'').trim(), marca:String(data.marca||'').trim(), modelo:String(data.modelo||'').trim(), observacoes:String(data.observacoes||'').trim() };
-    if(existing) Object.assign(existing, payload);
-    else state.vehicles.push(payload);
-    saveState(); renderPage('rotas'); toast('Viatura guardada.');
-  });
+  qs('#addVehicleBtn')?.addEventListener('click',()=>openVehicleModal());
+  qs('#vehicleListBtn')?.addEventListener('click',()=>openVehicleListModal());
 
   bindRouteActions();
   bindVehicleActions();
@@ -2036,25 +2026,58 @@ function bindVehicleActions(){
   qsa('[data-delete-vehicle]').forEach(btn=>btn.addEventListener('click',()=>{
     if(!canDelete()) return toast('Sem permissão para apagar.');
     state.vehicles = (state.vehicles || []).filter(v=>v.id!==btn.dataset.deleteVehicle);
-    saveState(); renderPage('rotas'); toast('Viatura apagada.');
+    saveState();
+    closeModal();
+    renderPage('rotas');
+    toast('Viatura apagada.');
   }));
   qsa('[data-edit-vehicle]').forEach(btn=>btn.addEventListener('click',()=>openVehicleModal(btn.dataset.editVehicle)));
 }
-function openVehicleModal(id){
-  const v = (state.vehicles || []).find(x=>x.id===id);
-  if(!v) return;
-  openModal('Editar viatura', `<form id="editVehicleForm" class="form-grid">
+function openVehicleListModal(){
+  openModal('Lista de viaturas', `<div class="vehicle-list-modal">
+    <div class="modal-actions-clean">
+      ${canEditOperational()?`<button class="btn primary" type="button" id="modalAddVehicleBtn">Adicionar Viatura</button>`:''}
+    </div>
+    ${vehiclesMiniTable()}
+  </div>`);
+  qs('#modalAddVehicleBtn')?.addEventListener('click',()=>openVehicleModal());
+  bindVehicleActions();
+}
+function vehicleFormHtml(v={}){
+  return `<form id="editVehicleForm" class="form-grid">
     <input class="field" name="viatura" placeholder="Nome da viatura" value="${esc(v.viatura||'')}" required>
     <input class="field" name="matricula" placeholder="Matrícula" value="${esc(v.matricula||'')}" required>
     <input class="field" name="marca" placeholder="Marca" value="${esc(v.marca||'')}">
     <input class="field" name="modelo" placeholder="Modelo" value="${esc(v.modelo||'')}">
     <textarea class="span3" name="observacoes" placeholder="Observações">${esc(v.observacoes||'')}</textarea>
     <div class="span3"><button class="btn primary">Guardar viatura</button></div>
-  </form>`);
+  </form>`;
+}
+function openVehicleModal(id=''){
+  const existing = id ? (state.vehicles || []).find(x=>x.id===id) : null;
+  openModal(existing ? 'Editar viatura' : 'Adicionar viatura', vehicleFormHtml(existing || {}));
   qs('#editVehicleForm').addEventListener('submit',e=>{
     e.preventDefault();
-    Object.assign(v, Object.fromEntries(new FormData(e.target).entries()));
-    saveState(); closeModal(); renderPage('rotas'); toast('Viatura atualizada.');
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    state.vehicles = Array.isArray(state.vehicles) ? state.vehicles : [];
+    const cleanName = String(data.viatura || '').trim();
+    const cleanPlate = String(data.matricula || '').trim();
+    const duplicate = state.vehicles.find(v => v.id !== id && (normalizeText(v.viatura) === normalizeText(cleanName) || (cleanPlate && normalizeText(v.matricula) === normalizeText(cleanPlate))));
+    const payload = {
+      id: existing?.id || duplicate?.id || uid('VEI'),
+      viatura: cleanName,
+      matricula: cleanPlate,
+      marca: String(data.marca || '').trim(),
+      modelo: String(data.modelo || '').trim(),
+      observacoes: String(data.observacoes || '').trim()
+    };
+    if(existing) Object.assign(existing, payload);
+    else if(duplicate) Object.assign(duplicate, payload);
+    else state.vehicles.push(payload);
+    saveState();
+    closeModal();
+    renderPage('rotas');
+    toast(existing ? 'Viatura atualizada.' : 'Viatura adicionada.');
   });
 }
 
