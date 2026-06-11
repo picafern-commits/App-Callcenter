@@ -1,4 +1,4 @@
-const APP_VERSION = '2.4.2';
+const APP_VERSION = '2.4.5';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -362,9 +362,22 @@ async function pushCloudState(options = {}){
   }
 }
 function canSyncCollectionKey(stateKey){
-  if(stateKey === 'users') return hasPermission('manageUsers');
-  if(stateKey === 'auditLogs' || stateKey === 'backups') return hasPermission('manageSettings');
-  return hasPermission('createOperational') || hasPermission('editAll') || canAction('add') || canAction('edit') || isAdminMaster();
+  if(isAdminMaster()) return true;
+  if(stateKey === 'users') return false;
+  if(stateKey === 'auditLogs' || stateKey === 'backups') return false;
+  const pageByKey = {
+    clients:'clientes',
+    suppliers:'fornecedores',
+    quotes:'orcamentos',
+    routes:'rotas',
+    vehicles:'rotas',
+    followups:'agenda',
+    stock:'stock',
+    contactGroups:'contactos',
+    calls:'pedidos'
+  };
+  const pageId = pageByKey[stateKey] || currentPage;
+  return canAction('add', pageId) || canAction('edit', pageId) || canAction('delete', pageId);
 }
 function canLoadCollectionKey(stateKey){
   // Coleções administrativas podem estar bloqueadas nas rules.
@@ -405,7 +418,7 @@ async function saveFirebaseCollections(){
   for (const [stateKey, collectionName] of Object.entries(FIREBASE_COLLECTIONS)) {
     if (!canSyncCollectionKey(stateKey)) continue;
     try {
-      await syncCollection(collectionName, state[stateKey] || [], canDelete());
+      await syncCollection(collectionName, state[stateKey] || [], isAdminMaster() || canSyncCollectionKey(stateKey));
     } catch(err) {
       errors.push([collectionName, err]);
       console.warn(`Firebase save failed for ${collectionName}`, err);
@@ -490,6 +503,7 @@ async function loadCloudState(options = {}){
     }
 
     cloudReadOnlyMode = !!authUser.isAnonymous || !!options.readOnly;
+    state = ensureStateShape(state);
     syncCurrentUserName();
     saveLocalOnly();
     startFirebaseListeners();
@@ -656,6 +670,7 @@ function fullPermissionDefaults(){
 function normalizeUserPermissions(user){
   const managed = managedPageList();
   const source = user?.permissions || {};
+  const hasNewPermissions = Object.keys(source || {}).length > 0;
   const oldPageAccess = user?.pageAccess || {};
   const oldActionAccess = user?.actionAccess || {};
   const migrated = {};
@@ -663,7 +678,9 @@ function normalizeUserPermissions(user){
     const existing = source[p.id] || {};
     const oldView = hasOwn(oldPageAccess, p.id) ? oldPageAccess[p.id] === true : true;
     migrated[p.id] = {
-      view: hasOwn(existing,'view') ? existing.view === true : oldView,
+      // Se ainda não houver permissões gravadas para este user, deixa a página visível.
+      // Depois de guardares permissões, o campo view passa a mandar.
+      view: hasOwn(existing,'view') ? existing.view === true : (hasNewPermissions ? false : oldView),
       add: hasOwn(existing,'add') ? existing.add === true : oldActionAccess.add === true,
       edit: hasOwn(existing,'edit') ? existing.edit === true : oldActionAccess.edit === true,
       delete: hasOwn(existing,'delete') ? existing.delete === true : oldActionAccess.delete === true
@@ -1620,9 +1637,8 @@ function users(){
   const isAdmin = isAdminMaster();
   const firebaseUser = firebaseAuth?.currentUser;
   const firebaseSessionOk = Boolean(firebaseReady && firebaseUser && !firebaseUser.isAnonymous);
-  const statusBadge = !firebaseReady
-    ? '<span class="badge orange">Firebase indisponível</span>'
-    : (firebaseSessionOk ? '<span class="badge green">Sessão Firebase ativa</span>' : '<span class="badge orange">Sem login Firebase</span>');
+  const fbStatus = firebaseStatus();
+  const statusBadge = `<span class="badge ${firebaseSessionOk ? 'green' : (firebaseReady ? 'orange' : 'orange')}">${esc(fbStatus)}</span>`;
   return `<div class="grid two users-page">
     <div class="card user-create-card">
       <div class="card-head">
@@ -1634,7 +1650,7 @@ function users(){
       </div>
       ${isAdmin ? `
         ${!firebaseSessionOk ? `<div class="readonly-note firebase-warning-note">
-          Para criar utilizadores diretamente na Firebase, entra primeiro na app com a tua conta Firebase Admin Master.
+          Para criar utilizadores diretamente na Firebase, entra primeiro na app com a tua conta Firebase Admin Master e confirma que aparece Firebase ligado.
           Se ainda não tens conta Admin Master, usa "Criar conta" no Login com o email pica.fern@gmail.com.
         </div>` : ''}
         <form id="createUserForm" class="form-grid user-create-form">
@@ -1901,6 +1917,13 @@ function rotas(){
         <input id="routeDateFrom" class="field" type="date" title="Data inicial">
         <input id="routeDateTo" class="field" type="date" title="Data final">
       </div>
+      ${isAdminMaster() && all.length ? `<div class="route-danger-zone">
+        <div>
+          <strong>Zona de segurança</strong>
+          <span>Apaga todos os registos de rotas. Só Admin Master.</span>
+        </div>
+        <button class="btn danger" id="deleteAllRoutesBtn" type="button">Apagar todos os registos</button>
+      </div>` : ''}
       <div id="routesTable">${routesTable(rows)}</div>
     </div>
   </div>`;
@@ -1997,6 +2020,9 @@ function bindRoutes(){
     saveState(); renderPage('rotas'); toast('Viatura guardada.');
   });
 
+  const deleteAllRoutesBtn = qs('#deleteAllRoutesBtn');
+  if(deleteAllRoutesBtn) deleteAllRoutesBtn.addEventListener('click', openDeleteAllRoutesModal);
+
   bindRouteActions();
   bindVehicleActions();
 }
@@ -2022,6 +2048,44 @@ function normalizeRouteData(data){
     observacoes:String(data.observacoes || '').trim()
   };
 }
+function openDeleteAllRoutesModal(){
+  if(!isAdminMaster()) return toast('Só o Admin Master pode apagar todos os registos.');
+  const total = (state.routes || []).length;
+  if(!total) return toast('Não existem rotas para apagar.');
+  openModal('Apagar todos os registos de rotas', `<div class="danger-confirm-box">
+    <div class="danger-confirm-icon">⚠️</div>
+    <div>
+      <h3>Esta ação apaga ${total} registo(s) de rotas.</h3>
+      <p>As fichas de viaturas ficam guardadas. Só serão apagados os registos da página Rotas.</p>
+      <p>Para confirmar, escreve exatamente:</p>
+      <code>APAGAR ROTAS</code>
+    </div>
+  </div>
+  <form id="deleteAllRoutesForm" class="form-grid">
+    <input class="field span3" name="confirmText" placeholder="Escreve APAGAR ROTAS" autocomplete="off" required>
+    <label class="checkline span3"><input type="checkbox" name="confirmCheck"> Confirmo que quero apagar todos os registos de rotas.</label>
+    <div class="span3 actions">
+      <button class="btn ghost" type="button" id="cancelDeleteAllRoutesBtn">Cancelar</button>
+      <button class="btn danger" type="submit">Apagar definitivamente</button>
+    </div>
+  </form>`);
+  qs('#cancelDeleteAllRoutesBtn')?.addEventListener('click', closeModal);
+  qs('#deleteAllRoutesForm')?.addEventListener('submit', async e=>{
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    if(String(data.confirmText || '').trim() !== 'APAGAR ROTAS') return toast('Confirmação incorreta.');
+    if(data.confirmCheck !== 'on') return toast('Tens de marcar a confirmação.');
+    state.routes = [];
+    saveState('Todos os registos de rotas apagados');
+    if(firebaseReady && firebaseAuth?.currentUser && !firebaseAuth.currentUser.isAnonymous){
+      await pushCloudState({ source:'delete-all-routes' });
+    }
+    closeModal();
+    renderPage('rotas');
+    toast('Todos os registos de rotas foram apagados.');
+  });
+}
+
 function bindRouteActions(){
   qsa('[data-delete-route]').forEach(btn=>btn.addEventListener('click',()=>{
     if(!canDelete()) return toast('Sem permissão para apagar.');
@@ -2112,7 +2176,7 @@ function permissionsSettingsCard(){
   const managed = managedPageList();
   const users = (state.users || []).filter(u => (u.role || 'Operador') !== 'Admin Master');
   const actions = [
-    ['view','Ver'],
+    ['view','Visível'],
     ['add','Adicionar'],
     ['edit','Editar'],
     ['delete','Apagar']
@@ -2121,31 +2185,37 @@ function permissionsSettingsCard(){
     <div class="card-head">
       <div>
         <h3>Permissões por utilizador</h3>
-        <span class="muted">Sistema único: escolhe o utilizador e define Ver / Adicionar / Editar / Apagar por página.</span>
+        <span class="muted">Para esconder uma página a um user, tira o visto em <b>Visível</b>. Também podes usar “Esconder tudo”.</span>
       </div>
     </div>
     <form id="permissionsForm" class="permissions-form unified-permissions-form">
       ${users.length ? users.map((u,idx)=>{
         u.permissions = normalizeUserPermissions(u);
-        return `<details class="user-permission-accordion" ${idx===0?'open':''}>
+        const hiddenCount = managed.filter(p=>!userPagePermissions(u,p.id).view).length;
+        return `<details class="user-permission-accordion" data-permission-user="${u.id}" ${idx===0?'open':''}>
           <summary>
             <div class="permission-user-summary">
               <strong>${esc(u.nome || u.email || '-')}</strong>
               <span>${esc(u.email || '')} · ${esc(u.role || 'Operador')} · ${esc(u.status || 'Ativo')}</span>
             </div>
-            <b>Permissões</b>
+            <b>${hiddenCount ? `${hiddenCount} escondida(s)` : 'Permissões'}</b>
           </summary>
+          <div class="permission-user-tools">
+            <button class="btn small ghost" type="button" data-user-perm-preset="${u.id}:readonly">Só consulta</button>
+            <button class="btn small" type="button" data-user-perm-preset="${u.id}:all">Acesso total</button>
+            <button class="btn danger-soft small" type="button" data-user-perm-preset="${u.id}:hidden">Esconder tudo</button>
+          </div>
           <div class="user-permission-pages">
             ${managed.map(p=>{
               const perm = userPagePermissions(u,p.id);
-              return `<div class="page-permission-row">
+              return `<div class="page-permission-row ${perm.view ? '' : 'page-hidden-row'}" data-permission-row="${u.id}:${p.id}">
                 <div class="page-permission-title">
                   <span class="page-permission-icon">${p.icon}</span>
-                  <div><strong>${esc(p.title)}</strong><small>${esc(p.subtitle || '')}</small></div>
+                  <div><strong>${esc(p.title)}</strong><small>${perm.view ? esc(p.subtitle || '') : 'Escondida para este utilizador'}</small></div>
                 </div>
                 <div class="page-permission-actions">
-                  ${actions.map(([key,label])=>`<label class="permission-pill ${key==='delete'?'danger-pill':''}">
-                    <input type="checkbox" name="perm:${u.id}:${p.id}:${key}" ${perm[key]===true?'checked':''}>
+                  ${actions.map(([key,label])=>`<label class="permission-pill ${key==='view'?'visible-pill':''} ${key==='delete'?'danger-pill':''}">
+                    <input type="checkbox" name="perm:${u.id}:${p.id}:${key}" data-permission-input="${key}" ${perm[key]===true?'checked':''}>
                     <span>${esc(label)}</span>
                   </label>`).join('')}
                 </div>
@@ -3426,9 +3496,54 @@ function bindConfig(){
       delete state.settings.operatorActionAccess;
     }
     saveState('Permissões por utilizador atualizadas');
+    if(firebaseReady && firebaseAuth?.currentUser && !firebaseAuth.currentUser.isAnonymous){
+      (state.users || []).forEach(u=>{
+        if((u.role || 'Operador') !== 'Admin Master') saveUserProfileToFirestore(u).catch(err=>console.warn('Permissões user Firebase falharam', err));
+      });
+      pushCloudState({ source:'permissions-save' });
+    }
     buildNav();
     refreshConfigPage('Permissões guardadas.');
   });
+  qsa('[data-user-perm-preset]').forEach(btn=>btn.addEventListener('click',()=>{
+    const [userId, preset] = btn.dataset.userPermPreset.split(':');
+    const panel = qs(`[data-permission-user="${userId}"]`);
+    if(!panel) return;
+    const rows = panel.querySelectorAll('[data-permission-row]');
+    rows.forEach(row=>{
+      const checks = {
+        view: row.querySelector('[data-permission-input="view"]'),
+        add: row.querySelector('[data-permission-input="add"]'),
+        edit: row.querySelector('[data-permission-input="edit"]'),
+        delete: row.querySelector('[data-permission-input="delete"]')
+      };
+      if(preset === 'hidden'){
+        Object.values(checks).forEach(input=>{ if(input) input.checked = false; });
+      }
+      if(preset === 'readonly'){
+        if(checks.view) checks.view.checked = true;
+        ['add','edit','delete'].forEach(k=>{ if(checks[k]) checks[k].checked = false; });
+      }
+      if(preset === 'all'){
+        Object.values(checks).forEach(input=>{ if(input) input.checked = true; });
+      }
+      const hidden = !checks.view?.checked;
+      row.classList.toggle('page-hidden-row', hidden);
+      const small = row.querySelector('.page-permission-title small');
+      if(small) small.textContent = hidden ? 'Escondida para este utilizador' : small.textContent.replace('Escondida para este utilizador','');
+    });
+    toast(preset === 'hidden' ? 'Páginas marcadas para esconder. Clica em Guardar permissões.' : 'Permissões ajustadas. Clica em Guardar permissões.');
+  }));
+  qsa('[data-permission-input="view"]').forEach(input=>input.addEventListener('change',()=>{
+    const row = input.closest('[data-permission-row]');
+    row?.classList.toggle('page-hidden-row', !input.checked);
+    if(!input.checked){
+      row?.querySelectorAll('[data-permission-input]').forEach(chk=>{
+        if(chk !== input) chk.checked = false;
+      });
+    }
+  }));
+
   qsa('[data-warehouse-up]').forEach(btn=>btn.addEventListener('click',()=>{
     if(!isAdminMaster()) return toast('Só o Admin Master pode alterar a ordem.');
     moveWarehouse(btn.dataset.warehouseUp, -1);
