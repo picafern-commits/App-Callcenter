@@ -1,4 +1,4 @@
-const APP_VERSION = '2.4.9';
+const APP_VERSION = '2.5.0';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -180,14 +180,9 @@ function seedData() {
 }
 
 function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const base = seedData();
-    if (!raw) return ensureStateShape(base);
-    return ensureStateShape({ ...base, ...JSON.parse(raw) });
-  } catch {
-    return ensureStateShape(seedData());
-  }
+  // Firebase-only: não carregamos dados da app do localStorage.
+  // O estado real vem sempre da Firestore depois do login Firebase.
+  return ensureStateShape(seedData());
 }
 function ensureStateShape(appState){
   const base = seedData();
@@ -228,7 +223,6 @@ function restoreStoredSession(){
   const stored = getStoredSession();
   if(stored?.email) {
     state.currentUser = { email: stored.email, name: stored.name || userNameFromEmail(stored.email) || String(stored.email).split('@')[0], nome: stored.name || userNameFromEmail(stored.email) || String(stored.email).split('@')[0] };
-    saveLocalOnly();
     return true;
   }
   if(state.currentUser?.email) {
@@ -283,9 +277,14 @@ function updateFirebaseStatusBadge(){
 }
 
 function saveState(action='Alteração guardada'){
+  if(!hasWritableFirebaseSession()){
+    toast('Sem Firebase ativo. Nada foi gravado.');
+    updateFirebaseStatusBadge();
+    return false;
+  }
   addAuditLog(action, currentPage || getDefaultPage());
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   scheduleCloudSave();
+  return true;
 }
 function addAuditLog(action, page=currentPage, details=''){
   try {
@@ -302,14 +301,17 @@ function addAuditLog(action, page=currentPage, details=''){
     state.auditLogs = state.auditLogs.slice(0, 300);
   } catch(err) { console.warn('Audit failed', err); }
 }
-function saveLocalOnly(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function saveLocalOnly(){
+  // Firebase-only: não guardar dados da app localmente.
+  // Tema/resolução/sessão continuam em chaves próprias, mas dados ficam só na Firestore.
+}
 function appIsVisible(){ return !qs('#appShell')?.classList.contains('hidden'); }
 function firebaseStatus(){
   if (!firebaseReady) return 'Firebase offline';
   if(!firebaseAuth?.currentUser) return 'Sem login Firebase';
   if(firebaseAuth.currentUser.isAnonymous || cloudReadOnlyMode) return 'Firebase leitura';
   if(cloudSaveInProgress) return 'Firebase a guardar';
-  if(localStorage.getItem('bragalis_firebase_dirty_v1') === '1' || cloudSavePending) return 'Firebase pendente';
+  if(cloudSavePending) return 'Firebase pendente';
   return 'Firebase ligado';
 }
 function hasWritableFirebaseSession(){
@@ -317,19 +319,17 @@ function hasWritableFirebaseSession(){
 }
 function markFirebaseDirty(){
   cloudSavePending = true;
-  try { localStorage.setItem('bragalis_firebase_dirty_v1', '1'); } catch {}
 }
 function clearFirebaseDirty(){
   cloudSavePending = false;
-  try { localStorage.removeItem('bragalis_firebase_dirty_v1'); } catch {}
 }
 function scheduleCloudSave(){
   markFirebaseDirty();
   clearTimeout(cloudSaveTimer);
-  cloudSaveTimer = setTimeout(()=>pushCloudState({ source:'autosave' }), 650);
+  cloudSaveTimer = setTimeout(()=>pushCloudState({ source:'autosave' }), 450);
 }
 async function flushPendingCloudSave(){
-  if((localStorage.getItem('bragalis_firebase_dirty_v1') === '1' || cloudSavePending) && hasWritableFirebaseSession()) {
+  if(cloudSavePending && hasWritableFirebaseSession()) {
     await pushCloudState({ source:'flush' });
   }
 }
@@ -354,7 +354,7 @@ async function pushCloudState(options = {}){
     markFirebaseDirty();
     console.warn('Firebase save failed', err);
     const code = err?.code ? ` (${err.code})` : '';
-    if(options.source !== 'autosave') toast(`Guardado localmente. Firebase não gravou${code}.`);
+    toast(`Erro Firebase: nada foi gravado${code}.`);
     return false;
   } finally {
     cloudSaveInProgress = false;
@@ -498,7 +498,7 @@ async function loadCloudState(options = {}){
         loadedRows += result.rows.length;
         loadedCollections++;
       } else {
-        state[stateKey] = Array.isArray(previousLocal[stateKey]) ? previousLocal[stateKey] : (base[stateKey] || []);
+        state[stateKey] = base[stateKey] || [];
       }
     });
 
@@ -509,7 +509,6 @@ async function loadCloudState(options = {}){
     cloudReadOnlyMode = !!authUser.isAnonymous || !!options.readOnly;
     state = ensureStateShape(state);
     syncCurrentUserName();
-    saveLocalOnly();
     startFirebaseListeners();
     updateFirebaseStatusBadge();
     if(options.flush === true) await flushPendingCloudSave();
@@ -756,20 +755,7 @@ function showApp(){
 
 
 async function autoConnectFirebaseForLocalSession(){
-  if(!firebaseReady || !firebaseAuth || firebaseAuth.currentUser) return false;
-  const stored = getStoredSession();
-  const hasSession = !!(stored?.email || state.currentUser?.email);
-  if(!hasSession) return false;
-  try {
-    await ensureFirebaseReadForLocalSession();
-    if(firebaseAuth.currentUser) {
-      await loadCloudState({ readOnly: firebaseAuth.currentUser.isAnonymous });
-      updateFirebaseStatusBadge();
-      return true;
-    }
-  } catch(err){
-    console.warn('Firebase auto connect failed', err);
-  }
+  // Firebase-only: não usar login anónimo/read-only para trabalhar.
   return false;
 }
 
@@ -786,10 +772,8 @@ async function init(){
     firebaseAuth.onAuthStateChanged(async user => {
       if (user) {
         if(user.isAnonymous) {
-          await loadCloudState({ readOnly:true });
-          const stored = getStoredSession();
-          if(stored?.email && !state.currentUser?.email) state.currentUser = { email: stored.email, name: stored.name || userNameFromEmail(stored.email) || String(stored.email).split('@')[0], nome: stored.name || userNameFromEmail(stored.email) || String(stored.email).split('@')[0] };
-          if(stored?.email && !appIsVisible() && !isLoginPage()) showApp();
+          await firebaseAuth.signOut().catch(()=>{});
+          toast('Login Firebase obrigatório.');
           return;
         }
         await loadCloudState();
@@ -797,7 +781,6 @@ async function init(){
           upsertAppUser({ ...pendingSignupUser, id:user.uid });
           syncCurrentUserName();
           pendingSignupUser = null;
-          saveLocalOnly();
         }
         if(!userIsActive()) {
           clearStoredSession();
@@ -816,7 +799,6 @@ async function init(){
         // Sem user Firebase real, não abrimos a app em modo local.
         // Isto evita gravar alterações só no browser/Electron sem sincronizar.
         state.currentUser = null;
-        saveLocalOnly();
         updateFirebaseStatusBadge();
         if(!isLoginPage()) { redirectToLogin(); return; }
         qs('#appShell')?.classList.add('hidden');
@@ -827,15 +809,12 @@ async function init(){
     return;
   }
 
-  // Só deixamos a app abrir sem Firebase se a biblioteca Firebase nem sequer carregou.
-  // Mesmo assim, mostra aviso para não parecer sincronizada.
-  if(state.currentUser || hasLocalSession) {
-    showApp();
-    toast('Firebase indisponível. App em modo local temporário.');
-  } else {
-    if(!isLoginPage()) { redirectToLogin(); return; }
-    document.body.classList.remove('auth-boot');
-  }
+  // Firebase-only: se Firebase não carregou, não abrimos a app em modo local.
+  state.currentUser = null;
+  if(!isLoginPage()) { redirectToLogin(); return; }
+  document.body.classList.remove('auth-boot');
+  toast('Firebase offline. A app precisa de Firebase para funcionar.');
+
 }
 
 function restoreLogin(){
@@ -3347,24 +3326,14 @@ function promiseTimeout(promise, ms=6500){
   ]);
 }
 async function approveUserSafely(user){
+  if(!hasWritableFirebaseSession()) throw new Error('firebase-required');
   user.status = 'Ativo';
   user.approvedAt = new Date().toISOString();
   user.approvedBy = state.currentUser?.email || firebaseAuth?.currentUser?.email || '';
   upsertAppUser(user);
-  saveLocalOnly();
-  try {
-    if(firebaseReady && firebaseAuth?.currentUser && !firebaseAuth.currentUser.isAnonymous && firebaseDb) {
-      await promiseTimeout(saveUserProfileToFirestore(user), 6500);
-      clearFirebaseDirty();
-      return { firebase:true };
-    }
-    markFirebaseDirty();
-    return { firebase:false };
-  } catch(err) {
-    console.warn('Approve user Firebase failed', err);
-    markFirebaseDirty();
-    return { firebase:false, error:err };
-  }
+  await promiseTimeout(saveUserProfileToFirestore(user), 6500);
+  clearFirebaseDirty();
+  return { firebase:true };
 }
 
 function bindUsersPage(){
@@ -3376,9 +3345,12 @@ function bindUsersPage(){
     btn.disabled = true;
     btn.textContent = 'A aprovar...';
     try {
-      const result = await approveUserSafely(user);
+      await approveUserSafely(user);
       renderPage('users');
-      toast(result.firebase ? 'Conta aprovada e gravada na Firebase.' : 'Conta aprovada localmente. Firebase fica pendente para sincronizar.');
+      toast('Conta aprovada e gravada na Firebase.');
+    } catch(err) {
+      console.warn('Aprovação Firebase falhou', err);
+      toast('Não foi possível aprovar: Firebase obrigatório.');
     } finally {
       btn.disabled = false;
       btn.textContent = originalText || 'Aprovar';
@@ -3413,7 +3385,6 @@ function bindUsersPage(){
       if(result?.uid) user.id = result.uid;
       upsertAppUser(user);
       await saveUserProfileToFirestore(user);
-      saveState('Utilizador criado na app');
       renderPage('users');
       toast(result?.authCreated ? 'Conta Firebase criada e perfil guardado.' : 'Perfil guardado. Email já existia no Auth ou foi criado localmente.');
     } catch (err) {
@@ -3423,7 +3394,6 @@ function bindUsersPage(){
         if(existing?.id) user.id = existing.id;
         upsertAppUser(user);
         await saveUserProfileToFirestore(user);
-        saveState('Perfil de utilizador atualizado');
         renderPage('users');
         toast('Email já existia. Perfil/role atualizado na app.');
       } else if(err.code === 'auth/operation-not-allowed') {
@@ -3606,7 +3576,6 @@ function bindConfig(){
       delete state.settings.operatorActionAccess;
     }
 
-    saveLocalOnly();
     let firebaseSaved = false;
     try {
       firebaseSaved = await saveAllUserPermissionsToFirestore(state.users || []);
