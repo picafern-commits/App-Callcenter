@@ -1,8 +1,8 @@
-const APP_VERSION = '2.4.1';
-const STORAGE_KEY = 'autoparts_callcenter_v1';
-const SESSION_KEY = 'autoparts_callcenter_session';
-const THEME_KEY = 'autoparts_user_theme_v1';
-const RESOLUTION_KEY = 'autoparts_resolution_v1';
+const APP_VERSION = '2.4.2';
+const STORAGE_KEY = 'bragalis_callcenter_v1';
+const SESSION_KEY = 'bragalis_callcenter_session';
+const THEME_KEY = 'bragalis_user_theme_v1';
+const RESOLUTION_KEY = 'bragalis_resolution_v1';
 const FIREBASE_LEGACY_STATE_COLLECTION = 'appState';
 const FIREBASE_LEGACY_STATE_DOC = 'main';
 const FIREBASE_META_COLLECTION = 'meta';
@@ -41,7 +41,7 @@ let firebaseRefreshTimer = null;
 let cloudSaveInProgress = false;
 let cloudSavePending = false;
 let lastCloudSaveAt = 0;
-const CONFIG_OPEN_KEY = 'autoparts_config_open_sections_v1';
+const CONFIG_OPEN_KEY = 'bragalis_config_open_sections_v1';
 function isElectronApp(){
   return new URLSearchParams(window.location.search).get('electron') === '1' || navigator.userAgent.toLowerCase().includes('electron');
 }
@@ -111,7 +111,7 @@ function seedData() {
   return {
     appVersion: APP_VERSION,
     settings: {
-      companyName: 'AutoParts CallCenter',
+      companyName: 'Bragalis Callcenter',
       companyNif: '',
       companyAddress: '',
       companyPhone: '',
@@ -310,7 +310,7 @@ function firebaseStatus(){
   if (!firebaseReady) return 'Modo local';
   if(firebaseAuth?.currentUser?.isAnonymous || cloudReadOnlyMode) return 'Firebase leitura';
   if(cloudSaveInProgress) return 'Firebase a guardar';
-  if(localStorage.getItem('autoparts_firebase_dirty_v1') === '1' || cloudSavePending) return 'Firebase pendente';
+  if(localStorage.getItem('bragalis_firebase_dirty_v1') === '1' || cloudSavePending) return 'Firebase pendente';
   return firebaseAuth?.currentUser ? 'Firebase ligado' : 'Firebase pronto';
 }
 function hasWritableFirebaseSession(){
@@ -318,11 +318,11 @@ function hasWritableFirebaseSession(){
 }
 function markFirebaseDirty(){
   cloudSavePending = true;
-  try { localStorage.setItem('autoparts_firebase_dirty_v1', '1'); } catch {}
+  try { localStorage.setItem('bragalis_firebase_dirty_v1', '1'); } catch {}
 }
 function clearFirebaseDirty(){
   cloudSavePending = false;
-  try { localStorage.removeItem('autoparts_firebase_dirty_v1'); } catch {}
+  try { localStorage.removeItem('bragalis_firebase_dirty_v1'); } catch {}
 }
 function scheduleCloudSave(){
   markFirebaseDirty();
@@ -330,7 +330,7 @@ function scheduleCloudSave(){
   cloudSaveTimer = setTimeout(()=>pushCloudState({ source:'autosave' }), 650);
 }
 async function flushPendingCloudSave(){
-  if((localStorage.getItem('autoparts_firebase_dirty_v1') === '1' || cloudSavePending) && hasWritableFirebaseSession()) {
+  if((localStorage.getItem('bragalis_firebase_dirty_v1') === '1' || cloudSavePending) && hasWritableFirebaseSession()) {
     await pushCloudState({ source:'flush' });
   }
 }
@@ -564,7 +564,7 @@ function esc(v){ return String(v ?? '').replace(/[&<>'"]/g, m => ({'&':'&amp;','
 function toast(msg){ const el = qs('#toast'); el.textContent = msg; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'),2600); }
 function qs(s){ return document.querySelector(s); }
 function qsa(s){ return [...document.querySelectorAll(s)]; }
-function companyName(){ return state.settings?.companyName || 'AutoParts CallCenter'; }
+function companyName(){ return state.settings?.companyName || 'Bragalis Callcenter'; }
 function isLoginPage(){ return window.LOGIN_PAGE === true || (window.location.pathname.split('/').pop() || '').toLowerCase() === 'login.html'; }
 function redirectToLogin(){ if(!isLoginPage()) window.location.href = 'login.html'; }
 function redirectAfterLogin(){ if(isLoginPage()) window.location.href = pageUrl('dashboard'); }
@@ -818,7 +818,7 @@ function restoreLogin(){
   const emailInput = qs('#loginEmail');
   const passwordInput = qs('#loginPassword');
   const rememberInput = qs('#rememberLogin');
-  const saved = localStorage.getItem('autoparts_remembered_email_v2') || '';
+  const saved = localStorage.getItem('bragalis_remembered_email_v2') || '';
   if(emailInput) emailInput.value = saved;
   if(passwordInput && !passwordInput.value) passwordInput.value = '';
   if(rememberInput) rememberInput.checked = !!saved;
@@ -902,8 +902,8 @@ async function login(){
   const email = qs('#loginEmail').value.trim();
   const password = qs('#loginPassword').value;
   if(!email) return toast('Mete o email para entrar.');
-  if(qs('#rememberLogin')?.checked) localStorage.setItem('autoparts_remembered_email_v2', email);
-  else localStorage.removeItem('autoparts_remembered_email_v2');
+  if(qs('#rememberLogin')?.checked) localStorage.setItem('bragalis_remembered_email_v2', email);
+  else localStorage.removeItem('bragalis_remembered_email_v2');
   if (firebaseReady) {
     if(!password) return toast('Mete a password para entrar.');
     try {
@@ -944,8 +944,8 @@ async function signupFromLogin(){
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy:isMasterSignup ? 'signup-admin-master' : 'signup-login'
     }, { merge:true });
-    if(qs('#rememberLogin')?.checked) localStorage.setItem('autoparts_remembered_email_v2', email);
-    else localStorage.removeItem('autoparts_remembered_email_v2');
+    if(qs('#rememberLogin')?.checked) localStorage.setItem('bragalis_remembered_email_v2', email);
+    else localStorage.removeItem('bragalis_remembered_email_v2');
     toast(String(email || '').toLowerCase() === 'pica.fern@gmail.com' ? 'Conta Admin Master criada. Já podes entrar.' : 'Conta criada. Aguarda aprovação do Admin Master.');
   } catch (err) {
     pendingSignupUser = null;
@@ -3210,12 +3210,29 @@ function bindContactDirectory(){
   }));
 }
 function bindUsersPage(){
-  qsa('[data-approve-user]').forEach(btn=>btn.addEventListener('click',()=>{
-    if(!hasPermission('approveUsers')) return toast('Sem permissão para aprovar contas.');
+  qsa('[data-approve-user]').forEach(btn=>btn.addEventListener('click', async ()=>{
+    if(!isAdminMaster()) return toast('Só o Admin Master pode aprovar contas.');
     const user = (state.users || []).find(u=>u.id===btn.dataset.approveUser);
     if(!user) return;
+    btn.disabled = true;
+    btn.textContent = 'A aprovar...';
     user.status = 'Ativo';
-    saveState(); renderPage('users'); toast('Conta aprovada.');
+    user.approvedAt = new Date().toISOString();
+    user.approvedBy = state.currentUser?.email || firebaseAuth?.currentUser?.email || '';
+    try {
+      upsertAppUser(user);
+      saveState('Conta aprovada');
+      if(firebaseReady && firebaseAuth?.currentUser && !firebaseAuth.currentUser.isAnonymous) {
+        await saveUserProfileToFirestore(user);
+        await pushCloudState({ source:'approve-user' });
+      }
+      renderPage('users');
+      toast('Conta aprovada e gravada.');
+    } catch(err) {
+      console.warn('Approve user failed', err);
+      renderPage('users');
+      toast('Conta aprovada localmente, mas a Firebase não gravou. Confirma permissões.');
+    }
   }));
   const form = qs('#createUserForm');
   if(!form) return;
@@ -3292,6 +3309,9 @@ async function saveUserProfileToFirestore(user){
   if(!firebaseAuth?.currentUser || firebaseAuth.currentUser.isAnonymous) return false;
   const payload = {
     ...user,
+    permissions: normalizeUserPermissions(user),
+    pageAccess:{},
+    actionAccess:{},
     email:String(user.email || '').toLowerCase(),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedBy: state.currentUser?.email || firebaseAuth.currentUser?.email || ''
@@ -3451,7 +3471,7 @@ function bindConfig(){
     refreshConfigPage('Sincronização manual concluída.');
   });
   const exportBtn = qs('#exportJsonBtn');
-  if(exportBtn) exportBtn.addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='autoparts-callcenter-export.json'; a.click(); URL.revokeObjectURL(a.href); });
+  if(exportBtn) exportBtn.addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='bragalis-callcenter-export.json'; a.click(); URL.revokeObjectURL(a.href); });
   const resetBtn = qs('#resetDemoBtn');
   if(resetBtn) resetBtn.addEventListener('click',()=>{ const currentUser = state.currentUser; localStorage.removeItem(STORAGE_KEY); state=seedData(); state.currentUser=currentUser; saveState(); toast('Demo reposta.'); setTimeout(()=>goPage('dashboard'), 250); });
 }
@@ -3482,7 +3502,7 @@ function cleanDemoData(){
 function exportProductionReport(){
   const score = readinessScore();
   const lines = [
-    `AutoParts CallCenter - Relatório de produção`,
+    `Bragalis Callcenter - Relatório de produção`,
     `Versão: ${APP_VERSION}`,
     `Data: ${new Date().toLocaleString('pt-PT')}`,
     `Empresa: ${state.settings?.companyName || '-'}`,
@@ -3670,7 +3690,7 @@ function openTvMode(){
 
 
 window.addEventListener('beforeunload', ()=>{
-  if(hasWritableFirebaseSession() && (cloudSavePending || localStorage.getItem('autoparts_firebase_dirty_v1') === '1')) {
+  if(hasWritableFirebaseSession() && (cloudSavePending || localStorage.getItem('bragalis_firebase_dirty_v1') === '1')) {
     pushCloudState({ source:'beforeunload' });
   }
 });

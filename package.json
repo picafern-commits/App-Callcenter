@@ -1,7 +1,7 @@
 {
-  "name": "autoparts-callcenter",
-  "version": "2.4.1",
-  "description": "App Callcenter Bragalis com visual premium e Electron com ícone e fundo de marca",
+  "name": "bragalis-callcenter",
+  "version": "2.4.2",
+  "description": "App Bragalis Callcenter",
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
@@ -20,7 +20,7 @@
   },
   "build": {
     "appId": "pt.autoparts.callcenter",
-    "productName": "AutoParts CallCenter",
+    "productName": "Bragalis Callcenter",
     "directories": {
       "output": "dist"
     },
@@ -48,13 +48,14 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "AutoParts CallCenter",
-      "artifactName": "AutoParts-CallCenter-Setup-${version}.${ext}",
+      "shortcutName": "Bragalis Callcenter",
+      "artifactName": "Bragalis-CallCenter-Setup-${version}.${ext}",
       "installerIcon": "assets/bragalis-callcenter.ico",
       "uninstallerIcon": "assets/bragalis-callcenter.ico",
       "installerHeaderIcon": "assets/bragalis-callcenter.ico"
     },
     "asar": true,
     "compression": "maximum"
-  }
+  },
+  "productName": "Bragalis Callcenter"
 }

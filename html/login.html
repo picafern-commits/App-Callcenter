@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Login · AutoParts CallCenter</title>
+  <title>Bragalis Callcenter</title>
   <script>
     (function(){
       try{
-        var theme=localStorage.getItem('autoparts_user_theme_v1');
-        var res=localStorage.getItem('autoparts_resolution_v1') || 'standard';
-        var scheme=localStorage.getItem('autoparts_color_scheme_v1') || 'az';
+        var theme=localStorage.getItem('bragalis_user_theme_v1');
+        var res=localStorage.getItem('bragalis_resolution_v1') || 'standard';
+        var scheme=localStorage.getItem('bragalis_color_scheme_v1') || 'az';
         if(theme==='dark') document.documentElement.classList.add('theme-dark');
         document.documentElement.classList.add('res-'+res);
         document.documentElement.classList.add('scheme-'+scheme);
@@ -22,8 +22,8 @@
 <body class="auth-boot login-page-body">
   <div id="loginScreen" class="login-screen">
     <div class="login-card glass">
-      <div class="brand-mark">AP</div>
-      <h1>AutoParts CallCenter</h1>
+      <div class="brand-mark">BC</div>
+      <h1>Bragalis Callcenter</h1>
       <p>Entra na tua conta para aceder à app.</p>
       <label>Email</label>
       <input id="loginEmail" type="email" placeholder="email@empresa.pt" autocomplete="email" />

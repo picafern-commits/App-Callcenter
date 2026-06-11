@@ -80,7 +80,7 @@ function loadGithub(win) {
 }
 
 function showOfflinePage(win, message) {
-  const html = `<!doctype html><html lang="pt-PT"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AutoParts CallCenter</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:Segoe UI,Arial,sans-serif;background:linear-gradient(135deg,#edf4fb,#dce8f4);color:#183b5d}.card{max-width:560px;background:white;border-radius:24px;padding:34px;box-shadow:0 24px 70px rgba(17,55,91,.18);text-align:center}.logo{width:72px;height:72px;border-radius:22px;margin:0 auto 18px;background:linear-gradient(135deg,#145c97,#0b426f);display:grid;place-items:center;color:white;font-weight:900;font-size:24px}h1{margin:0 0 10px;font-size:26px}p{color:#64809c;line-height:1.5}.btn{border:0;border-radius:14px;background:#0b426f;color:white;font-weight:900;padding:13px 18px;cursor:pointer;margin:6px}.muted{font-size:12px;color:#64809c;margin-top:14px}</style></head><body><div class="card"><div class="logo">AP</div><h1>Não consegui abrir o GitHub Pages</h1><p>${message}</p><button class="btn" onclick="location.reload()">Tentar novamente</button><button class="btn" onclick="window.close()">Fechar</button><div class="muted">URL: ${APP_URL}</div></div></body></html>`;
+  const html = `<!doctype html><html lang="pt-PT"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bragalis Callcenter</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:Segoe UI,Arial,sans-serif;background:linear-gradient(135deg,#edf4fb,#dce8f4);color:#183b5d}.card{max-width:560px;background:white;border-radius:24px;padding:34px;box-shadow:0 24px 70px rgba(17,55,91,.18);text-align:center}.logo{width:72px;height:72px;border-radius:22px;margin:0 auto 18px;background:linear-gradient(135deg,#145c97,#0b426f);display:grid;place-items:center;color:white;font-weight:900;font-size:24px}h1{margin:0 0 10px;font-size:26px}p{color:#64809c;line-height:1.5}.btn{border:0;border-radius:14px;background:#0b426f;color:white;font-weight:900;padding:13px 18px;cursor:pointer;margin:6px}.muted{font-size:12px;color:#64809c;margin-top:14px}</style></head><body><div class="card"><div class="logo">BC</div><h1>Não consegui abrir o GitHub Pages</h1><p>${message}</p><button class="btn" onclick="location.reload()">Tentar novamente</button><button class="btn" onclick="window.close()">Fechar</button><div class="muted">URL: ${APP_URL}</div></div></body></html>`;
   win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 }
 
@@ -88,7 +88,7 @@ async function loadApp(win) {
   try {
     await prepareSession();
     await loadGithub(win);
-    console.log('AutoParts aberto pelo GitHub Pages:', APP_URL);
+    console.log('Bragalis aberto pelo GitHub Pages:', APP_URL);
   } catch (err) {
     console.warn('Falhou a abrir GitHub Pages:', err?.message || err);
     if (LOCAL_FALLBACK) {
@@ -107,7 +107,7 @@ function createWindow() {
     minWidth: profile.minWidth,
     minHeight: profile.minHeight,
     backgroundColor: '#edf4fb',
-    title: 'AutoParts CallCenter',
+    title: 'Bragalis Callcenter',
     icon: WINDOW_ICON,
     autoHideMenuBar: true,
     show: false,
@@ -168,8 +168,8 @@ function createWindow() {
   loadApp(mainWindow);
 }
 
-app.setName('AutoParts CallCenter');
-app.setAppUserModelId('pt.autoparts.callcenter');
+app.setName('Bragalis Callcenter');
+app.setAppUserModelId('pt.bragalis.callcenter');
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
