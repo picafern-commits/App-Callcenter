@@ -1,4 +1,4 @@
-const APP_VERSION = '2.6.5';
+const APP_VERSION = '2.6.6';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -507,7 +507,10 @@ async function saveFirebaseCollections(){
     }
   }
 
+  const pageKeys = keysForPage(currentPage || getDefaultPage());
+  const syncKeys = pageKeys.length ? pageKeys : Object.keys(FIREBASE_COLLECTIONS);
   for (const [stateKey, collectionName] of Object.entries(FIREBASE_COLLECTIONS)) {
+    if (!syncKeys.includes(stateKey)) continue;
     if (!firebaseLoadedKeys.has(stateKey) && stateKey !== 'users') continue;
     if (!canSyncCollectionKey(stateKey)) continue;
     try {
@@ -549,11 +552,9 @@ async function syncCollection(collectionName, rows, allowDelete=false){
   for(const row of rows){
     const id = row.id || uid('DOC');
     row.id = id;
-    const payload = sanitizeRowForFirestore({
-      ...row,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      updatedBy: firebaseAuth.currentUser.email || ''
-    });
+    const payload = sanitizeRowForFirestore(row);
+    payload.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+    payload.updatedBy = firebaseAuth.currentUser.email || '';
     batch.set(collectionRef.doc(id), payload, { merge: true });
     ops++;
     await commitIfNeeded();
@@ -561,6 +562,20 @@ async function syncCollection(collectionName, rows, allowDelete=false){
 
   await commitIfNeeded(true);
 }
+async function saveSingleRowToFirebase(stateKey, row){
+  if(!hasWritableFirebaseSession()) return false;
+  const collectionName = FIREBASE_COLLECTIONS[stateKey];
+  if(!collectionName || !row?.id) return false;
+  const payload = sanitizeRowForFirestore(row);
+  payload.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+  payload.updatedBy = firebaseAuth.currentUser.email || '';
+  await firebaseDb.collection(collectionName).doc(row.id).set(payload, { merge:true });
+  firebaseLoadedKeys.add(stateKey);
+  clearFirebaseDirty();
+  updateFirebaseStatusBadge();
+  return true;
+}
+
 async function loadCloudState(options = {}){
   if (!firebaseReady || !firebaseAuth?.currentUser || !firebaseDb) return;
   try {
@@ -3991,7 +4006,9 @@ async function saveUserProfileToFirestore(user){
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedBy: state.currentUser?.email || firebaseAuth.currentUser?.email || ''
   };
-  await firebaseDb.collection(FIREBASE_COLLECTIONS.users).doc(user.id).set(sanitizeRowForFirestore(payload), { merge:true });
+  const cleanPayload = sanitizeRowForFirestore(payload);
+  cleanPayload.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+  await firebaseDb.collection(FIREBASE_COLLECTIONS.users).doc(user.id).set(cleanPayload, { merge:true });
   return true;
 }
 async function saveAllUserPermissionsToFirestore(users){
@@ -4048,7 +4065,26 @@ function bindEntities(){
   qsa('[data-edit-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.editEntity.split(':'); if(type==='user' && !isAdminMaster()) return toast('Só o Admin Master pode alterar utilizadores.'); openEntityModal(type,id); }));
   qsa('[data-view-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.viewEntity.split(':'); openEntityReadModal(type,id); }));
   const forms = [{id:'clientForm',key:'clients',prefix:'CLI'},{id:'supplierForm',key:'suppliers',prefix:'FOR'},{id:'stockForm',key:'stock',prefix:'STK'},{id:'userForm',key:'users',prefix:'USR'}];
-  forms.forEach(f=>{ const form=qs('#'+f.id); if(form) form.addEventListener('submit',e=>{ e.preventDefault(); if(f.key==='users' && !hasPermission('manageUsers')) return toast('Sem permissão para gerir utilizadores.'); if(f.key!=='users' && !canEditOperational()) return toast('Sem permissão para guardar.'); state[f.key].push({id:uid(f.prefix),...Object.fromEntries(new FormData(e.target).entries())}); if(f.key==='suppliers') sortSuppliersState(); saveState(); renderPage(currentPage); toast('Registo guardado.'); }); });
+  forms.forEach(f=>{ const form=qs('#'+f.id); if(form) form.addEventListener('submit',async e=>{ 
+    e.preventDefault(); 
+    if(f.key==='users' && !hasPermission('manageUsers')) return toast('Sem permissão para gerir utilizadores.'); 
+    if(f.key!=='users' && !canEditOperational()) return toast('Sem permissão para guardar.'); 
+    const row = {id:uid(f.prefix),...Object.fromEntries(new FormData(e.target).entries())};
+    state[f.key].push(row); 
+    if(f.key==='suppliers') sortSuppliersState(); 
+    try{
+      const ok = await saveSingleRowToFirebase(f.key, row);
+      if(!ok) saveState();
+      renderPage(currentPage); 
+      toast('Registo guardado na Firebase.');
+    }catch(err){
+      console.warn('Direct Firebase save failed', err);
+      state[f.key] = state[f.key].filter(x=>x.id!==row.id);
+      renderPage(currentPage);
+      const code = err?.code ? ` (${err.code})` : '';
+      toast(`Erro Firebase ao guardar${code}.`);
+    }
+  }); });
 }
 function openEntityModal(type,id){
   const map = { client:['clients','CLI'], supplier:['suppliers','FOR'], stock:['stock','STK'], user:['users','USR'], follow:['followups','AGE'] };
