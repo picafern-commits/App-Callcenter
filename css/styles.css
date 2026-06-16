@@ -4302,3 +4302,11 @@ body.theme-dark .quote-items-total b{
     display:none;
   }
 }
+
+
+/* v2.5.5 - carregamento mais leve */
+#pageContent.soft-loading{
+  opacity:.72;
+  transition:opacity .12s ease;
+  pointer-events:none;
+}
