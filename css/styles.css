@@ -4337,3 +4337,90 @@ body.theme-dark .quote-items-total b{
     width:100%;
   }
 }
+
+
+/* v2.6.1 - Modal de campos para email do orçamento */
+.email-options-intro{
+  display:grid;
+  gap:4px;
+  padding:12px 14px;
+  border-radius:16px;
+  background:rgba(17,128,201,.08);
+  border:1px solid rgba(17,128,201,.14);
+}
+.email-options-intro strong{
+  color:var(--brand3);
+}
+.email-options-intro span{
+  color:var(--muted);
+  font-weight:800;
+  font-size:12px;
+}
+.email-options-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+}
+.email-option-pill{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 12px;
+  border-radius:14px;
+  background:rgba(255,255,255,.72);
+  border:1px solid rgba(20,92,151,.12);
+  color:var(--brand3);
+  font-weight:900;
+  font-size:13px;
+}
+.email-option-pill input{
+  accent-color:var(--brand2);
+}
+body.theme-dark .email-options-intro,
+body.theme-dark .email-option-pill{
+  background:rgba(255,255,255,.05);
+  border-color:rgba(255,255,255,.10);
+}
+body.theme-dark .email-options-intro strong,
+body.theme-dark .email-option-pill{
+  color:var(--text);
+}
+@media(max-width:760px){
+  .email-options-grid{
+    grid-template-columns:1fr;
+  }
+}
+
+
+/* v2.6.2 - Modo rápido para ligação remota do Windows */
+.remote-fast-mode *,
+.remote-fast-mode *::before,
+.remote-fast-mode *::after{
+  transition:none!important;
+  animation:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  scroll-behavior:auto!important;
+}
+.remote-fast-mode .card,
+.remote-fast-mode .clean-data-card,
+.remote-fast-mode .big-page-button,
+.remote-fast-mode .modal-card,
+.remote-fast-mode .glass{
+  box-shadow:0 3px 10px rgba(0,0,0,.10)!important;
+}
+.remote-fast-mode .app-shell,
+.remote-fast-mode .login-screen,
+.remote-fast-mode body::before,
+.remote-fast-mode body::after{
+  background-attachment:scroll!important;
+  filter:none!important;
+}
+.remote-fast-mode .dashboard-az-watermark,
+.remote-fast-mode .dashboard-hero::before,
+.remote-fast-mode .dashboard-hero::after{
+  display:none!important;
+}
+.remote-fast-mode #pageContent.soft-loading{
+  opacity:.86!important;
+}

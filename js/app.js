@@ -1,4 +1,4 @@
-const APP_VERSION = '2.6.0';
+const APP_VERSION = '2.6.2';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -308,39 +308,17 @@ function pageTitleById(id){
   return pages.find(p=>p.id===id)?.title || id || '-';
 }
 async function updateUserPresence(online=true){
-  if(!firebaseReady || !firebaseDb || !firebaseAuth?.currentUser || firebaseAuth.currentUser.isAnonymous) return false;
-  const uid = currentUserId();
-  if(!uid) return false;
-  const nowIso = new Date().toISOString();
-  const payload = {
-    online: !!online,
-    lastSeen: nowIso,
-    currentPage: online ? (currentPage || getDefaultPage()) : '',
-    sessionId: USER_SESSION_ID,
-    userAgent: navigator.userAgent || '',
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  };
-  try {
-    await firebaseDb.collection(FIREBASE_COLLECTIONS.users).doc(uid).set(payload, { merge:true });
-    const local = (state.users || []).find(u=>u.id === uid || String(u.email || '').toLowerCase() === String(firebaseAuth.currentUser.email || '').toLowerCase());
-    if(local) Object.assign(local, { ...payload, updatedAt: nowIso });
-    return true;
-  } catch(err) {
-    console.warn('Presence update failed', err);
-    return false;
-  }
+  // Desativado por performance: em ligação remota criava escritas Firebase desnecessárias.
+  return false;
 }
 function startUserPresence(){
-  stopUserPresence(false);
-  updateUserPresence(true);
-  userPresenceTimer = setInterval(()=>updateUserPresence(true), 45000);
+  // Presença desativada para tornar a app mais leve.
 }
 function stopUserPresence(markOffline=true){
   if(userPresenceTimer) clearInterval(userPresenceTimer);
   userPresenceTimer = null;
-  if(markOffline) updateUserPresence(false);
 }
-window.addEventListener('beforeunload', ()=>{ stopUserPresence(true); });
+window.addEventListener('beforeunload', ()=>{ stopUserPresence(false); });
 
 function saveState(action='Alteração guardada'){
   if(!hasWritableFirebaseSession()){
@@ -485,11 +463,12 @@ async function loadCollectionKey(stateKey){
 }
 async function ensurePageCollections(pageId){
   const keys = keysForPage(pageId).filter(k=>!firebaseLoadedKeys.has(k));
-  if(!keys.length) return;
+  if(!keys.length) return false;
   const content = qs('#pageContent');
   if(content) content.classList.add('soft-loading');
-  await Promise.all(keys.map(k=>loadCollectionKey(k)));
+  const results = await Promise.all(keys.map(k=>loadCollectionKey(k)));
   if(content) content.classList.remove('soft-loading');
+  return results.some(Boolean);
 }
 
 function canLoadCollectionKey(stateKey){
@@ -771,6 +750,9 @@ function applyTheme(){
   const dark = currentTheme() === 'dark';
   const resolution = currentResolution();
   const resolvedResolution = effectiveResolution();
+  const themeKey = `${dark}|${resolution}|${resolvedResolution}|${isAdminMaster()}|${currentRole ? currentRole() : ''}`;
+  if(window.__lastAppliedThemeKey === themeKey) return;
+  window.__lastAppliedThemeKey = themeKey;
   document.documentElement.classList.toggle('theme-dark', dark);
   document.body.classList.toggle('theme-dark', dark);
   document.body.classList.toggle('admin-master', isAdminMaster());
@@ -782,6 +764,8 @@ function applyTheme(){
   document.documentElement.classList.toggle('res-auto', resolution === 'auto');
   document.body.classList.toggle('res-auto', resolution === 'auto');
   ['compact','standard','wide','large'].forEach(v=>{ document.documentElement.classList.toggle(`res-${v}`, resolvedResolution===v); document.body.classList.toggle(`res-${v}`, resolvedResolution===v); });
+  document.documentElement.classList.add('remote-fast-mode');
+  document.body.classList.add('remote-fast-mode');
   const btn = qs('#themeToggleBtn');
   if(btn) btn.textContent = dark ? 'Modo Normal' : 'Darkmode';
 }
@@ -1203,7 +1187,6 @@ function renderPage(id){
     id = 'dashboard';
   }
   currentPage = id;
-  if(!window.__lastPresencePage || window.__lastPresencePage !== id){ updateUserPresence(true); window.__lastPresencePage = id; }
   qs('#appShell')?.classList.toggle('dashboard-mode', id === 'dashboard');
   applyTheme();
   updateGlobalSearchVisibility(id);
@@ -1217,13 +1200,13 @@ function renderPage(id){
     const content = qs('#pageContent');
     if(content) content.innerHTML = `${excelToolbar(id)}${pageBody}`;
     bindPage(id);
-    applySpellcheckEnhancements(qs('#pageContent'));
+    // Correção ortográfica pesada desativada no render para melhorar ligação remota.
     document.body.classList.remove('page-loading','page-changing','page-changing-soft');
     clearPendingPageLoader();
   };
   paint();
-  ensurePageCollections(id).then(()=>{
-    if(currentPage === id) paint();
+  ensurePageCollections(id).then((changed)=>{
+    if(changed && currentPage === id) paint();
   }).catch(err=>console.warn('Lazy page load failed', err));
 }
 
@@ -1339,13 +1322,14 @@ function dashboard(){
 }
 function metric(label,value,note){ return `<div class="card metric"><div class="label">${label}</div><div class="value">${value}</div><div class="note">${note}</div></div>`; }
 function globalSearchRows(){
-  const contacts = (state.contactGroups || []).flatMap(g => (g.contactos || []).map(c => ({ type:'Contacto', title:c.nome, detail:`${g.nome} · ${c.telemovel || c.telefone || ''} · ${c.email || ''}`, page:'contactos' })));
-  return [
-    ...state.clients.map(c=>({ type:'Cliente', title:c.nome, detail:`${clientCode(c)} · ${c.telefone || ''} · ${c.email || ''}`, page:'clientes', id:c.id })),
-    ...state.calls.map(c=>({ type:'Pedido', title:c.cliente, detail:`${c.matricula || ''} · ${c.peca || ''} · ${c.estado || ''}`, page:'pedidos' })),
-    ...state.quotes.map(q=>({ type:'Orçamento', title:q.cliente, detail:`${q.id} · ${q.peca || ''} · ${money(q.total)}`, page:'orcamentos' })),
-    ...contacts
-  ];
+  const rows = [];
+  if(firebaseLoadedKeys.has('clients')) rows.push(...state.clients.map(c=>({ type:'Cliente', title:c.nome, detail:`${clientCode(c)} · ${c.telefone || ''} · ${c.email || ''}`, page:'clientes', id:c.id })));
+  if(firebaseLoadedKeys.has('calls')) rows.push(...state.calls.map(c=>({ type:'Pedido', title:c.cliente, detail:`${c.matricula || ''} · ${c.peca || ''} · ${c.estado || ''}`, page:'pedidos' })));
+  if(firebaseLoadedKeys.has('quotes')) rows.push(...state.quotes.map(q=>({ type:'Orçamento', title:q.cliente, detail:`${q.id} · ${q.peca || ''} · ${money(q.total)}`, page:'orcamentos' })));
+  if(firebaseLoadedKeys.has('contactGroups')) {
+    (state.contactGroups || []).forEach(g => (g.contactos || []).forEach(c => rows.push({ type:'Contacto', title:c.nome, detail:`${g.nome} · ${c.telemovel || c.telefone || ''} · ${c.email || ''}`, page:'contactos' })));
+  }
+  return rows;
 }
 function globalSearchResults(query){
   const q = (query || '').toLowerCase();
@@ -3509,67 +3493,97 @@ function printQuote(id){
 }
 function emailQuote(id){
   const q = quoteById(id); if(!q) return;
+  openQuoteEmailOptionsModal(q);
+}
+function quoteEmailOptionCheckbox(key, label, checked=true){
+  return `<label class="email-option-pill"><input type="checkbox" name="${key}" ${checked?'checked':''}> <span>${esc(label)}</span></label>`;
+}
+function openQuoteEmailOptionsModal(q){
+  openModal('Enviar orçamento por email', `<form id="quoteEmailOptionsForm" class="form-grid email-options-form">
+    <div class="span3 email-options-intro">
+      <strong>Escolhe os campos que queres enviar no email</strong>
+      <span>O Outlook/app de email abre com o texto já montado.</span>
+    </div>
+
+    <div class="span3 email-options-grid">
+      ${quoteEmailOptionCheckbox('includeNumero','Nº do orçamento', true)}
+      ${quoteEmailOptionCheckbox('includeMatricula','Matrícula', true)}
+      ${quoteEmailOptionCheckbox('includeMarcaModelo','Marca & Modelo', true)}
+      ${quoteEmailOptionCheckbox('includeMotor','Motor', true)}
+      ${quoteEmailOptionCheckbox('includeReferencias','Referências / peças', true)}
+      ${quoteEmailOptionCheckbox('includePrecoLiquido','Preço líquido', true)}
+      ${quoteEmailOptionCheckbox('includeTotalLinha','Total c/ IVA por referência', true)}
+      ${quoteEmailOptionCheckbox('includeResumo','Resumo final', true)}
+      ${quoteEmailOptionCheckbox('includePrazo','Prazo de entrega', true)}
+      ${quoteEmailOptionCheckbox('includeCondicoes','Condições', true)}
+      ${quoteEmailOptionCheckbox('includeObservacoes','Observações', false)}
+      ${quoteEmailOptionCheckbox('includeCliente','Nome do cliente', false)}
+    </div>
+
+    <textarea class="span3" name="mensagemExtra" placeholder="Mensagem extra opcional"></textarea>
+
+    <div class="span3 actions">
+      <button class="btn ghost" type="button" id="cancelQuoteEmailBtn">Cancelar</button>
+      <button class="btn primary" type="submit">Abrir Outlook / Email</button>
+    </div>
+  </form>`);
+  qs('#cancelQuoteEmailBtn')?.addEventListener('click', closeModal);
+  qs('#quoteEmailOptionsForm')?.addEventListener('submit',e=>{
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const opts = Object.fromEntries([...fd.entries()]);
+    const include = key => fd.get(key) === 'on';
+    openQuoteEmailWithOptions(q, include, opts.mensagemExtra || '');
+  });
+}
+function openQuoteEmailWithOptions(q, include, mensagemExtra=''){
   const items = quoteItemsFromLegacy(q);
   const subtotal = quoteItemsTotal(items);
   const iva = subtotal * 0.23;
   const totalComIva = subtotal + iva;
-  const subject = `Orçamento ${q.id} - ${q.viatura || quoteMainDescription(q)}`;
-  const lines = items.map((item,idx)=>{
-    const totalLinhaComIva = Number(item.total || 0) * 1.23;
-    return `━━━━━━━━━━━━━━━━━━━━
-REF. ${idx+1}
-Peça: ${item.nome || '-'}
-Referência: ${item.referencia || '-'}
-Unidade: ${item.unidade}
-Preço líquido: ${money(item.preco)}
-Total c/ IVA: ${money(totalLinhaComIva)}`;
-  }).join('\n\n');
+  const v = quoteVehicleParts(q);
+  const subject = `Orçamento ${q.id} - ${v.matricula || q.viatura || quoteMainDescription(q)}`;
 
-  const body = `Olá,
+  const blocks = ['Olá,', '', 'Segue orçamento solicitado.'];
 
-Segue orçamento solicitado.
+  if(String(mensagemExtra || '').trim()) {
+    blocks.push('', String(mensagemExtra).trim());
+  }
 
-==============================
-ORÇAMENTO ${q.id}
-==============================
+  if(include('includeNumero')) {
+    blocks.push('', '==============================', `ORÇAMENTO ${q.id}`, '==============================');
+  }
 
-MATRÍCULA
-${quoteVehicleParts(q).matricula || '-'}
+  if(include('includeCliente')) blocks.push('', 'CLIENTE', q.cliente || '-');
+  if(include('includeMatricula')) blocks.push('', 'MATRÍCULA', v.matricula || '-');
+  if(include('includeMarcaModelo')) blocks.push('', 'MARCA & MODELO', v.marcaModelo || '-');
+  if(include('includeMotor')) blocks.push('', 'MOTOR', v.motor || '-');
 
-MARCA & MODELO
-${quoteVehicleParts(q).marcaModelo || '-'}
+  if(include('includeReferencias')) {
+    const lines = items.map((item,idx)=>{
+      const totalLinhaComIva = Number(item.total || 0) * 1.23;
+      const row = ['━━━━━━━━━━━━━━━━━━━━', `REF. ${idx+1}`, `Peça: ${item.nome || '-'}`, `Referência: ${item.referencia || '-'}`, `Unidade: ${item.unidade}`];
+      if(include('includePrecoLiquido')) row.push(`Preço líquido: ${money(item.preco)}`);
+      if(include('includeTotalLinha')) row.push(`Total c/ IVA: ${money(totalLinhaComIva)}`);
+      return row.join('\n');
+    }).join('\n\n');
+    blocks.push('', 'REFERÊNCIAS', lines);
+  }
 
-MOTOR
-${quoteVehicleParts(q).motor || '-'}
+  if(include('includeResumo')) {
+    blocks.push('', '==============================', 'RESUMO', `Subtotal líquido: ${money(subtotal)}`, `IVA 23%: ${money(iva)}`, `TOTAL FINAL: ${money(totalComIva)}`, '==============================');
+  }
 
-REFERÊNCIAS
-${lines}
+  if(include('includePrazo')) blocks.push('', 'Prazo de entrega:', q.prazoEntrega || 'A confirmar');
+  if(include('includeCondicoes')) blocks.push('', 'Condições:', q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.');
+  if(include('includeObservacoes')) blocks.push('', 'Observações:', q.observacoes || '-');
 
-==============================
-RESUMO
-Subtotal líquido: ${money(subtotal)}
-IVA 23%: ${money(iva)}
-TOTAL FINAL: ${money(totalComIva)}
-==============================
+  blocks.push('', 'Qualquer questão estamos disponíveis.', '', 'Obrigado,', companyName());
 
-Prazo de entrega:
-${q.prazoEntrega || 'A confirmar'}
-
-Condições:
-${q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.'}
-
-Observações:
-${q.observacoes || '-'}
-
-Qualquer questão estamos disponíveis.
-
-Obrigado,
-${companyName()}`;
-
-  // Não gravar nada na Firebase só por preparar email.
-  // Usa assign e fallback para melhorar compatibilidade com Outlook/mailto em alguns Windows.
+  const body = blocks.join('\n');
   const mailto = `mailto:${encodeURIComponent(q.email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   try {
+    closeModal();
     window.location.assign(mailto);
     setTimeout(()=>toast('Se o Outlook não abriu, confirma a app predefinida de Email no Windows.'), 900);
   } catch(err) {
