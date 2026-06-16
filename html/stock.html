@@ -17,6 +17,11 @@
     })();
   </script>
   <link rel="stylesheet" href="../css/styles.css" />
+  <link rel="manifest" href="../manifest.webmanifest">
+  <meta name="theme-color" content="#06447f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="Bragalis Callcenter">
+  <link rel="apple-touch-icon" href="../assets/bragalis-callcenter-icon.png">
   <link rel="icon" href="../assets/bragalis-callcenter-icon.png">
 </head>
 <body class="auth-boot">
@@ -71,6 +76,15 @@
   <div id="toast" class="toast hidden"></div>
 
   <script>window.DEFAULT_PAGE = 'stock';</script>
+  <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('../sw.js').catch(function(err){
+        console.warn('Service Worker não registado:', err);
+      });
+    });
+  }
+</script>
   <script src="../js/app.js"></script>
 </body>
 </html>

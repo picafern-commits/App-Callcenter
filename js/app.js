@@ -1,4 +1,4 @@
-const APP_VERSION = '2.5.7';
+const APP_VERSION = '2.6.0';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -1988,33 +1988,17 @@ function bindQuoteItemsEditor(scope=document){
 }
 
 function orcamentos(){
-  const clientOptions = state.clients.map(c=>`<option value="${esc(c.nome)}" data-email="${esc(c.email || '')}" data-phone="${esc(c.telefone || '')}" data-code="${esc(clientCode(c))}">${esc(clientCode(c) ? `${clientCode(c)} - ${c.nome}` : c.nome)}</option>`).join('');
   const canEdit = canEditOperational();
   const total = state.quotes.length;
   const totalValue = state.quotes.reduce((sum,q)=>sum + Number(q.total || quoteItemsTotal(quoteItemsFromLegacy(q)) || 0), 0);
-  const addCard = canEdit ? `<div class="card compact-form-card clean-side-card quote-form-card">
-      <div class="card-head clean-card-head"><div><h3>Novo orçamento</h3><span class="muted">Com uma ou várias referências</span></div></div>
-      <form id="quoteForm" class="simple-stack-form quote-clean-form">
-        <select class="select" name="cliente" id="quoteClientSelect" required><option value="">Selecionar cliente</option>${clientOptions}</select>
-        <input class="field" name="codigoCliente" placeholder="Código cliente">
-        <input class="field" name="telefone" placeholder="Telefone">
-        <input class="field" name="email" placeholder="Email do cliente">
-        <input class="field" name="viatura" placeholder="Viatura / matrícula">
-        ${quoteItemsInputs([normalizeQuoteItem({ nome:'', referencia:'', unidade:1, preco:0 })])}
-        <select class="select" name="estado"><option>Rascunho</option><option>Enviado</option><option>Aceite</option><option>Recusado</option></select>
-        <input class="field" name="validade" type="date" value="${today()}">
-        <input class="field" name="prazoEntrega" placeholder="Prazo de entrega">
-        <textarea name="condicoes" placeholder="Condições comerciais">Preços sujeitos a disponibilidade da peça no momento da confirmação.</textarea>
-        <textarea name="observacoes" placeholder="Notas internas"></textarea>
-        <button class="btn primary full" type="submit">Criar orçamento</button>
-      </form>
-    </div>` : '';
-  return `<div class="grid ${canEdit ? 'two split-form-list clean-page-layout' : 'single-list'} quotes-page clean-module-page">
-    ${addCard}
+  return `<div class="quotes-page clean-module-page quote-modal-page">
     <div class="card clean-main-card">
       <div class="clean-page-head">
         <div><span class="clean-eyebrow">Orçamentos</span><h3>Propostas comerciais</h3></div>
         <div class="clean-stats"><span><b>${total}</b> registos</span><span><b>${money(totalValue)}</b> total</span></div>
+      </div>
+      <div class="quote-page-actions">
+        ${canEdit ? `<button class="btn primary quote-new-btn" id="openNewQuoteModalBtn" type="button">+ Novo Orçamento</button>` : ''}
       </div>
       ${!canEdit ? '<div class="readonly-note">Modo leitura: podes consultar e enviar orçamento por email, mas não podes criar nem alterar estados.</div>' : ''}
       ${state.quotes.length ? quotesTable() : '<div class="empty">Ainda não existem orçamentos.</div>'}
@@ -2029,8 +2013,8 @@ function quotesTable(){
       <div class="data-card-main">
         <span class="data-card-code big-visible-code">${esc(q.id)}</span>
         <strong>${esc(q.cliente || '-')}</strong>
-        <small>${esc(quoteMainDescription(q))}</small>
-        <div class="quote-item-mini-list">${items.slice(0,3).map(item=>`<span>${esc(item.nome || '-')} · ${esc(item.referencia || '-')} · ${esc(item.unidade)} un. · ${money(item.preco)}</span>`).join('')}${items.length>3?`<span>+ ${items.length-3} referências</span>`:''}</div>
+        <small>${esc(quoteVehicleLabel(q))}</small>
+        <div class="quote-item-mini-list"><span>${items.length} referência(s) · ${esc(quoteMainDescription(q))}</span></div>
       </div>
       <div class="quote-value-box">
         <b>${money(total)}</b>
@@ -2782,7 +2766,7 @@ function excelPageRegistry(){
     orcamentos: {
       key:'quotes', title:'Orçamentos', file:'orcamentos', prefix:'ORC', edit:()=>canEditOperational(),
       fields:[
-        ['id','ID'], ['createdAt','Data'], ['estado','Estado'], ['cliente','Cliente'], ['codigoCliente','Código Cliente'], ['telefone','Telefone'], ['email','Email'], ['viatura','Viatura'], ['items','Referências JSON'], ['peca','1ª Peça'], ['referencia','1ª Referência'], ['quantidade','1ª Unidade'], ['precoUnitario','1º Preço'], ['total','Total'], ['validade','Validade'], ['prazoEntrega','Prazo Entrega'], ['condicoes','Condições'], ['observacoes','Observações']
+        ['id','ID'], ['createdAt','Data'], ['estado','Estado'], ['cliente','Cliente'], ['codigoCliente','Código Cliente'], ['telefone','Telefone'], ['email','Email'], ['matricula','Matrícula'], ['marcaModelo','Marca & Modelo'], ['motor','Motor'], ['viatura','Viatura'], ['items','Referências JSON'], ['peca','1ª Peça'], ['referencia','1ª Referência'], ['quantidade','1ª Unidade'], ['precoUnitario','1º Preço'], ['total','Total'], ['validade','Validade'], ['prazoEntrega','Prazo Entrega'], ['condicoes','Condições'], ['observacoes','Observações']
       ]
     },
     users: {
@@ -3367,29 +3351,104 @@ function createQuoteFromCall(id){
   const c = state.calls.find(x=>x.id===id); if(!c) return;
   const client = state.clients.find(x => x.nome?.toLowerCase() === c.cliente?.toLowerCase() || (c.telefone && x.telefone === c.telefone)) || {};
   const items = [normalizeQuoteItem({ nome:c.peca, referencia:c.referencia, unidade:1, preco:Number(c.precoVenda||0) })];
-  const q = { id: uid('ORC'), callId:id, cliente:c.cliente, codigoCliente:clientCode(client), telefone:c.telefone, email:c.email, viatura:`${c.marca || ''} ${c.modelo || ''} ${c.matricula ? '- ' + c.matricula : ''}`.trim(), items, peca:c.peca, referencia:c.referencia, quantidade:1, precoUnitario:Number(c.precoVenda||0), total:quoteItemsTotal(items), validade:today(), prazoEntrega:'A confirmar', condicoes:'Preços sujeitos a disponibilidade da peça no momento da confirmação.', observacoes:c.observacoes || '', estado:'Rascunho', createdAt:today(), history:[{ date:today(), action:'Criado a partir de pedido', by:state.currentUser?.email || '' }] };
+  const marcaModelo = `${c.marca || ''} ${c.modelo || ''}`.trim();
+  const matricula = c.matricula || '';
+  const motor = c.motor || '';
+  const q = { id: uid('ORC'), callId:id, cliente:c.cliente, codigoCliente:clientCode(client), telefone:c.telefone, email:c.email, matricula, marcaModelo, motor, viatura:composeQuoteVehicle({matricula, marcaModelo, motor}), items, peca:c.peca, referencia:c.referencia, quantidade:1, precoUnitario:Number(c.precoVenda||0), total:quoteItemsTotal(items), validade:today(), prazoEntrega:'A confirmar', condicoes:'Preços sujeitos a disponibilidade da peça no momento da confirmação.', observacoes:c.observacoes || '', estado:'Rascunho', createdAt:today(), history:[{ date:today(), action:'Criado a partir de pedido', by:state.currentUser?.email || '' }] };
   state.quotes.push(q); c.estado='Orçamento enviado'; saveState(); toast('Orçamento criado.'); setTimeout(()=>goPage('orcamentos'), 250);
 }
-function bindQuotes(){
-  const clientSelect = qs('#quoteClientSelect');
-  if(clientSelect) clientSelect.addEventListener('change',()=>{
-    const opt = clientSelect.selectedOptions[0];
-    qs('[name="codigoCliente"]').value = opt?.dataset.code || '';
-    qs('[name="telefone"]').value = opt?.dataset.phone || '';
-    qs('[name="email"]').value = opt?.dataset.email || '';
-  });
-  bindQuoteItemsEditor(document);
-  const form = qs('#quoteForm');
-  if(form) form.addEventListener('submit',e=>{
+function quoteClientOptions(){
+  return state.clients.map(c=>`<option value="${esc(c.nome)}" data-email="${esc(c.email || '')}" data-phone="${esc(c.telefone || '')}" data-code="${esc(clientCode(c))}">${esc(clientCode(c) ? `${clientCode(c)} - ${c.nome}` : c.nome)}</option>`).join('');
+}
+function quoteVehicleParts(q){
+  const matricula = String(q.matricula || '').trim();
+  const marcaModelo = String(q.marcaModelo || '').trim();
+  const motor = String(q.motor || '').trim();
+
+  if(matricula || marcaModelo || motor) {
+    return { matricula, marcaModelo, motor };
+  }
+
+  const legacy = String(q.viatura || '').trim();
+  if(!legacy) return { matricula:'', marcaModelo:'', motor:'' };
+
+  const parts = legacy.split('-').map(x=>x.trim()).filter(Boolean);
+  if(parts.length >= 2) return { marcaModelo:parts[0], matricula:parts.slice(1).join(' - '), motor:'' };
+  return { matricula:legacy, marcaModelo:'', motor:'' };
+}
+function quoteVehicleLabel(q){
+  const v = quoteVehicleParts(q);
+  return [
+    v.marcaModelo || 'Sem marca/modelo',
+    v.motor || 'Sem motor',
+    v.matricula || 'Sem matrícula',
+    q.createdAt ? `Criado: ${formatDatePt(q.createdAt)}` : ''
+  ].filter(Boolean).join(' · ');
+}
+function composeQuoteVehicle(data){
+  return [data.marcaModelo, data.motor, data.matricula].map(v=>String(v || '').trim()).filter(Boolean).join(' · ');
+}
+
+function quoteCreateFormHtml(){
+  return `<form id="quoteForm" class="form-grid quote-modal-form">
+    <select class="select span3" name="cliente" id="quoteClientSelect" required><option value="">Selecionar cliente</option>${quoteClientOptions()}</select>
+    <input class="field" name="codigoCliente" placeholder="Código cliente">
+    <input class="field" name="telefone" placeholder="Telefone">
+    <input class="field" name="email" placeholder="Email do cliente">
+    <input class="field span3" name="matricula" placeholder="Matrícula">
+    <input class="field span3" name="marcaModelo" placeholder="Marca & Modelo">
+    <input class="field span3" name="motor" placeholder="Motor">
+    <div class="span3">${quoteItemsInputs([normalizeQuoteItem({ nome:'', referencia:'', unidade:1, preco:0 })])}</div>
+    <select class="select" name="estado"><option>Rascunho</option><option>Enviado</option><option>Aceite</option><option>Recusado</option></select>
+    <input class="field" name="validade" type="date" value="${today()}">
+    <input class="field" name="prazoEntrega" placeholder="Prazo de entrega">
+    <textarea class="span3" name="condicoes" placeholder="Condições comerciais">Preços sujeitos a disponibilidade da peça no momento da confirmação.</textarea>
+    <textarea class="span3" name="observacoes" placeholder="Notas internas"></textarea>
+    <div class="span3"><button class="btn primary full" type="submit">Criar orçamento</button></div>
+  </form>`;
+}
+function openNewQuoteModal(){
+  if(!canEditOperational()) return toast('Sem permissão para criar orçamentos.');
+  openModal('Novo orçamento', quoteCreateFormHtml());
+  bindNewQuoteForm(qs('#quoteForm'));
+}
+function bindQuoteClientSelect(scope=document){
+  const clientSelect = scope.querySelector?.('#quoteClientSelect') || qs('#quoteClientSelect');
+  if(clientSelect && !clientSelect.dataset.boundClientSelect) {
+    clientSelect.dataset.boundClientSelect = '1';
+    clientSelect.addEventListener('change',()=>{
+      const opt = clientSelect.selectedOptions[0];
+      const form = clientSelect.closest('form') || document;
+      const code = form.querySelector('[name="codigoCliente"]');
+      const phone = form.querySelector('[name="telefone"]');
+      const email = form.querySelector('[name="email"]');
+      if(code) code.value = opt?.dataset.code || '';
+      if(phone) phone.value = opt?.dataset.phone || '';
+      if(email) email.value = opt?.dataset.email || '';
+    });
+  }
+}
+function bindNewQuoteForm(form){
+  if(!form) return;
+  bindQuoteClientSelect(form);
+  bindQuoteItemsEditor(form);
+  if(form.dataset.boundQuoteSubmit) return;
+  form.dataset.boundQuoteSubmit = '1';
+  form.addEventListener('submit',e=>{
     e.preventDefault();
     if(!canEditOperational()) return toast('Sem permissão para criar orçamentos.');
     const data = Object.fromEntries(new FormData(e.target).entries());
     const items = collectQuoteItems(e.target);
     if(!items.length) return toast('Adiciona pelo menos uma referência.');
     const first = items[0];
-    state.quotes.push({ id:uid('ORC'), createdAt:today(), estado:data.estado || 'Rascunho', ...data, items, peca:first.nome, referencia:first.referencia, quantidade:first.unidade, precoUnitario:first.preco, total: quoteItemsTotal(items), history:[{ date:today(), action:'Criado', by:state.currentUser?.email || '' }] });
-    saveState(); renderPage('orcamentos'); toast('Orçamento criado.');
+    const viatura = composeQuoteVehicle(data);
+    state.quotes.push({ id:uid('ORC'), createdAt:today(), estado:data.estado || 'Rascunho', ...data, viatura, items, peca:first.nome, referencia:first.referencia, quantidade:first.unidade, precoUnitario:first.preco, total: quoteItemsTotal(items), history:[{ date:today(), action:'Criado', by:state.currentUser?.email || '' }] });
+    saveState(); closeModal(); renderPage('orcamentos'); toast('Orçamento criado.');
   });
+}
+
+function bindQuotes(){
+  qs('#openNewQuoteModalBtn')?.addEventListener('click', openNewQuoteModal);
   qsa('[data-print-quote]').forEach(b=>b.addEventListener('click',()=>printQuote(b.dataset.printQuote)));
   qsa('[data-email-quote]').forEach(b=>b.addEventListener('click',()=>emailQuote(b.dataset.emailQuote)));
   qsa('[data-edit-quote]').forEach(b=>b.addEventListener('click',()=>openQuoteModal(b.dataset.editQuote)));
@@ -3399,28 +3458,33 @@ function bindQuotes(){
 function openQuoteModal(id){
   const q = quoteById(id); if(!q) return;
   const items = quoteItemsFromLegacy(q);
-  openModal('Editar orçamento', `<form id="editQuoteForm" class="form-grid quote-edit-form">
+  const v = quoteVehicleParts(q);
+  openModal('Editar orçamento', `<form id="editQuoteForm" class="form-grid quote-modal-form">
     <input class="field" name="cliente" placeholder="Cliente" value="${esc(q.cliente||'')}" required>
     <input class="field" name="codigoCliente" placeholder="Código cliente" value="${esc(q.codigoCliente||'')}">
     <input class="field" name="telefone" placeholder="Telefone" value="${esc(q.telefone||'')}">
-    <input class="field" name="email" placeholder="Email" value="${esc(q.email||'')}">
-    <input class="field span3" name="viatura" placeholder="Viatura / matrícula" value="${esc(q.viatura||'')}">
+    <input class="field" name="email" placeholder="Email do cliente" value="${esc(q.email||'')}">
+    <input class="field span3" name="matricula" placeholder="Matrícula" value="${esc(v.matricula)}">
+    <input class="field span3" name="marcaModelo" placeholder="Marca & Modelo" value="${esc(v.marcaModelo)}">
+    <input class="field span3" name="motor" placeholder="Motor" value="${esc(v.motor)}">
     <div class="span3">${quoteItemsInputs(items)}</div>
     <select class="select" name="estado">${['Rascunho','Enviado','Aceite','Recusado'].map(s=>`<option ${q.estado===s?'selected':''}>${s}</option>`).join('')}</select>
     <input class="field" name="validade" type="date" value="${esc(q.validade||today())}">
     <input class="field" name="prazoEntrega" placeholder="Prazo de entrega" value="${esc(q.prazoEntrega||'')}">
     <textarea class="span3" name="condicoes" placeholder="Condições comerciais">${esc(q.condicoes||'')}</textarea>
     <textarea class="span3" name="observacoes" placeholder="Notas internas">${esc(q.observacoes||'')}</textarea>
-    <div class="span3"><button class="btn primary">Guardar orçamento</button></div>
+    <div class="span3"><button class="btn primary full">Guardar orçamento</button></div>
   </form>`);
-  bindQuoteItemsEditor(qs('#editQuoteForm'));
-  qs('#editQuoteForm')?.addEventListener('submit',e=>{
+  const form = qs('#editQuoteForm');
+  bindQuoteItemsEditor(form);
+  form?.addEventListener('submit',e=>{
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.target).entries());
     const newItems = collectQuoteItems(e.target);
     if(!newItems.length) return toast('Adiciona pelo menos uma referência.');
     const first = newItems[0];
     Object.assign(q, data, {
+      viatura:composeQuoteVehicle(data),
       items:newItems,
       peca:first.nome,
       referencia:first.referencia,
@@ -3469,8 +3533,14 @@ Segue orçamento solicitado.
 ORÇAMENTO ${q.id}
 ==============================
 
-MATRÍCULA / VIATURA
-${q.viatura || '-'}
+MATRÍCULA
+${quoteVehicleParts(q).matricula || '-'}
+
+MARCA & MODELO
+${quoteVehicleParts(q).marcaModelo || '-'}
+
+MOTOR
+${quoteVehicleParts(q).motor || '-'}
 
 REFERÊNCIAS
 ${lines}
@@ -3519,7 +3589,7 @@ function quotePdfHtml(q){
     table{width:100%;border-collapse:collapse;margin-top:22px}th{background:#06447f;color:white;text-align:left;padding:12px}td{border-bottom:1px solid #dce7f0;padding:12px}.totals{margin-left:auto;width:310px;margin-top:18px}.totals div{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #dce7f0}.totals .grand{font-size:20px;font-weight:900;color:#06447f}.notes{margin-top:26px;line-height:1.5}.footer{margin-top:40px;color:#49677f;font-size:12px;border-top:1px solid #dce7f0;padding-top:12px}@media print{body{background:white}.page{margin:0;box-shadow:none}button{display:none!important}}
   </style></head><body><button onclick="window.print()" style="position:fixed;right:18px;top:18px;z-index:20;border:0;border-radius:12px;padding:10px 14px;background:#06447f;color:white;font-weight:800;cursor:pointer">Imprimir / Guardar PDF</button><main class="page">
     <section class="top"><div class="brand"><h1>${esc(companyName())}</h1><p>${esc(settings.companyAddress || 'Callcenter de peças automóveis')}</p><p>${settings.companyNif ? `NIF: ${esc(settings.companyNif)} · ` : ''}${esc(settings.companyPhone || '')} ${settings.companyEmail ? '· ' + esc(settings.companyEmail) : ''}</p><p>Orçamento gerado em ${esc(today())}</p></div><div><div class="stamp">ORÇAMENTO</div><p><strong>${esc(q.id)}</strong></p><p>Validade: ${esc(q.validade || today())}</p><p>Estado: ${esc(q.estado || 'Rascunho')}</p></div></section>
-    <section class="box"><h2>Cliente</h2><p><strong>${esc(q.cliente)}</strong></p><p>Código cliente: ${esc(q.codigoCliente || '-')}</p><p>Telefone: ${esc(q.telefone || '-')} · Email: ${esc(q.email || '-')}</p><p>Viatura: ${esc(q.viatura || '-')}</p></section>
+    <section class="box"><h2>Cliente</h2><p><strong>${esc(q.cliente)}</strong></p><p>Código cliente: ${esc(q.codigoCliente || '-')}</p><p>Telefone: ${esc(q.telefone || '-')} · Email: ${esc(q.email || '-')}</p><p>Matrícula: ${esc(quoteVehicleParts(q).matricula || '-')}</p><p>Marca & Modelo: ${esc(quoteVehicleParts(q).marcaModelo || '-')}</p><p>Motor: ${esc(quoteVehicleParts(q).motor || '-')}</p></section>
     <table><thead><tr><th>Nome</th><th>Referência</th><th>Unidade</th><th>Preço Líquido</th><th>Total c/ IVA</th></tr></thead><tbody>${items.map(item=>`<tr><td>${esc(item.nome)}</td><td>${esc(item.referencia || '-')}</td><td>${esc(item.unidade)}</td><td>${money(item.preco)}</td><td>${money(Number(item.total || 0) * 1.23)}</td></tr>`).join('')}</tbody></table>
     <section class="totals"><div><span>Subtotal líquido</span><strong>${money(subtotal)}</strong></div><div><span>IVA 23%</span><strong>${money(iva)}</strong></div><div class="grand"><span>Total</span><strong>${money(totalComIva)}</strong></div></section>
     <section class="notes"><p><strong>Prazo de entrega:</strong> ${esc(q.prazoEntrega || 'A confirmar')}</p><p><strong>Condições:</strong> ${esc(q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.')}</p><p><strong>Observações:</strong> ${esc(q.observacoes || '-')}</p></section>

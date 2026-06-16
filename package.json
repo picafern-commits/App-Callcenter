@@ -1,6 +1,6 @@
 {
   "name": "bragalis-callcenter",
-  "version": "2.5.7",
+  "version": "2.6.0",
   "description": "App Bragalis Callcenter",
   "main": "electron/main.js",
   "scripts": {
@@ -19,7 +19,7 @@
     "electron-builder": "latest"
   },
   "build": {
-    "appId": "pt.autoparts.callcenter",
+    "appId": "pt.bragalis.callcenter",
     "productName": "Bragalis Callcenter",
     "directories": {
       "output": "dist"
