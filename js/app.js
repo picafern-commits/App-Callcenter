@@ -1,4 +1,4 @@
-const APP_VERSION = '2.5.0';
+const APP_VERSION = '2.5.2';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -201,6 +201,7 @@ function ensureStateShape(appState){
   appState.suppliers = Array.isArray(appState.suppliers) ? appState.suppliers : [];
   appState.routes = Array.isArray(appState.routes) ? appState.routes : [];
   appState.vehicles = Array.isArray(appState.vehicles) ? appState.vehicles : deriveVehiclesFromRoutes(appState.routes || []);
+  appState.quotes = (Array.isArray(appState.quotes) ? appState.quotes : []).map(q=>{ const items = quoteItemsFromLegacy(q); return { ...q, items, total: quoteItemsTotal(items) }; });
   return appState;
 }
 function getStoredSession(){
@@ -1813,22 +1814,126 @@ function entityTable(rows, cols, type){
   return `<div class="table-wrap"><table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}<th>Ações</th></tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c])}</td>`).join('')}<td><div class="actions">${canEditOperational()?`<button class="btn small" data-edit-entity="${type}:${r.id}">Editar</button>`:'<span class="muted">Consulta</span>'}${canDelete()?`<button class="btn danger small" data-delete-entity="${type}:${r.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`;
 }
 
+function quoteItemsFromLegacy(q){
+  if(Array.isArray(q.items) && q.items.length) {
+    return q.items.map(item => normalizeQuoteItem(item)).filter(item => item.nome || item.referencia || item.preco);
+  }
+  if(q.peca || q.referencia || q.precoUnitario || q.total) {
+    return [normalizeQuoteItem({
+      nome:q.peca || '',
+      referencia:q.referencia || '',
+      unidade:q.quantidade || q.unidade || 1,
+      preco:q.precoUnitario || q.preco || q.total || 0
+    })];
+  }
+  return [normalizeQuoteItem({ nome:'', referencia:'', unidade:1, preco:0 })];
+}
+function normalizeQuoteItem(item){
+  const unidade = Number(String(item?.unidade ?? item?.quantidade ?? 1).replace(',','.')) || 1;
+  const preco = Number(String(item?.preco ?? item?.precoUnitario ?? 0).replace(',','.')) || 0;
+  return {
+    id:item?.id || uid('ITM'),
+    nome:String(item?.nome ?? item?.peca ?? '').trim(),
+    referencia:String(item?.referencia ?? '').trim(),
+    unidade,
+    preco,
+    total: unidade * preco
+  };
+}
+function quoteItemsTotal(items){
+  return (items || []).reduce((sum,item)=>sum + Number(item.total || (Number(item.unidade||0) * Number(item.preco||0))), 0);
+}
+function quoteMainDescription(q){
+  const items = quoteItemsFromLegacy(q);
+  if(!items.length) return '-';
+  const first = items[0];
+  const extra = items.length > 1 ? ` +${items.length - 1} ref.` : '';
+  return `${first.nome || first.referencia || '-'}${extra}`;
+}
+function quoteItemsInputs(items){
+  const rows = (items && items.length ? items : [normalizeQuoteItem({})]);
+  return `<div class="quote-items-editor" id="quoteItemsEditor">
+    <div class="quote-items-head">
+      <strong>Referências / peças</strong>
+      <button class="btn small ghost" type="button" id="addQuoteItemBtn">+ Adicionar referência</button>
+    </div>
+    <div class="quote-items-grid quote-items-grid-head">
+      <span>Nome</span><span>Referência</span><span>Unidade</span><span>Preço</span><span></span>
+    </div>
+    <div id="quoteItemsRows">
+      ${rows.map((item,idx)=>quoteItemRow(item, idx)).join('')}
+    </div>
+    <div class="quote-items-total"><span>Total orçamento</span><b id="quoteItemsLiveTotal">${money(quoteItemsTotal(rows))}</b></div>
+  </div>`;
+}
+function quoteItemRow(item={}, idx=0){
+  const row = normalizeQuoteItem(item);
+  return `<div class="quote-items-grid quote-item-row" data-quote-item-row>
+    <input class="field" name="itemNome[]" placeholder="Nome" value="${esc(row.nome)}" required>
+    <input class="field" name="itemReferencia[]" placeholder="Referência" value="${esc(row.referencia)}">
+    <input class="field" name="itemUnidade[]" type="number" min="0" step="1" placeholder="Unidade" value="${esc(row.unidade || 1)}">
+    <input class="field" name="itemPreco[]" type="number" min="0" step="0.01" placeholder="Preço" value="${esc(row.preco || '')}" required>
+    <button class="btn danger-soft small" type="button" data-remove-quote-item>×</button>
+  </div>`;
+}
+function collectQuoteItems(form){
+  const nomes = [...form.querySelectorAll('[name="itemNome[]"]')].map(x=>x.value);
+  const refs = [...form.querySelectorAll('[name="itemReferencia[]"]')].map(x=>x.value);
+  const unidades = [...form.querySelectorAll('[name="itemUnidade[]"]')].map(x=>x.value);
+  const precos = [...form.querySelectorAll('[name="itemPreco[]"]')].map(x=>x.value);
+  return nomes.map((nome,idx)=>normalizeQuoteItem({
+    nome,
+    referencia:refs[idx],
+    unidade:unidades[idx],
+    preco:precos[idx]
+  })).filter(item => item.nome || item.referencia || item.preco);
+}
+function refreshQuoteItemsTotal(container=document){
+  const form = container.closest?.('form') || qs('#quoteForm') || qs('#editQuoteForm');
+  if(!form) return;
+  const items = collectQuoteItems(form);
+  const el = form.querySelector('#quoteItemsLiveTotal');
+  if(el) el.textContent = money(quoteItemsTotal(items));
+}
+function bindQuoteItemsEditor(scope=document){
+  const rows = scope.querySelector?.('#quoteItemsRows') || qs('#quoteItemsRows');
+  const addBtn = scope.querySelector?.('#addQuoteItemBtn') || qs('#addQuoteItemBtn');
+  if(addBtn && rows) addBtn.addEventListener('click',()=>{
+    rows.insertAdjacentHTML('beforeend', quoteItemRow({}, rows.querySelectorAll('[data-quote-item-row]').length));
+    bindQuoteItemsEditor(scope);
+    refreshQuoteItemsTotal(rows);
+  });
+  qsa('[data-remove-quote-item]').forEach(btn=>{
+    if(btn.dataset.boundQuoteRemove) return;
+    btn.dataset.boundQuoteRemove = '1';
+    btn.addEventListener('click',()=>{
+      const allRows = qsa('[data-quote-item-row]');
+      if(allRows.length <= 1) return toast('O orçamento precisa de pelo menos uma referência.');
+      btn.closest('[data-quote-item-row]')?.remove();
+      refreshQuoteItemsTotal(rows);
+    });
+  });
+  qsa('#quoteItemsRows input').forEach(input=>{
+    if(input.dataset.boundQuoteInput) return;
+    input.dataset.boundQuoteInput = '1';
+    input.addEventListener('input',()=>refreshQuoteItemsTotal(rows));
+  });
+}
+
 function orcamentos(){
   const clientOptions = state.clients.map(c=>`<option value="${esc(c.nome)}" data-email="${esc(c.email || '')}" data-phone="${esc(c.telefone || '')}" data-code="${esc(clientCode(c))}">${esc(clientCode(c) ? `${clientCode(c)} - ${c.nome}` : c.nome)}</option>`).join('');
   const canEdit = canEditOperational();
   const total = state.quotes.length;
-  const totalValue = state.quotes.reduce((sum,q)=>sum + Number(q.total || 0), 0);
-  const addCard = canEdit ? `<div class="card compact-form-card clean-side-card">
-      <div class="card-head clean-card-head"><div><h3>Novo orçamento</h3><span class="muted">Criação rápida</span></div></div>
+  const totalValue = state.quotes.reduce((sum,q)=>sum + Number(q.total || quoteItemsTotal(quoteItemsFromLegacy(q)) || 0), 0);
+  const addCard = canEdit ? `<div class="card compact-form-card clean-side-card quote-form-card">
+      <div class="card-head clean-card-head"><div><h3>Novo orçamento</h3><span class="muted">Com uma ou várias referências</span></div></div>
       <form id="quoteForm" class="simple-stack-form quote-clean-form">
         <select class="select" name="cliente" id="quoteClientSelect" required><option value="">Selecionar cliente</option>${clientOptions}</select>
         <input class="field" name="codigoCliente" placeholder="Código cliente">
         <input class="field" name="telefone" placeholder="Telefone">
         <input class="field" name="email" placeholder="Email do cliente">
         <input class="field" name="viatura" placeholder="Viatura / matrícula">
-        <input class="field" name="peca" placeholder="Peça / serviço" required>
-        <input class="field" name="referencia" placeholder="Referência">
-        <div class="mini-two-fields"><input class="field" name="quantidade" type="number" min="1" value="1" placeholder="Qtd"><input class="field" name="precoUnitario" type="number" min="0" step="0.01" placeholder="Preço" required></div>
+        ${quoteItemsInputs([normalizeQuoteItem({ nome:'', referencia:'', unidade:1, preco:0 })])}
         <select class="select" name="estado"><option>Rascunho</option><option>Enviado</option><option>Aceite</option><option>Recusado</option></select>
         <input class="field" name="validade" type="date" value="${today()}">
         <input class="field" name="prazoEntrega" placeholder="Prazo de entrega">
@@ -1850,26 +1955,29 @@ function orcamentos(){
   </div>`;
 }
 function quotesTable(){
-  return `<div class="clean-card-list quote-card-list">${state.quotes.map(q=>`
-    <article class="clean-data-card quote-data-card">
+  return `<div class="clean-card-list quote-card-list">${state.quotes.map(q=>{
+    const items = quoteItemsFromLegacy(q);
+    const total = Number(q.total || quoteItemsTotal(items));
+    return `<article class="clean-data-card quote-data-card">
       <div class="data-card-main">
         <span class="data-card-code big-visible-code">${esc(q.id)}</span>
         <strong>${esc(q.cliente || '-')}</strong>
-        <small>${esc(q.peca || '-')} ${q.referencia ? '· ' + esc(q.referencia) : ''}</small>
+        <small>${esc(quoteMainDescription(q))}</small>
+        <div class="quote-item-mini-list">${items.slice(0,3).map(item=>`<span>${esc(item.nome || '-')} · ${esc(item.referencia || '-')} · ${esc(item.unidade)} un. · ${money(item.preco)}</span>`).join('')}${items.length>3?`<span>+ ${items.length-3} referências</span>`:''}</div>
       </div>
       <div class="quote-value-box">
-        <b>${money(q.total)}</b>
+        <b>${money(total)}</b>
         ${badge(q.estado)}
       </div>
       <div class="actions data-card-actions">
         <button class="btn small" data-print-quote="${q.id}">PDF</button>
         <button class="btn success small" data-email-quote="${q.id}">Email</button>
-        ${canEditOperational()?`<button class="btn success small" data-quote-status="${q.id}:Aceite">Aceite</button><button class="btn warn small" data-quote-status="${q.id}:Recusado">Recusado</button>`:''}
+        ${canEditOperational()?`<button class="btn small ghost" data-edit-quote="${q.id}">${ICONS.edit}<span>Editar</span></button><button class="btn success small" data-quote-status="${q.id}:Aceite">Aceite</button><button class="btn warn small" data-quote-status="${q.id}:Recusado">Recusado</button>`:''}
         ${canDelete()?`<button class="btn danger small" data-delete-quote="${q.id}">Apagar</button>`:''}
       </div>
-    </article>`).join('')}</div>`;
+    </article>`;
+  }).join('')}</div>`;
 }
-
 
 function uniqueSorted(values){
   return [...new Set((values || []).map(v=>String(v || '').trim()).filter(Boolean))]
@@ -2607,7 +2715,7 @@ function excelPageRegistry(){
     orcamentos: {
       key:'quotes', title:'Orçamentos', file:'orcamentos', prefix:'ORC', edit:()=>canEditOperational(),
       fields:[
-        ['id','ID'], ['createdAt','Data'], ['estado','Estado'], ['cliente','Cliente'], ['codigoCliente','Código Cliente'], ['telefone','Telefone'], ['email','Email'], ['viatura','Viatura'], ['peca','Peça'], ['referencia','Referência'], ['quantidade','Quantidade'], ['precoUnitario','Preço Unitário'], ['total','Total'], ['validade','Validade'], ['prazoEntrega','Prazo Entrega'], ['condicoes','Condições'], ['observacoes','Observações']
+        ['id','ID'], ['createdAt','Data'], ['estado','Estado'], ['cliente','Cliente'], ['codigoCliente','Código Cliente'], ['telefone','Telefone'], ['email','Email'], ['viatura','Viatura'], ['items','Referências JSON'], ['peca','1ª Peça'], ['referencia','1ª Referência'], ['quantidade','1ª Unidade'], ['precoUnitario','1º Preço'], ['total','Total'], ['validade','Validade'], ['prazoEntrega','Prazo Entrega'], ['condicoes','Condições'], ['observacoes','Observações']
       ]
     },
     users: {
@@ -3191,7 +3299,8 @@ function createQuoteFromCall(id){
   if(!canEditOperational()) return toast('Sem permissão para criar orçamento.');
   const c = state.calls.find(x=>x.id===id); if(!c) return;
   const client = state.clients.find(x => x.nome?.toLowerCase() === c.cliente?.toLowerCase() || (c.telefone && x.telefone === c.telefone)) || {};
-  const q = { id: uid('ORC'), callId:id, cliente:c.cliente, codigoCliente:clientCode(client), telefone:c.telefone, email:c.email, viatura:`${c.marca || ''} ${c.modelo || ''} ${c.matricula ? '- ' + c.matricula : ''}`.trim(), peca:c.peca, referencia:c.referencia, quantidade:1, precoUnitario:Number(c.precoVenda||0), total:Number(c.precoVenda||0), validade:today(), prazoEntrega:'A confirmar', condicoes:'Preços sujeitos a disponibilidade da peça no momento da confirmação.', observacoes:c.observacoes || '', estado:'Rascunho', createdAt:today(), history:[{ date:today(), action:'Criado a partir de pedido', by:state.currentUser?.email || '' }] };
+  const items = [normalizeQuoteItem({ nome:c.peca, referencia:c.referencia, unidade:1, preco:Number(c.precoVenda||0) })];
+  const q = { id: uid('ORC'), callId:id, cliente:c.cliente, codigoCliente:clientCode(client), telefone:c.telefone, email:c.email, viatura:`${c.marca || ''} ${c.modelo || ''} ${c.matricula ? '- ' + c.matricula : ''}`.trim(), items, peca:c.peca, referencia:c.referencia, quantidade:1, precoUnitario:Number(c.precoVenda||0), total:quoteItemsTotal(items), validade:today(), prazoEntrega:'A confirmar', condicoes:'Preços sujeitos a disponibilidade da peça no momento da confirmação.', observacoes:c.observacoes || '', estado:'Rascunho', createdAt:today(), history:[{ date:today(), action:'Criado a partir de pedido', by:state.currentUser?.email || '' }] };
   state.quotes.push(q); c.estado='Orçamento enviado'; saveState(); toast('Orçamento criado.'); setTimeout(()=>goPage('orcamentos'), 250);
 }
 function bindQuotes(){
@@ -3202,20 +3311,60 @@ function bindQuotes(){
     qs('[name="telefone"]').value = opt?.dataset.phone || '';
     qs('[name="email"]').value = opt?.dataset.email || '';
   });
+  bindQuoteItemsEditor(document);
   const form = qs('#quoteForm');
   if(form) form.addEventListener('submit',e=>{
     e.preventDefault();
     if(!canEditOperational()) return toast('Sem permissão para criar orçamentos.');
     const data = Object.fromEntries(new FormData(e.target).entries());
-    const quantidade = Number(data.quantidade || 1);
-    const precoUnitario = Number(data.precoUnitario || 0);
-    state.quotes.push({ id:uid('ORC'), createdAt:today(), estado:data.estado || 'Rascunho', ...data, quantidade, precoUnitario, total: quantidade * precoUnitario, history:[{ date:today(), action:'Criado', by:state.currentUser?.email || '' }] });
+    const items = collectQuoteItems(e.target);
+    if(!items.length) return toast('Adiciona pelo menos uma referência.');
+    const first = items[0];
+    state.quotes.push({ id:uid('ORC'), createdAt:today(), estado:data.estado || 'Rascunho', ...data, items, peca:first.nome, referencia:first.referencia, quantidade:first.unidade, precoUnitario:first.preco, total: quoteItemsTotal(items), history:[{ date:today(), action:'Criado', by:state.currentUser?.email || '' }] });
     saveState(); renderPage('orcamentos'); toast('Orçamento criado.');
   });
   qsa('[data-print-quote]').forEach(b=>b.addEventListener('click',()=>printQuote(b.dataset.printQuote)));
   qsa('[data-email-quote]').forEach(b=>b.addEventListener('click',()=>emailQuote(b.dataset.emailQuote)));
+  qsa('[data-edit-quote]').forEach(b=>b.addEventListener('click',()=>openQuoteModal(b.dataset.editQuote)));
   qsa('[data-quote-status]').forEach(b=>b.addEventListener('click',()=>{ if(!canEditOperational()) return toast('Sem permissão para alterar orçamento.'); const [id,status]=b.dataset.quoteStatus.split(':'); const q=quoteById(id); if(!q) return; q.estado=status; q.history=q.history||[]; q.history.push({date:today(), action:`Marcado como ${status}`, by:state.currentUser?.email || ''}); saveState(); renderPage('orcamentos'); toast('Estado atualizado.'); }));
   qsa('[data-delete-quote]').forEach(b=>b.addEventListener('click',()=>{ if(!canDelete()) return toast('Sem permissão para apagar.'); state.quotes = state.quotes.filter(q=>q.id!==b.dataset.deleteQuote); saveState(); renderPage('orcamentos'); toast('Orçamento apagado.'); }));
+}
+function openQuoteModal(id){
+  const q = quoteById(id); if(!q) return;
+  const items = quoteItemsFromLegacy(q);
+  openModal('Editar orçamento', `<form id="editQuoteForm" class="form-grid quote-edit-form">
+    <input class="field" name="cliente" placeholder="Cliente" value="${esc(q.cliente||'')}" required>
+    <input class="field" name="codigoCliente" placeholder="Código cliente" value="${esc(q.codigoCliente||'')}">
+    <input class="field" name="telefone" placeholder="Telefone" value="${esc(q.telefone||'')}">
+    <input class="field" name="email" placeholder="Email" value="${esc(q.email||'')}">
+    <input class="field span3" name="viatura" placeholder="Viatura / matrícula" value="${esc(q.viatura||'')}">
+    <div class="span3">${quoteItemsInputs(items)}</div>
+    <select class="select" name="estado">${['Rascunho','Enviado','Aceite','Recusado'].map(s=>`<option ${q.estado===s?'selected':''}>${s}</option>`).join('')}</select>
+    <input class="field" name="validade" type="date" value="${esc(q.validade||today())}">
+    <input class="field" name="prazoEntrega" placeholder="Prazo de entrega" value="${esc(q.prazoEntrega||'')}">
+    <textarea class="span3" name="condicoes" placeholder="Condições comerciais">${esc(q.condicoes||'')}</textarea>
+    <textarea class="span3" name="observacoes" placeholder="Notas internas">${esc(q.observacoes||'')}</textarea>
+    <div class="span3"><button class="btn primary">Guardar orçamento</button></div>
+  </form>`);
+  bindQuoteItemsEditor(qs('#editQuoteForm'));
+  qs('#editQuoteForm')?.addEventListener('submit',e=>{
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    const newItems = collectQuoteItems(e.target);
+    if(!newItems.length) return toast('Adiciona pelo menos uma referência.');
+    const first = newItems[0];
+    Object.assign(q, data, {
+      items:newItems,
+      peca:first.nome,
+      referencia:first.referencia,
+      quantidade:first.unidade,
+      precoUnitario:first.preco,
+      total:quoteItemsTotal(newItems)
+    });
+    q.history=q.history||[];
+    q.history.push({date:today(), action:'Orçamento editado', by:state.currentUser?.email || ''});
+    saveState(); closeModal(); renderPage('orcamentos'); toast('Orçamento atualizado.');
+  });
 }
 function quoteById(id){ return state.quotes.find(q=>q.id===id); }
 function printQuote(id){
@@ -3232,14 +3381,17 @@ function emailQuote(id){
   q.history = q.history || [];
   q.history.push({ date:today(), action:'Email preparado', by:state.currentUser?.email || '' });
   saveState();
-  const subject = `Orçamento ${q.id} - ${q.peca}`;
-  const body = `Olá ${q.cliente},\n\nEnviamos em anexo o orçamento ${q.id}.\n\nResumo:\n- Peça/serviço: ${q.peca}\n- Referência: ${q.referencia || '-'}\n- Total: ${money(q.total)}\n- Prazo de entrega: ${q.prazoEntrega || 'A confirmar'}\n\nQualquer questão estamos disponíveis.\n\nObrigado,\n${companyName()}`;
+  const items = quoteItemsFromLegacy(q);
+  const subject = `Orçamento ${q.id} - ${quoteMainDescription(q)}`;
+  const body = `Olá ${q.cliente},\n\nEnviamos em anexo o orçamento ${q.id}.\n\nResumo:\n${items.map(item=>`- ${item.nome || '-'} | Ref: ${item.referencia || '-'} | Unid: ${item.unidade} | Preço: ${money(item.preco)} | Total: ${money(item.total)}`).join('\n')}\n- Total: ${money(quoteItemsTotal(items))}\n- Prazo de entrega: ${q.prazoEntrega || 'A confirmar'}\n\nQualquer questão estamos disponíveis.\n\nObrigado,\n${companyName()}`;
   window.location.href = `mailto:${encodeURIComponent(q.email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   renderPage('orcamentos');
 }
 function quotePdfHtml(q){
-  const iva = Number(q.total || 0) * 0.23;
-  const totalComIva = Number(q.total || 0) + iva;
+  const items = quoteItemsFromLegacy(q);
+  const subtotal = quoteItemsTotal(items);
+  const iva = subtotal * 0.23;
+  const totalComIva = subtotal + iva;
   const settings = state.settings || {};
   return `<!doctype html><html lang="pt-PT"><head><meta charset="utf-8"><title>Orçamento ${esc(q.id)}</title><style>
     *{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;color:#12344d;background:#eef4f8}.page{width:210mm;min-height:297mm;margin:0 auto;background:white;padding:20mm}
@@ -3248,8 +3400,8 @@ function quotePdfHtml(q){
   </style></head><body><main class="page">
     <section class="top"><div class="brand"><h1>${esc(companyName())}</h1><p>${esc(settings.companyAddress || 'Callcenter de peças automóveis')}</p><p>${settings.companyNif ? `NIF: ${esc(settings.companyNif)} · ` : ''}${esc(settings.companyPhone || '')} ${settings.companyEmail ? '· ' + esc(settings.companyEmail) : ''}</p><p>Orçamento gerado em ${esc(today())}</p></div><div><div class="stamp">ORÇAMENTO</div><p><strong>${esc(q.id)}</strong></p><p>Validade: ${esc(q.validade || today())}</p><p>Estado: ${esc(q.estado || 'Rascunho')}</p></div></section>
     <section class="box"><h2>Cliente</h2><p><strong>${esc(q.cliente)}</strong></p><p>Código cliente: ${esc(q.codigoCliente || '-')}</p><p>Telefone: ${esc(q.telefone || '-')} · Email: ${esc(q.email || '-')}</p><p>Viatura: ${esc(q.viatura || '-')}</p></section>
-    <table><thead><tr><th>Descrição</th><th>Referência</th><th>Qtd</th><th>Preço unit.</th><th>Total</th></tr></thead><tbody><tr><td>${esc(q.peca)}</td><td>${esc(q.referencia || '-')}</td><td>${esc(q.quantidade || 1)}</td><td>${money(q.precoUnitario)}</td><td>${money(q.total)}</td></tr></tbody></table>
-    <section class="totals"><div><span>Subtotal</span><strong>${money(q.total)}</strong></div><div><span>IVA 23%</span><strong>${money(iva)}</strong></div><div class="grand"><span>Total</span><strong>${money(totalComIva)}</strong></div></section>
+    <table><thead><tr><th>Nome</th><th>Referência</th><th>Unidade</th><th>Preço</th><th>Total</th></tr></thead><tbody>${items.map(item=>`<tr><td>${esc(item.nome)}</td><td>${esc(item.referencia || '-')}</td><td>${esc(item.unidade)}</td><td>${money(item.preco)}</td><td>${money(item.total)}</td></tr>`).join('')}</tbody></table>
+    <section class="totals"><div><span>Subtotal</span><strong>${money(subtotal)}</strong></div><div><span>IVA 23%</span><strong>${money(iva)}</strong></div><div class="grand"><span>Total</span><strong>${money(totalComIva)}</strong></div></section>
     <section class="notes"><p><strong>Prazo de entrega:</strong> ${esc(q.prazoEntrega || 'A confirmar')}</p><p><strong>Condições:</strong> ${esc(q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.')}</p><p><strong>Observações:</strong> ${esc(q.observacoes || '-')}</p></section>
     <section class="footer">Para avançar, responda a este email com a confirmação do orçamento. Documento gerado por ${esc(companyName())}.</section>
   </main></body></html>`;

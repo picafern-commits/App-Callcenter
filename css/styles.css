@@ -4224,3 +4224,81 @@ body.theme-dark .route-deliver-summary strong{
 .user-online-row td{
   background: rgba(25, 135, 84, .08);
 }
+
+
+/* v2.5.2 - Orçamentos com várias referências */
+.quote-items-editor{
+  display:grid;
+  gap:10px;
+  padding:12px;
+  border:1px solid rgba(20,92,151,.12);
+  border-radius:18px;
+  background:rgba(255,255,255,.62);
+}
+.quote-items-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.quote-items-head strong{
+  color:var(--brand3);
+}
+.quote-items-grid{
+  display:grid;
+  grid-template-columns:1.3fr 1fr .55fr .75fr auto;
+  gap:8px;
+  align-items:center;
+}
+.quote-items-grid-head{
+  color:var(--muted);
+  font-size:12px;
+  font-weight:900;
+  padding:0 4px;
+}
+.quote-item-row .field{
+  min-width:0;
+}
+.quote-items-total{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border-top:1px solid rgba(20,92,151,.10);
+  padding-top:10px;
+  color:var(--muted);
+  font-weight:900;
+}
+.quote-items-total b{
+  color:var(--brand3);
+  font-size:18px;
+}
+.quote-item-mini-list{
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+  margin-top:6px;
+}
+.quote-item-mini-list span{
+  color:var(--muted);
+  font-size:12px;
+  font-weight:800;
+}
+.quote-edit-form .quote-items-editor{
+  grid-column:1 / -1;
+}
+body.theme-dark .quote-items-editor{
+  background:rgba(255,255,255,.04);
+  border-color:rgba(255,255,255,.10);
+}
+body.theme-dark .quote-items-head strong,
+body.theme-dark .quote-items-total b{
+  color:var(--text);
+}
+@media(max-width:900px){
+  .quote-items-grid{
+    grid-template-columns:1fr;
+  }
+  .quote-items-grid-head{
+    display:none;
+  }
+}
