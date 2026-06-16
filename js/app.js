@@ -1,4 +1,4 @@
-const APP_VERSION = '2.5.5';
+const APP_VERSION = '2.5.7';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -445,7 +445,7 @@ function canSyncCollectionKey(stateKey){
   return canAction('add', pageId) || canAction('edit', pageId) || canAction('delete', pageId);
 }
 const PAGE_COLLECTION_KEYS = {
-  dashboard:['calls','clients','suppliers','quotes','routes'],
+  dashboard:['users'],
   'nova-chamada':['calls','clients','suppliers'],
   pedidos:['calls','clients','suppliers','quotes'],
   clientes:['clients'],
@@ -461,21 +461,27 @@ const PAGE_COLLECTION_KEYS = {
   'configs-user':['users']
 };
 function initialFirebaseKeys(){
-  return ['users','clients','suppliers','calls','quotes'];
+  return ['users'];
 }
 function keysForPage(pageId){
   return PAGE_COLLECTION_KEYS[pageId] || [];
 }
+const firebaseLoadingKeys = new Map();
 async function loadCollectionKey(stateKey){
   if(!firebaseReady || !firebaseDb || !FIREBASE_COLLECTIONS[stateKey] || firebaseLoadedKeys.has(stateKey)) return true;
-  const result = await safeLoadCollection(stateKey, FIREBASE_COLLECTIONS[stateKey]);
-  if(result.ok && Array.isArray(result.rows)) {
-    state[stateKey] = result.rows;
-    firebaseLoadedKeys.add(stateKey);
-    state = ensureStateShape(state);
-    return true;
-  }
-  return false;
+  if(firebaseLoadingKeys.has(stateKey)) return firebaseLoadingKeys.get(stateKey);
+  const task = (async ()=>{
+    const result = await safeLoadCollection(stateKey, FIREBASE_COLLECTIONS[stateKey]);
+    if(result.ok && Array.isArray(result.rows)) {
+      state[stateKey] = result.rows;
+      firebaseLoadedKeys.add(stateKey);
+      state = ensureStateShape(state);
+      return true;
+    }
+    return false;
+  })().finally(()=>firebaseLoadingKeys.delete(stateKey));
+  firebaseLoadingKeys.set(stateKey, task);
+  return task;
 }
 async function ensurePageCollections(pageId){
   const keys = keysForPage(pageId).filter(k=>!firebaseLoadedKeys.has(k));
@@ -1197,7 +1203,7 @@ function renderPage(id){
     id = 'dashboard';
   }
   currentPage = id;
-  updateUserPresence(true);
+  if(!window.__lastPresencePage || window.__lastPresencePage !== id){ updateUserPresence(true); window.__lastPresencePage = id; }
   qs('#appShell')?.classList.toggle('dashboard-mode', id === 'dashboard');
   applyTheme();
   updateGlobalSearchVisibility(id);
@@ -3443,29 +3449,44 @@ function emailQuote(id){
   const subtotal = quoteItemsTotal(items);
   const iva = subtotal * 0.23;
   const totalComIva = subtotal + iva;
-  const subject = `Orçamento ${q.id} - ${quoteMainDescription(q)}`;
-  const lines = items.map((item,idx)=>`${idx+1}. ${item.nome || '-'}\n   Referência: ${item.referencia || '-'}\n   Unidade: ${item.unidade}\n   Preço: ${money(item.preco)}\n   Total: ${money(item.total)}`).join('\n\n');
-  const body = `Olá ${q.cliente || ''},
+  const subject = `Orçamento ${q.id} - ${q.viatura || quoteMainDescription(q)}`;
+  const lines = items.map((item,idx)=>{
+    const totalLinhaComIva = Number(item.total || 0) * 1.23;
+    return `━━━━━━━━━━━━━━━━━━━━
+REF. ${idx+1}
+Peça: ${item.nome || '-'}
+Referência: ${item.referencia || '-'}
+Unidade: ${item.unidade}
+Preço líquido: ${money(item.preco)}
+Total c/ IVA: ${money(totalLinhaComIva)}`;
+  }).join('\n\n');
 
-Segue o orçamento ${q.id}.
+  const body = `Olá,
 
-DADOS DO ORÇAMENTO
-Cliente: ${q.cliente || '-'}
-Código cliente: ${q.codigoCliente || '-'}
-Telefone: ${q.telefone || '-'}
-Email: ${q.email || '-'}
-Viatura: ${q.viatura || '-'}
+Segue orçamento solicitado.
+
+==============================
+ORÇAMENTO ${q.id}
+==============================
+
+MATRÍCULA / VIATURA
+${q.viatura || '-'}
 
 REFERÊNCIAS
 ${lines}
 
+==============================
 RESUMO
-Subtotal: ${money(subtotal)}
+Subtotal líquido: ${money(subtotal)}
 IVA 23%: ${money(iva)}
-Total: ${money(totalComIva)}
+TOTAL FINAL: ${money(totalComIva)}
+==============================
 
-Prazo de entrega: ${q.prazoEntrega || 'A confirmar'}
-Condições: ${q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.'}
+Prazo de entrega:
+${q.prazoEntrega || 'A confirmar'}
+
+Condições:
+${q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.'}
 
 Observações:
 ${q.observacoes || '-'}
@@ -3476,9 +3497,15 @@ Obrigado,
 ${companyName()}`;
 
   // Não gravar nada na Firebase só por preparar email.
-  // Isto evita o erro invalid-argument e abre diretamente o Outlook/app de email.
-  window.location.href = `mailto:${encodeURIComponent(q.email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  toast('Email preparado no Outlook/app de email.');
+  // Usa assign e fallback para melhorar compatibilidade com Outlook/mailto em alguns Windows.
+  const mailto = `mailto:${encodeURIComponent(q.email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  try {
+    window.location.assign(mailto);
+    setTimeout(()=>toast('Se o Outlook não abriu, confirma a app predefinida de Email no Windows.'), 900);
+  } catch(err) {
+    console.warn('Mailto failed', err);
+    toast('Não foi possível abrir o email. Confirma a app predefinida de Email no Windows.');
+  }
 }
 function quotePdfHtml(q){
   const items = quoteItemsFromLegacy(q);
@@ -3493,8 +3520,8 @@ function quotePdfHtml(q){
   </style></head><body><button onclick="window.print()" style="position:fixed;right:18px;top:18px;z-index:20;border:0;border-radius:12px;padding:10px 14px;background:#06447f;color:white;font-weight:800;cursor:pointer">Imprimir / Guardar PDF</button><main class="page">
     <section class="top"><div class="brand"><h1>${esc(companyName())}</h1><p>${esc(settings.companyAddress || 'Callcenter de peças automóveis')}</p><p>${settings.companyNif ? `NIF: ${esc(settings.companyNif)} · ` : ''}${esc(settings.companyPhone || '')} ${settings.companyEmail ? '· ' + esc(settings.companyEmail) : ''}</p><p>Orçamento gerado em ${esc(today())}</p></div><div><div class="stamp">ORÇAMENTO</div><p><strong>${esc(q.id)}</strong></p><p>Validade: ${esc(q.validade || today())}</p><p>Estado: ${esc(q.estado || 'Rascunho')}</p></div></section>
     <section class="box"><h2>Cliente</h2><p><strong>${esc(q.cliente)}</strong></p><p>Código cliente: ${esc(q.codigoCliente || '-')}</p><p>Telefone: ${esc(q.telefone || '-')} · Email: ${esc(q.email || '-')}</p><p>Viatura: ${esc(q.viatura || '-')}</p></section>
-    <table><thead><tr><th>Nome</th><th>Referência</th><th>Unidade</th><th>Preço</th><th>Total</th></tr></thead><tbody>${items.map(item=>`<tr><td>${esc(item.nome)}</td><td>${esc(item.referencia || '-')}</td><td>${esc(item.unidade)}</td><td>${money(item.preco)}</td><td>${money(item.total)}</td></tr>`).join('')}</tbody></table>
-    <section class="totals"><div><span>Subtotal</span><strong>${money(subtotal)}</strong></div><div><span>IVA 23%</span><strong>${money(iva)}</strong></div><div class="grand"><span>Total</span><strong>${money(totalComIva)}</strong></div></section>
+    <table><thead><tr><th>Nome</th><th>Referência</th><th>Unidade</th><th>Preço Líquido</th><th>Total c/ IVA</th></tr></thead><tbody>${items.map(item=>`<tr><td>${esc(item.nome)}</td><td>${esc(item.referencia || '-')}</td><td>${esc(item.unidade)}</td><td>${money(item.preco)}</td><td>${money(Number(item.total || 0) * 1.23)}</td></tr>`).join('')}</tbody></table>
+    <section class="totals"><div><span>Subtotal líquido</span><strong>${money(subtotal)}</strong></div><div><span>IVA 23%</span><strong>${money(iva)}</strong></div><div class="grand"><span>Total</span><strong>${money(totalComIva)}</strong></div></section>
     <section class="notes"><p><strong>Prazo de entrega:</strong> ${esc(q.prazoEntrega || 'A confirmar')}</p><p><strong>Condições:</strong> ${esc(q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.')}</p><p><strong>Observações:</strong> ${esc(q.observacoes || '-')}</p></section>
     <section class="footer">Para avançar, responda a este email com a confirmação do orçamento. Documento gerado por ${esc(companyName())}.</section>
   </main></body></html>`;
