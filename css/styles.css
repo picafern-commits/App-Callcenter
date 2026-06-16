@@ -4434,3 +4434,48 @@ body.theme-dark .email-option-pill{
 body.theme-dark #quoteClientSearch{
   border-color:rgba(106,174,232,.22)!important;
 }
+
+
+/* v2.6.8 - Clientes com múltiplos emails e telefones */
+.client-multi-field{
+  display:grid;
+  gap:8px;
+  padding:10px;
+  border-radius:16px;
+  border:1px solid rgba(20,92,151,.12);
+  background:rgba(255,255,255,.58);
+}
+.client-multi-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.client-multi-head strong{
+  color:var(--brand3);
+}
+.client-multi-rows{
+  display:grid;
+  gap:8px;
+}
+.client-contact-row{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:8px;
+  align-items:center;
+}
+.client-name-box small{
+  display:block;
+  margin-top:3px;
+}
+.client-phone-box{
+  display:grid;
+  gap:4px;
+}
+body.theme-dark .client-multi-field{
+  background:rgba(255,255,255,.04);
+  border-color:rgba(255,255,255,.10);
+}
+body.theme-dark .client-multi-head strong{
+  color:var(--text);
+}

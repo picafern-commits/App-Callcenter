@@ -1,4 +1,4 @@
-const APP_VERSION = '2.6.6';
+const APP_VERSION = '2.6.8';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -1445,19 +1445,101 @@ function badge(v){
   return `<span class="badge ${map[v]||''}">${esc(v||'-')}</span>`;
 }
 
+function normalizeClientContacts(c){
+  const emails = Array.isArray(c?.emails) ? c.emails : (c?.email ? [c.email] : []);
+  const telefones = Array.isArray(c?.telefones) ? c.telefones : (c?.telefone ? [c.telefone] : []);
+  return {
+    emails:[...new Set(emails.map(v=>String(v || '').trim()).filter(Boolean))],
+    telefones:[...new Set(telefones.map(v=>String(v || '').trim()).filter(Boolean))]
+  };
+}
+function clientPrimaryEmail(c){ return normalizeClientContacts(c).emails[0] || c.email || ''; }
+function clientPrimaryPhone(c){ return normalizeClientContacts(c).telefones[0] || c.telefone || ''; }
+function clientEmailsLabel(c){
+  const emails = normalizeClientContacts(c).emails;
+  if(!emails.length) return '<small>Sem email</small>';
+  return emails.map((email,idx)=>`<small>Email ${idx+1}: ${esc(email)}</small>`).join('');
+}
+function clientPhonesLabel(c){
+  const phones = normalizeClientContacts(c).telefones;
+  if(!phones.length) return '<span>☎ Sem telefone</span>';
+  return phones.map((phone,idx)=>`<span>☎ Telefone ${idx+1}: ${esc(phone)}</span>`).join('');
+}
+function clientContactRows(values=[], type='email'){
+  const rows = values.length ? values : [''];
+  const label = type === 'email' ? 'Email' : 'Telefone';
+  const name = type === 'email' ? 'clientEmail[]' : 'clientTelefone[]';
+  const inputType = type === 'email' ? 'email' : 'tel';
+  return `<div class="client-multi-field" data-client-multi="${type}">
+    <div class="client-multi-head"><strong>${label}s</strong><button class="btn small ghost" type="button" data-add-client-contact="${type}">+ ${label}</button></div>
+    <div class="client-multi-rows">
+      ${rows.map((v,idx)=>`<div class="client-contact-row" data-client-contact-row>
+        <input class="field" type="${inputType}" name="${name}" placeholder="${label} ${idx+1}" value="${esc(v)}">
+        <button class="btn danger-soft small" type="button" data-remove-client-contact>×</button>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+function collectClientContacts(form){
+  const emails = [...form.querySelectorAll('[name="clientEmail[]"]')].map(i=>i.value.trim()).filter(Boolean);
+  const telefones = [...form.querySelectorAll('[name="clientTelefone[]"]')].map(i=>i.value.trim()).filter(Boolean);
+  return { emails:[...new Set(emails)], telefones:[...new Set(telefones)], email:emails[0] || '', telefone:telefones[0] || '' };
+}
+function bindClientMultiContacts(scope=document){
+  const root = scope && scope.querySelector ? scope : document;
+  root.querySelectorAll('[data-add-client-contact]').forEach(btn=>{
+    if(btn.dataset.boundClientAdd) return;
+    btn.dataset.boundClientAdd = '1';
+    btn.addEventListener('click',()=>{
+      const type = btn.dataset.addClientContact;
+      const box = btn.closest('[data-client-multi]');
+      const rows = box?.querySelector('.client-multi-rows');
+      const count = rows?.querySelectorAll('[data-client-contact-row]').length || 0;
+      const label = type === 'email' ? 'Email' : 'Telefone';
+      const name = type === 'email' ? 'clientEmail[]' : 'clientTelefone[]';
+      const inputType = type === 'email' ? 'email' : 'tel';
+      rows?.insertAdjacentHTML('beforeend', `<div class="client-contact-row" data-client-contact-row>
+        <input class="field" type="${inputType}" name="${name}" placeholder="${label} ${count+1}">
+        <button class="btn danger-soft small" type="button" data-remove-client-contact>×</button>
+      </div>`);
+      bindClientMultiContacts(root);
+    });
+  });
+  root.querySelectorAll('[data-remove-client-contact]').forEach(btn=>{
+    if(btn.dataset.boundClientRemove) return;
+    btn.dataset.boundClientRemove = '1';
+    btn.addEventListener('click',()=>{
+      const box = btn.closest('[data-client-multi]');
+      const rows = box?.querySelectorAll('[data-client-contact-row]') || [];
+      if(rows.length <= 1) {
+        const input = btn.closest('[data-client-contact-row]')?.querySelector('input');
+        if(input) input.value = '';
+        return;
+      }
+      btn.closest('[data-client-contact-row]')?.remove();
+    });
+  });
+}
+function clientFormHtml(c={}){
+  const contacts = normalizeClientContacts(c);
+  return `<input class="field" name="codigoCliente" placeholder="Código cliente" value="${esc(c.codigoCliente || '')}" required>
+    <input class="field" name="nome" placeholder="Nome do cliente" value="${esc(c.nome || '')}" required>
+    <div class="span3">${clientContactRows(contacts.telefones,'telefone')}</div>
+    <div class="span3">${clientContactRows(contacts.emails,'email')}</div>
+    <input class="field" name="morada" placeholder="Morada" value="${esc(c.morada || '')}">
+    <input class="field" name="codigoPostal" placeholder="Código postal" value="${esc(c.codigoPostal || '')}">
+    <textarea name="notas" placeholder="Notas internas">${esc(c.notas || '')}</textarea>`;
+}
+
 function clientes(){
   const canEdit = canEditOperational();
   const total = state.clients.length;
-  const withEmail = state.clients.filter(c=>c.email).length;
-  const withPhone = state.clients.filter(c=>c.telefone).length;
+  const withEmail = state.clients.filter(c=>normalizeClientContacts(c).emails.length).length;
+  const withPhone = state.clients.filter(c=>normalizeClientContacts(c).telefones.length).length;
   const addCard = canEdit ? `<div class="card compact-form-card clean-side-card">
       <div class="card-head clean-card-head"><div><h3>Novo cliente</h3><span class="muted">Registo rápido</span></div></div>
       <form id="clientForm" class="simple-stack-form">
-        <input class="field" name="codigoCliente" placeholder="Código cliente" required>
-        <input class="field" name="nome" placeholder="Nome do cliente" required>
-        <input class="field" name="telefone" placeholder="Telefone">
-        <input class="field" name="email" placeholder="Email">
-        <textarea name="notas" placeholder="Notas internas"></textarea>
+        ${clientFormHtml({})}
         <button class="btn primary full" type="submit">Guardar cliente</button>
       </form>
     </div>` : '';
@@ -1469,7 +1551,7 @@ function clientes(){
         <div class="clean-stats"><span><b>${total}</b> total</span><span><b>${withEmail}</b> email</span><span><b>${withPhone}</b> telefone</span></div>
       </div>
       ${!canEdit ? '<div class="readonly-note">Modo leitura: podes consultar dados e enviar emails, mas não podes adicionar nem editar clientes.</div>' : ''}
-      <div class="clean-search-row"><input id="clientSearch" class="field" placeholder="Pesquisar cliente, código, telefone ou email"></div>
+      <div class="clean-search-row"><input id="clientSearch" class="field" placeholder="Pesquisar cliente, código, telefone, email, morada ou código postal"></div>
       <div id="clientsTable">${clientsTable(state.clients)}</div>
     </div>
   </div>`;
@@ -1704,7 +1786,7 @@ function contactsCards(group){
 function clientCode(c){ return c.codigoCliente || c.codigo || c.tipo || ''; }
 function filterClients(){
   const q = (qs('#clientSearch')?.value || '').toLowerCase();
-  return state.clients.filter(c => `${clientCode(c)} ${c.nome || ''} ${c.telefone || ''} ${c.email || ''}`.toLowerCase().includes(q));
+  return state.clients.filter(c => `${clientCode(c)} ${c.nome || ''} ${(normalizeClientContacts(c).telefones||[]).join(' ')} ${(normalizeClientContacts(c).emails||[]).join(' ')} ${c.morada || ''} ${c.codigoPostal || ''}`.toLowerCase().includes(q));
 }
 function clientsTable(rows){
   if(!rows.length) return '<div class="empty">Sem clientes registados.</div>';
@@ -1712,17 +1794,18 @@ function clientsTable(rows){
     <article class="clean-data-card client-data-card code-centered-card">
       <div class="data-card-main client-name-box">
         <strong>${esc(c.nome || '-')}</strong>
-        <small>${esc(c.email || 'Sem email')}</small>
+        ${clientEmailsLabel(c)}
+        <small>${esc([c.morada, c.codigoPostal].filter(Boolean).join(' · ') || 'Sem morada')}</small>
       </div>
       <div class="card-code-center client-code-box">
         <span class="data-card-code big-visible-code">${esc(clientCode(c) || 'Sem código')}</span>
       </div>
       <div class="data-card-meta client-phone-box">
-        <span>☎ ${esc(c.telefone || 'Sem telefone')}</span>
+        ${clientPhonesLabel(c)}
       </div>
       <div class="actions data-card-actions">
         <button class="btn small" data-client-detail="${c.id}">Ficha</button>
-        ${c.email ? `<button class="btn success small" data-client-email="${c.id}">Email</button>` : ''}
+        ${clientPrimaryEmail(c) ? `<button class="btn success small" data-client-email="${c.id}">Email</button>` : ''}
         ${canEditOperational()?`<button class="btn small" data-edit-entity="client:${c.id}">Editar</button>`:''}
         ${canDelete()?`<button class="btn danger small" data-delete-entity="client:${c.id}">Apagar</button>`:''}
       </div>
@@ -1730,17 +1813,21 @@ function clientsTable(rows){
 }
 function openClientDetail(id){
   const c = state.clients.find(x=>x.id===id); if(!c) return;
-  const calls = state.calls.filter(x => x.cliente?.toLowerCase() === c.nome?.toLowerCase() || (c.telefone && x.telefone === c.telefone));
-  const quotes = state.quotes.filter(x => x.cliente?.toLowerCase() === c.nome?.toLowerCase() || (c.email && x.email === c.email));
+  const phones = normalizeClientContacts(c).telefones;
+  const emails = normalizeClientContacts(c).emails;
+  const calls = state.calls.filter(x => x.cliente?.toLowerCase() === c.nome?.toLowerCase() || (x.telefone && phones.includes(x.telefone)));
+  const quotes = state.quotes.filter(x => x.cliente?.toLowerCase() === c.nome?.toLowerCase() || (x.email && emails.includes(x.email)));
   openModal(`Ficha cliente · ${esc(c.nome)}`, `
     <div class="client-detail">
       <div class="detail-grid">
         <div><span>Código</span><strong>${esc(clientCode(c) || '-')}</strong></div>
-        <div><span>Telefone</span><strong>${esc(c.telefone || '-')}</strong></div>
-        <div><span>Email</span><strong>${esc(c.email || '-')}</strong></div>
+        <div><span>Telefones</span><strong>${esc(phones.map((p,i)=>`Telefone ${i+1}: ${p}`).join(' · ') || '-')}</strong></div>
+        <div><span>Emails</span><strong>${esc(emails.map((e,i)=>`Email ${i+1}: ${e}`).join(' · ') || '-')}</strong></div>
+        <div><span>Morada</span><strong>${esc(c.morada || '-')}</strong></div>
+        <div><span>Código postal</span><strong>${esc(c.codigoPostal || '-')}</strong></div>
         <div><span>Pedidos</span><strong>${calls.length}</strong></div>
       </div>
-      <div class="actions">${c.email ? `<button class="btn success" data-client-email="${c.id}">Enviar email ao cliente</button>` : '<span class="muted">Cliente sem email registado.</span>'}</div>
+      <div class="actions">${clientPrimaryEmail(c) ? `<button class="btn success" data-client-email="${c.id}">Enviar email ao cliente</button>` : '<span class="muted">Cliente sem email registado.</span>'}</div>
       <h4>Histórico de pedidos</h4>
       ${callsTable(calls, false)}
       <h4>Orçamentos</h4>
@@ -1751,10 +1838,11 @@ function openClientDetail(id){
 }
 function emailClient(id){
   const c = state.clients.find(x=>x.id===id); if(!c) return;
-  if(!c.email) return toast('Este cliente não tem email registado.');
+  const primaryEmail = clientPrimaryEmail(c);
+  if(!primaryEmail) return toast('Este cliente não tem email registado.');
   openModal(`Enviar email · ${esc(c.nome || '')}`, `
     <form id="clientEmailForm" class="form-grid">
-      <input class="field span3" name="to" value="${esc(c.email)}" readonly>
+      <input class="field span3" name="to" value="${esc(primaryEmail)}" readonly>
       <input class="field span3" name="subject" placeholder="Assunto" value="Contacto ${esc(companyName())}">
       <textarea class="span3" name="body" placeholder="Mensagem">Olá ${esc(c.nome || '')},\n\n</textarea>
       <div class="span3 actions">
@@ -1769,8 +1857,8 @@ function emailClient(id){
     closeModal();
   });
   qs('#copyClientEmailBtn')?.addEventListener('click', async()=>{
-    try { await navigator.clipboard.writeText(c.email); toast('Email copiado.'); }
-    catch { toast(c.email); }
+    try { await navigator.clipboard.writeText(primaryEmail); toast('Email copiado.'); }
+    catch { toast(primaryEmail); }
   });
 }
 function supplierName(s){ return s.nomeMarca || s.nomeFornecedor || s.nome || ''; }
@@ -2784,7 +2872,7 @@ function excelPageRegistry(){
     clientes: {
       key:'clients', title:'Clientes', file:'clientes', prefix:'CLI', edit:()=>canEditOperational(),
       fields:[
-        ['id','ID'], ['codigoCliente','Código Cliente'], ['nome','Nome'], ['telefone','Telefone'], ['email','Email'], ['notas','Notas']
+        ['id','ID'], ['codigoCliente','Código Cliente'], ['nome','Nome'], ['telefone','Telefone 1'], ['email','Email 1'], ['telefones','Telefones'], ['emails','Emails'], ['morada','Morada'], ['codigoPostal','Código Postal'], ['notas','Notas']
       ]
     },
     contactos: {
@@ -4060,6 +4148,7 @@ function upsertAppUser(user){
   if(currentEmail && currentEmail === String(user.email || '').toLowerCase()) syncCurrentUserName();
 }
 function bindEntities(){
+  bindClientMultiContacts(document);
   const map = { client:[state.clients,'clients'], supplier:[state.suppliers,'suppliers'], stock:[state.stock,'stock'], user:[state.users,'users'], follow:[state.followups,'followups'] };
   qsa('[data-delete-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.deleteEntity.split(':'); if(!canDelete()) return toast('Sem permissão para apagar.'); if(type==='user' && !isAdminMaster()) return toast('Só o Admin Master pode alterar utilizadores.'); const target=map[type]; state[target[1]] = target[0].filter(x=>x.id!==id); saveState(); renderPage(currentPage); toast('Registo apagado.'); }));
   qsa('[data-edit-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.editEntity.split(':'); if(type==='user' && !isAdminMaster()) return toast('Só o Admin Master pode alterar utilizadores.'); openEntityModal(type,id); }));
@@ -4069,7 +4158,8 @@ function bindEntities(){
     e.preventDefault(); 
     if(f.key==='users' && !hasPermission('manageUsers')) return toast('Sem permissão para gerir utilizadores.'); 
     if(f.key!=='users' && !canEditOperational()) return toast('Sem permissão para guardar.'); 
-    const row = {id:uid(f.prefix),...Object.fromEntries(new FormData(e.target).entries())};
+    let row = {id:uid(f.prefix),...Object.fromEntries(new FormData(e.target).entries())};
+    if(f.key==='clients') row = {...row, ...collectClientContacts(e.target)};
     state[f.key].push(row); 
     if(f.key==='suppliers') sortSuppliersState(); 
     try{
@@ -4089,9 +4179,27 @@ function bindEntities(){
 function openEntityModal(type,id){
   const map = { client:['clients','CLI'], supplier:['suppliers','FOR'], stock:['stock','STK'], user:['users','USR'], follow:['followups','AGE'] };
   const [key] = map[type]; const item = state[key].find(x=>x.id===id); if(!item) return;
-  const fields = Object.keys(item).filter(k=>k!=='id' && !(type==='user' && k==='pageAccess'));
-  openModal('Editar registo', `<form id="entityEditForm" class="form-grid">${fields.map(k=>`<input class="field" name="${k}" placeholder="${k}" value="${esc(item[k])}">`).join('')}<div class="span3"><button class="btn primary">Guardar</button></div></form>`);
-  qs('#entityEditForm').addEventListener('submit',e=>{e.preventDefault(); Object.assign(item,Object.fromEntries(new FormData(e.target).entries())); if(key==='suppliers') sortSuppliersState(); saveState(); closeModal(); renderPage(currentPage); toast('Registo atualizado.');});
+  const fields = type === 'client'
+    ? ['codigoCliente','nome','telefone','email','morada','codigoPostal','notas']
+    : Object.keys(item).filter(k=>k!=='id' && !(type==='user' && k==='pageAccess'));
+  openModal('Editar registo', `<form id="entityEditForm" class="form-grid">${type==='client' ? clientFormHtml(item) : fields.map(k=>`<input class="field" name="${k}" placeholder="${k}" value="${esc(item[k])}">`).join('')}<div class="span3"><button class="btn primary">Guardar</button></div></form>`);
+  bindClientMultiContacts(qs('#entityEditForm'));
+  qs('#entityEditForm').addEventListener('submit',async e=>{
+    e.preventDefault(); 
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    if(type==='client') Object.assign(data, collectClientContacts(e.target));
+    Object.assign(item,data); 
+    if(key==='suppliers') sortSuppliersState(); 
+    try{
+      const ok = await saveSingleRowToFirebase(key, item);
+      if(!ok) saveState();
+      closeModal(); renderPage(currentPage); toast('Registo atualizado.');
+    }catch(err){
+      console.warn('Update Firebase failed', err);
+      const code = err?.code ? ` (${err.code})` : '';
+      toast(`Erro Firebase ao atualizar${code}.`);
+    }
+  });
 }
 function openEntityReadModal(type,id){
   const map = { client:['clients'], supplier:['suppliers'], stock:['stock'], user:['users'], follow:['followups'] };
