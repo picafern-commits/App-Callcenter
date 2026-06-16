@@ -52,6 +52,7 @@
 
       <div class="top-actions">
         <button id="homeBtn" class="btn ghost">Início</button>
+        <button id="quickCallBtn" class="btn primary">+ Nova chamada</button>
         <span id="userBadge" class="user-badge">Admin</span>
         <button id="logoutBtn" class="btn danger-soft">Fechar app</button>
       </div>
@@ -69,7 +70,7 @@
   <div id="modalRoot" class="modal-root hidden"></div>
   <div id="toast" class="toast hidden"></div>
 
-  <script>window.DEFAULT_PAGE = 'users';</script>
+  <script>window.DEFAULT_PAGE = 'stock';</script>
   <script src="../js/app.js"></script>
 </body>
 </html>
