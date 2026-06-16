@@ -1,6 +1,6 @@
 {
   "name": "bragalis-callcenter",
-  "version": "2.6.2",
+  "version": "2.6.5",
   "description": "App Bragalis Callcenter",
   "main": "electron/main.js",
   "scripts": {

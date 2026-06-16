@@ -1,4 +1,4 @@
-const APP_VERSION = '2.6.2';
+const APP_VERSION = '2.6.5';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -398,7 +398,7 @@ async function pushCloudState(options = {}){
     markFirebaseDirty();
     console.warn('Firebase save failed', err);
     const code = err?.code ? ` (${err.code})` : '';
-    toast(`Erro Firebase: nada foi gravado${code}.`);
+    toast(`Erro Firebase: nada foi gravado${code}. Dados limpos e prontos para nova tentativa.`);
     return false;
   } finally {
     cloudSaveInProgress = false;
@@ -494,7 +494,7 @@ async function saveFirebaseCollections(){
   if (hasPermission('manageSettings')) {
     try {
       await metaRef.set({
-        settings: state.settings || {},
+        settings: sanitizeForFirestore(state.settings || {}),
         appVersion: APP_VERSION,
         dataModel: 'collections-v2',
         collections: FIREBASE_COLLECTIONS,
@@ -530,26 +530,36 @@ async function syncCollection(collectionName, rows, allowDelete=false){
   const ids = new Set(rows.map(row => row.id).filter(Boolean));
   let batch = firebaseDb.batch();
   let ops = 0;
+  const commitIfNeeded = async(force=false)=>{
+    if(ops && (force || ops >= 450)){
+      await batch.commit();
+      batch = firebaseDb.batch();
+      ops = 0;
+    }
+  };
 
-  existing.forEach(doc => {
+  for(const doc of existing.docs || []){
     if (allowDelete && !ids.has(doc.id)) {
       batch.delete(doc.ref);
       ops++;
+      await commitIfNeeded();
     }
-  });
+  }
 
-  rows.forEach(row => {
+  for(const row of rows){
     const id = row.id || uid('DOC');
     row.id = id;
-    batch.set(collectionRef.doc(id), {
+    const payload = sanitizeRowForFirestore({
       ...row,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedBy: firebaseAuth.currentUser.email || ''
-    }, { merge: true });
+    });
+    batch.set(collectionRef.doc(id), payload, { merge: true });
     ops++;
-  });
+    await commitIfNeeded();
+  }
 
-  if (ops) await batch.commit();
+  await commitIfNeeded(true);
 }
 async function loadCloudState(options = {}){
   if (!firebaseReady || !firebaseAuth?.currentUser || !firebaseDb) return;
@@ -626,6 +636,45 @@ function cleanFirebaseDoc(doc){
     updatedAt: normalizeDate(doc.updatedAt)
   };
 }
+function sanitizeForFirestore(value){
+  if(value === undefined) return undefined;
+  if(value === null) return null;
+  if(value instanceof Date) return value.toISOString();
+  if(typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if(typeof value === 'string' || typeof value === 'boolean') return value;
+  if(Array.isArray(value)) {
+    return value
+      .map(item => sanitizeForFirestore(item))
+      .filter(item => item !== undefined);
+  }
+  if(typeof value === 'object') {
+    // Mantém valores especiais da Firebase, como serverTimestamp().
+    if(value && value.constructor && String(value.constructor.name || '').includes('FieldValue')) return value;
+    const out = {};
+    Object.entries(value).forEach(([key,val])=>{
+      if(typeof val === 'function') return;
+      const clean = sanitizeForFirestore(val);
+      if(clean !== undefined) out[key] = clean;
+    });
+    return out;
+  }
+  return String(value || '');
+}
+function sanitizeRowForFirestore(row){
+  const clean = sanitizeForFirestore(row || {});
+  if(clean.items && Array.isArray(clean.items)) {
+    clean.items = clean.items.map(item => ({
+      id:item.id || uid('ITM'),
+      nome:String(item.nome || ''),
+      referencia:String(item.referencia || ''),
+      unidade:Number.isFinite(Number(item.unidade)) ? Number(item.unidade) : 1,
+      preco:Number.isFinite(Number(item.preco)) ? Number(item.preco) : 0,
+      total:Number.isFinite(Number(item.total)) ? Number(item.total) : ((Number(item.unidade)||1) * (Number(item.preco)||0))
+    }));
+  }
+  return clean;
+}
+
 async function migrateLegacyCloudState(base){
   const legacy = await firebaseDb.collection(FIREBASE_LEGACY_STATE_COLLECTION).doc(FIREBASE_LEGACY_STATE_DOC).get();
   if (legacy.exists && legacy.data()?.state) {
@@ -3342,7 +3391,34 @@ function createQuoteFromCall(id){
   state.quotes.push(q); c.estado='Orçamento enviado'; saveState(); toast('Orçamento criado.'); setTimeout(()=>goPage('orcamentos'), 250);
 }
 function quoteClientOptions(){
-  return state.clients.map(c=>`<option value="${esc(c.nome)}" data-email="${esc(c.email || '')}" data-phone="${esc(c.telefone || '')}" data-code="${esc(clientCode(c))}">${esc(clientCode(c) ? `${clientCode(c)} - ${c.nome}` : c.nome)}</option>`).join('');
+  return state.clients.map(c=>`<option value="${esc(clientCode(c) ? `${clientCode(c)} - ${c.nome}` : c.nome)}"></option>`).join('');
+}
+function quoteClientSearchHtml(value=''){
+  return `<input class="field span3" name="clienteSearch" id="quoteClientSearch" list="quoteClientList" placeholder="Escreve código ou nome do cliente" value="${esc(value)}" autocomplete="off" required>
+    <datalist id="quoteClientList">${quoteClientOptions()}</datalist>
+    <input type="hidden" name="cliente" value="${esc(value)}">`;
+}
+function findClientFromQuoteSearch(value){
+  const raw = String(value || '').trim().toLowerCase();
+  if(!raw) return null;
+  const codePart = raw.split('-')[0].trim();
+  return (state.clients || []).find(c=>{
+    const code = String(clientCode(c) || '').toLowerCase();
+    const nome = String(c.nome || '').toLowerCase();
+    const combo = `${code} - ${nome}`.trim();
+    return code === raw || code === codePart || nome === raw || combo === raw || code.includes(raw) || nome.includes(raw);
+  }) || null;
+}
+function fillQuoteClientFields(form, client, fallbackName=''){
+  if(!form) return;
+  const cliente = form.querySelector('[name="cliente"]');
+  const code = form.querySelector('[name="codigoCliente"]');
+  const phone = form.querySelector('[name="telefone"]');
+  const email = form.querySelector('[name="email"]');
+  if(cliente) cliente.value = client?.nome || fallbackName || '';
+  if(code) code.value = client ? clientCode(client) : '';
+  if(phone) phone.value = client?.telefone || '';
+  if(email) email.value = client?.email || '';
 }
 function quoteVehicleParts(q){
   const matricula = String(q.matricula || '').trim();
@@ -3375,7 +3451,7 @@ function composeQuoteVehicle(data){
 
 function quoteCreateFormHtml(){
   return `<form id="quoteForm" class="form-grid quote-modal-form">
-    <select class="select span3" name="cliente" id="quoteClientSelect" required><option value="">Selecionar cliente</option>${quoteClientOptions()}</select>
+    ${quoteClientSearchHtml()}
     <input class="field" name="codigoCliente" placeholder="Código cliente">
     <input class="field" name="telefone" placeholder="Telefone">
     <input class="field" name="email" placeholder="Email do cliente">
@@ -3397,19 +3473,18 @@ function openNewQuoteModal(){
   bindNewQuoteForm(qs('#quoteForm'));
 }
 function bindQuoteClientSelect(scope=document){
-  const clientSelect = scope.querySelector?.('#quoteClientSelect') || qs('#quoteClientSelect');
-  if(clientSelect && !clientSelect.dataset.boundClientSelect) {
-    clientSelect.dataset.boundClientSelect = '1';
-    clientSelect.addEventListener('change',()=>{
-      const opt = clientSelect.selectedOptions[0];
-      const form = clientSelect.closest('form') || document;
-      const code = form.querySelector('[name="codigoCliente"]');
-      const phone = form.querySelector('[name="telefone"]');
-      const email = form.querySelector('[name="email"]');
-      if(code) code.value = opt?.dataset.code || '';
-      if(phone) phone.value = opt?.dataset.phone || '';
-      if(email) email.value = opt?.dataset.email || '';
-    });
+  const input = scope.querySelector?.('#quoteClientSearch') || qs('#quoteClientSearch');
+  if(input && !input.dataset.boundClientSearch) {
+    input.dataset.boundClientSearch = '1';
+    const sync = ()=>{
+      const form = input.closest('form') || document;
+      const client = findClientFromQuoteSearch(input.value);
+      const fallback = client ? client.nome : input.value.trim();
+      fillQuoteClientFields(form, client, fallback);
+    };
+    input.addEventListener('input', sync);
+    input.addEventListener('change', sync);
+    input.addEventListener('blur', sync);
   }
 }
 function bindNewQuoteForm(form){
@@ -3444,7 +3519,7 @@ function openQuoteModal(id){
   const items = quoteItemsFromLegacy(q);
   const v = quoteVehicleParts(q);
   openModal('Editar orçamento', `<form id="editQuoteForm" class="form-grid quote-modal-form">
-    <input class="field" name="cliente" placeholder="Cliente" value="${esc(q.cliente||'')}" required>
+    ${quoteClientSearchHtml(q.codigoCliente ? `${q.codigoCliente} - ${q.cliente || ''}` : (q.cliente || ''))}
     <input class="field" name="codigoCliente" placeholder="Código cliente" value="${esc(q.codigoCliente||'')}">
     <input class="field" name="telefone" placeholder="Telefone" value="${esc(q.telefone||'')}">
     <input class="field" name="email" placeholder="Email do cliente" value="${esc(q.email||'')}">
@@ -3460,6 +3535,7 @@ function openQuoteModal(id){
     <div class="span3"><button class="btn primary full">Guardar orçamento</button></div>
   </form>`);
   const form = qs('#editQuoteForm');
+  bindQuoteClientSelect(form);
   bindQuoteItemsEditor(form);
   form?.addEventListener('submit',e=>{
     e.preventDefault();
@@ -3915,7 +3991,7 @@ async function saveUserProfileToFirestore(user){
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedBy: state.currentUser?.email || firebaseAuth.currentUser?.email || ''
   };
-  await firebaseDb.collection(FIREBASE_COLLECTIONS.users).doc(user.id).set(payload, { merge:true });
+  await firebaseDb.collection(FIREBASE_COLLECTIONS.users).doc(user.id).set(sanitizeRowForFirestore(payload), { merge:true });
   return true;
 }
 async function saveAllUserPermissionsToFirestore(users){
@@ -3928,7 +4004,7 @@ async function saveAllUserPermissionsToFirestore(users){
     user.pageAccess = {};
     user.actionAccess = {};
     const ref = firebaseDb.collection(FIREBASE_COLLECTIONS.users).doc(user.id);
-    batch.set(ref, {
+    batch.set(ref, sanitizeRowForFirestore({
       ...user,
       email:String(user.email || '').toLowerCase(),
       permissions:user.permissions,
@@ -3938,7 +4014,7 @@ async function saveAllUserPermissionsToFirestore(users){
       permissionsUpdatedBy: state.currentUser?.email || firebaseAuth.currentUser?.email || '',
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedBy: state.currentUser?.email || firebaseAuth.currentUser?.email || ''
-    }, { merge:true });
+    }), { merge:true });
     ops++;
   });
   if(ops) await promiseTimeout(batch.commit(), 9000);
@@ -4228,8 +4304,32 @@ function bindProductionControls(){
   });
 }
 
-function openModal(title, html){ qs('#modalRoot').innerHTML = `<div class="modal"><div class="modal-head"><h3>${title}</h3><button class="btn danger-soft small" id="closeModalBtn">Fechar</button></div>${html}</div>`; qs('#modalRoot').classList.remove('hidden'); qs('#closeModalBtn').addEventListener('click',closeModal); qsa('#modalRoot [data-client-email]').forEach(b=>b.addEventListener('click',()=>emailClient(b.dataset.clientEmail))); applySpellcheckEnhancements(qs('#modalRoot')); }
-function closeModal(){ qs('#modalRoot').classList.add('hidden'); qs('#modalRoot').innerHTML=''; }
+function openModal(title, html){
+  const root = qs('#modalRoot');
+  root.innerHTML = `<div class="modal"><div class="modal-head"><h3>${title}</h3><button class="btn danger-soft small" id="closeModalBtn">Fechar</button></div>${html}</div>`;
+  root.classList.remove('hidden');
+
+  qs('#closeModalBtn')?.addEventListener('click',closeModal);
+
+  // Fechar modal ao clicar fora da caixa.
+  root.addEventListener('mousedown', handleModalBackdropClick);
+  root.addEventListener('touchstart', handleModalBackdropClick, { passive:true });
+
+  qsa('#modalRoot [data-client-email]').forEach(b=>b.addEventListener('click',()=>emailClient(b.dataset.clientEmail)));
+  applySpellcheckEnhancements(qs('#modalRoot'));
+}
+function handleModalBackdropClick(e){
+  if(e.target && e.target.id === 'modalRoot') closeModal();
+}
+function closeModal(){
+  const root = qs('#modalRoot');
+  root?.classList.add('hidden');
+  if(root) {
+    root.removeEventListener('mousedown', handleModalBackdropClick);
+    root.removeEventListener('touchstart', handleModalBackdropClick);
+    root.innerHTML='';
+  }
+}
 
 
 

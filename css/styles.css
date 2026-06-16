@@ -4424,3 +4424,13 @@ body.theme-dark .email-option-pill{
 .remote-fast-mode #pageContent.soft-loading{
   opacity:.86!important;
 }
+
+
+/* v2.6.4 - Autocomplete cliente em orçamentos */
+#quoteClientSearch{
+  border-color:rgba(17,128,201,.28)!important;
+  box-shadow:0 8px 16px rgba(7,52,95,.08);
+}
+body.theme-dark #quoteClientSearch{
+  border-color:rgba(106,174,232,.22)!important;
+}
