@@ -1,4 +1,4 @@
-const APP_VERSION = '2.7.8';
+const APP_VERSION = '2.7.9';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -3895,6 +3895,23 @@ function quoteEmailTableImageHtml(q){
 function sanitizeFilePart(value){
   return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._ -]+/g,'').trim().slice(0,80) || 'orcamento';
 }
+function quoteEmailCompactBody(q, mensagemExtra=''){
+  const v = quoteVehicleParts(q);
+  return `${greetingByCurrentHour()},
+
+Segue orçamento solicitado.
+
+${mensagemExtra ? String(mensagemExtra).trim() + '\n\n' : ''}Dados da viatura:
+Matrícula: ${v.matricula || '-'}
+Marca & Modelo: ${v.marcaModelo || '-'}
+Motor: ${v.motor || '-'}
+
+Em anexo envio o orçamento em PDF e a imagem da tabela de referências.
+
+Com os melhores cumprimentos,
+${quoteEmailSignatureName()}`;
+}
+
 function quoteElectronEmailPayload(q, mensagemExtra=''){
   const v = quoteVehicleParts(q);
   const subject = quoteEmailSubject(q);
@@ -3932,6 +3949,8 @@ function openOutlookHtmlEmail(q, mensagemExtra=''){
     window.bragalisElectron.composeOutlookEmail(payload).then(result=>{
       if(result?.ok) {
         toast('Outlook aberto com PDF e imagem da tabela em anexo.');
+      } else if(result?.fallback === 'mailto') {
+        toast('Outlook novo aberto. A pasta com PDF e imagem foi aberta para anexares.');
       } else {
         console.warn('Electron Outlook compose failed', result);
         toast('Não consegui anexar automaticamente. Abri email normal e copiei o layout.');

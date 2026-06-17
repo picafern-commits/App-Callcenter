@@ -165,12 +165,25 @@ function runPowerShell(script) {
   });
 }
 
-async function composeOutlookEmailWithAttachments(_event, payload = {}) {
-  if (process.platform !== 'win32') {
-    shell.openExternal(`mailto:${encodeURIComponent(payload.to || '')}?subject=${encodeURIComponent(payload.subject || '')}&body=${encodeURIComponent(payload.plainBody || '')}`);
-    return { ok: false, reason: 'not-windows' };
-  }
+function compactMailtoBody(payload) {
+  const body = String(payload.compactBody || payload.plainBody || '').trim();
+  // O Outlook novo pode bloquear mailto gigante. Mantém curto.
+  return body.length > 1800 ? body.slice(0, 1700) + '\n\n[Texto encurtado. Consulta o PDF/imagem do orçamento gerados pela app.]' : body;
+}
 
+async function openMailClient(payload, attachmentsDir) {
+  const mailto = `mailto:${encodeURIComponent(payload.to || '')}?subject=${encodeURIComponent(payload.subject || '')}&body=${encodeURIComponent(compactMailtoBody(payload))}`;
+  await shell.openExternal(mailto);
+
+  // Como o Outlook novo não aceita anexos por mailto, abre a pasta para arrastar/anexar.
+  if (attachmentsDir && fs.existsSync(attachmentsDir)) {
+    setTimeout(() => {
+      shell.openPath(attachmentsDir).catch(err => console.warn('Falhou abrir pasta anexos:', err));
+    }, 900);
+  }
+}
+
+async function composeOutlookEmailWithAttachments(_event, payload = {}) {
   const base = safeFileName(payload.fileBase || payload.subject || 'orcamento');
   const dir = path.join(os.tmpdir(), 'BragalisCallcenter', `${Date.now()}-${Math.random().toString(16).slice(2)}`);
   fs.mkdirSync(dir, { recursive: true });
@@ -192,6 +205,11 @@ async function composeOutlookEmailWithAttachments(_event, payload = {}) {
     console.warn('Falhou gerar PNG:', err);
   }
 
+  if (process.platform !== 'win32') {
+    await openMailClient(payload, dir);
+    return { ok: false, fallback: 'mailto', reason: 'not-windows', dir };
+  }
+
   const attachments = [pdfPath, pngPath].filter(p => fs.existsSync(p));
   const attachmentPs = attachments.map(p => `$mail.Attachments.Add(${psQuote(p)}) | Out-Null`).join('\n');
 
@@ -209,11 +227,17 @@ $mail.Display()
 
   try {
     await runPowerShell(script);
-    return { ok: true, attachments, dir };
+    return { ok: true, mode: 'classic-outlook', attachments, dir };
   } catch (err) {
-    console.warn('Falhou abrir Outlook por COM:', err);
-    shell.openExternal(`mailto:${encodeURIComponent(payload.to || '')}?subject=${encodeURIComponent(payload.subject || '')}&body=${encodeURIComponent(payload.plainBody || '')}`);
-    return { ok: false, reason: err.message || String(err), attachments, dir };
+    console.warn('Falhou abrir Outlook clássico por COM. A usar Outlook novo/mailto:', err?.message || err);
+    try {
+      await openMailClient(payload, dir);
+      return { ok: false, fallback: 'mailto', reason: err.message || String(err), attachments, dir };
+    } catch (mailtoErr) {
+      console.warn('Também falhou mailto:', mailtoErr);
+      await shell.openPath(dir).catch(()=>{});
+      return { ok: false, fallback: 'folder-only', reason: mailtoErr.message || String(mailtoErr), attachments, dir };
+    }
   }
 }
 
