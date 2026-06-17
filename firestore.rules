@@ -88,7 +88,7 @@ service cloud.firestore {
     }
 
     match /clientes/{document} {
-      allow read: if canPage('clientes', 'view');
+      allow read: if canPage('clientes', 'view') || canPage('relatorios', 'view');
       allow create: if canPage('clientes', 'add');
       allow update: if canPage('clientes', 'edit');
       allow delete: if canPage('clientes', 'delete');
@@ -117,15 +117,15 @@ service cloud.firestore {
     }
 
     match /orcamentos/{document} {
-      allow read: if canPage('orcamentos', 'view');
+      allow read: if canPage('orcamentos', 'view') || canPage('relatorios', 'view');
       allow create: if canPage('orcamentos', 'add');
       allow update: if canPage('orcamentos', 'edit');
       allow delete: if canPage('orcamentos', 'delete');
     }
 
     match /pedidos/{document} {
-      allow read: if canPage('pedidos', 'view');
-      allow create: if canPage('pedidos', 'add');
+      allow read: if canPage('pedidos', 'view') || canPage('relatorios', 'view');
+      allow create: if canPage('pedidos', 'add') || canPage('nova-chamada', 'add');
       allow update: if canPage('pedidos', 'edit');
       allow delete: if canPage('pedidos', 'delete');
     }
