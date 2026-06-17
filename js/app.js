@@ -1,4 +1,4 @@
-const APP_VERSION = '2.6.9';
+const APP_VERSION = '2.7.0';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -1720,7 +1720,7 @@ function contactGroupsView(groups){
     const sections = grouped[armazem].sort((a,b)=>contactSection(a).localeCompare(contactSection(b),'pt'));
     const total = sections.reduce((sum,g)=>sum + (g.contactos || []).length, 0);
     return `<section class="warehouse-simple-card">
-      <div class="warehouse-simple-head">
+      <div class="warehouse-simple-head" data-toggle-warehouse="${esc(armazem)}" role="button" tabindex="0" title="Abrir/fechar secções deste armazém">
         <div class="warehouse-title-block">
           <span class="warehouse-dot"></span>
           <div>
@@ -1749,7 +1749,7 @@ function contactGroupsView(groups){
 function contactSectionView(group, forceOpen=false){
   const rows = group.contactos || [];
   const opened = forceOpen || group.aberto;
-  return `<div class="directory-section-simple ${opened ? '' : 'hidden'}">
+  return `<div class="directory-section-simple ${opened ? '' : 'hidden'}" data-contact-section-panel="${group.id}">
     <div class="section-simple-head">
       <div>
         <strong>${esc(contactSection(group))}</strong>
@@ -3916,7 +3916,7 @@ function bindContactDirectory(){
     // Toggle visual local, sem redesenhar a página.
     btn.classList.toggle('active', group.aberto);
     const warehouse = btn.closest('.warehouse-simple-card');
-    const panel = warehouse?.querySelector(`.directory-section-simple [data-add-contact-section="${group.id}"]`)?.closest('.directory-section-simple');
+    const panel = warehouse?.querySelector(`[data-contact-section-panel="${group.id}"]`);
     if(panel) panel.classList.toggle('hidden', !group.aberto);
 
     const allBtn = qs('#toggleAllDirectoryBtn');
@@ -3928,6 +3928,32 @@ function bindContactDirectory(){
     const icon = btn.querySelector('.section-toggle-icon, i');
     if(body) body.classList.toggle('hidden', !group.aberto);
     if(icon) icon.textContent = group.aberto ? '−' : '+';
+  }));
+
+  qsa('[data-toggle-warehouse]').forEach(head=>head.addEventListener('click',()=>{
+    normalizeContactDirectory();
+    const card = head.closest('.warehouse-simple-card');
+    const chips = [...(card?.querySelectorAll('[data-toggle-contact-group]') || [])];
+    if(!chips.length) return;
+    const groups = chips.map(chip => (state.contactGroups || []).find(g=>g.id===chip.dataset.toggleContactGroup)).filter(Boolean);
+    const nextOpen = groups.some(g=>!g.aberto);
+    groups.forEach(group=>{
+      group.aberto = nextOpen;
+      setDirectoryRuntimeOpen(group.id, nextOpen);
+      const chip = card.querySelector(`[data-toggle-contact-group="${group.id}"]`);
+      const panel = card.querySelector(`[data-contact-section-panel="${group.id}"]`);
+      chip?.classList.toggle('active', nextOpen);
+      panel?.classList.toggle('hidden', !nextOpen);
+    });
+    const allBtn = qs('#toggleAllDirectoryBtn');
+    if(allBtn) allBtn.textContent = allDirectoryGroupsOpen() ? 'Fechar Tudo' : 'Abrir Tudo';
+  }));
+
+  qsa('[data-toggle-warehouse]').forEach(head=>head.addEventListener('keydown',e=>{
+    if(e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      head.click();
+    }
   }));
 
   const toggleAllDirectoryBtn = qs('#toggleAllDirectoryBtn');

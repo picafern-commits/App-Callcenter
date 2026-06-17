@@ -4479,3 +4479,27 @@ body.theme-dark .client-multi-field{
 body.theme-dark .client-multi-head strong{
   color:var(--text);
 }
+
+
+/* v2.7.0 - Corrige abrir/fechar secções do Diretório */
+.warehouse-simple-head[data-toggle-warehouse]{
+  cursor:pointer;
+  user-select:none;
+}
+.warehouse-simple-head[data-toggle-warehouse]:hover{
+  filter:brightness(1.03);
+}
+.warehouse-simple-head[data-toggle-warehouse]::after{
+  content:'Abrir / Fechar';
+  font-size:11px;
+  font-weight:900;
+  color:var(--muted);
+  padding:6px 9px;
+  border-radius:999px;
+  background:rgba(255,255,255,.45);
+  border:1px solid rgba(20,92,151,.10);
+}
+body.theme-dark .warehouse-simple-head[data-toggle-warehouse]::after{
+  background:rgba(255,255,255,.06);
+  border-color:rgba(255,255,255,.10);
+}
