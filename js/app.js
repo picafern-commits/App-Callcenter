@@ -1,4 +1,4 @@
-const APP_VERSION = '2.7.2';
+const APP_VERSION = '2.7.3';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -3757,6 +3757,79 @@ function printQuote(id){
   // Não abrir automaticamente a janela de impressão.
   // O utilizador pode imprimir/guardar PDF manualmente pela janela aberta.
 }
+function greetingByCurrentHour(){
+  const hour = new Date().getHours();
+  return hour < 12 ? 'Bom dia' : 'Boa tarde';
+}
+function quoteEmailSubject(q){
+  const v = quoteVehicleParts(q);
+  return `Orçamento - ${v.marcaModelo || 'Marca&Modelo'} - ${v.matricula || 'Matrícula'}`;
+}
+function quoteEmailSignatureName(){
+  return preferredUserName('Utilizador');
+}
+function quoteEmailPlainText(q, mensagemExtra=''){
+  const items = quoteItemsFromLegacy(q);
+  const subtotal = quoteItemsTotal(items);
+  const iva = subtotal * 0.23;
+  const totalComIva = subtotal + iva;
+  const v = quoteVehicleParts(q);
+  return `${greetingByCurrentHour()},
+
+Segue orçamento solicitado.
+
+${mensagemExtra ? String(mensagemExtra).trim() + '\\n\\n' : ''}ORÇAMENTO ${q.id}
+
+Matrícula: ${v.matricula || '-'}
+Marca & Modelo: ${v.marcaModelo || '-'}
+Motor: ${v.motor || '-'}
+
+Referências:
+${items.map((item,idx)=>`${idx+1}. ${item.nome || '-'} | Ref: ${item.referencia || '-'} | Unid: ${item.unidade} | Preço líquido: ${money(item.preco)} | Total c/ IVA: ${money(Number(item.total || 0) * 1.23)}`).join('\\n')}
+
+Subtotal líquido: ${money(subtotal)}
+IVA 23%: ${money(iva)}
+Total: ${money(totalComIva)}
+
+Prazo de entrega: ${q.prazoEntrega || 'A confirmar'}
+Condições: ${q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.'}
+
+Com os melhores cumprimentos,
+${quoteEmailSignatureName()}`;
+}
+async function openOutlookHtmlEmail(q, mensagemExtra=''){
+  const subject = quoteEmailSubject(q);
+  const html = quoteEmailHtml(q, mensagemExtra);
+  const plain = quoteEmailPlainText(q, mensagemExtra);
+  const to = q.email || '';
+
+  // No Edge/Chrome, isto tenta abrir o cliente de email com HTML via Web Share.
+  // Em muitos Windows/Outlook, o sistema só aceita texto simples por mailto.
+  if(navigator.share && navigator.canShare) {
+    try {
+      const htmlBlob = new Blob([html], { type:'text/html' });
+      const txtBlob = new Blob([plain], { type:'text/plain' });
+      const files = [
+        new File([htmlBlob], `orcamento-${q.id}.html`, { type:'text/html' }),
+        new File([txtBlob], `orcamento-${q.id}.txt`, { type:'text/plain' })
+      ];
+      if(navigator.canShare({ files })) {
+        await navigator.share({ title:subject, text:plain, files });
+        return true;
+      }
+    } catch(err) {
+      console.warn('Web Share email HTML failed', err);
+    }
+  }
+
+  // Plano principal compatível: abre Outlook já preenchido, com texto simples.
+  // O HTML igual ao PDF fica disponível para copiar/colar se o Outlook não aceitar HTML direto.
+  const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(plain)}`;
+  window.location.assign(mailto);
+  setTimeout(()=>openQuoteEmailHtmlPreview(q, mensagemExtra, true), 700);
+  return false;
+}
+
 function quoteEmailHtml(q, mensagemExtra=''){
   const items = quoteItemsFromLegacy(q);
   const subtotal = quoteItemsTotal(items);
@@ -3782,7 +3855,9 @@ function quoteEmailHtml(q, mensagemExtra=''){
         </div>
       </div>
 
-      ${String(mensagemExtra || '').trim() ? `<p style="margin:18px 0 0;line-height:1.5;color:#12344d">${esc(String(mensagemExtra).trim()).replace(/\n/g,'<br>')}</p>` : ''}
+      <p style="margin:18px 0 0;line-height:1.5;color:#12344d"><strong>${esc(greetingByCurrentHour())},</strong></p>
+      <p style="margin:8px 0 0;line-height:1.5;color:#12344d">Segue orçamento solicitado.</p>
+      ${String(mensagemExtra || '').trim() ? `<p style="margin:14px 0 0;line-height:1.5;color:#12344d">${esc(String(mensagemExtra).trim()).replace(/\n/g,'<br>')}</p>` : ''}
 
       <div style="border:1px solid #c9d8e5;border-radius:10px;padding:14px;margin-top:20px">
         <h2 style="margin:0 0 10px;color:#06447f">Cliente / Viatura</h2>
@@ -3826,19 +3901,24 @@ function quoteEmailHtml(q, mensagemExtra=''){
         <p><strong>Observações:</strong> ${esc(q.observacoes || '-')}</p>
       </div>
 
-      <div style="margin-top:40px;color:#49677f;font-size:12px;border-top:1px solid #dce7f0;padding-top:12px">
+      <div style="margin-top:30px;line-height:1.5;color:#12344d">
+        <p style="margin:0">Com os melhores cumprimentos,</p>
+        <p style="margin:4px 0 0"><strong>${esc(quoteEmailSignatureName())}</strong></p>
+      </div>
+      <div style="margin-top:24px;color:#49677f;font-size:12px;border-top:1px solid #dce7f0;padding-top:12px">
         Para avançar, responda a este email com a confirmação do orçamento. Documento gerado por ${esc(companyName())}.
       </div>
     </div>
   </div>`;
 }
-function openQuoteEmailHtmlPreview(q, mensagemExtra=''){
-  const subject = `Orçamento ${q.id} - ${quoteVehicleParts(q).matricula || q.viatura || quoteMainDescription(q)}`;
+function openQuoteEmailHtmlPreview(q, mensagemExtra='', fallbackNotice=false){
+  const subject = quoteEmailSubject(q);
   const html = quoteEmailHtml(q, mensagemExtra);
   const win = window.open('', '_blank', 'width=920,height=900');
   win.document.write(`<!doctype html><html lang="pt-PT"><head><meta charset="utf-8"><title>${esc(subject)}</title></head><body>
-    <div style="position:sticky;top:0;z-index:20;background:#ffffff;padding:12px;border-bottom:1px solid #dce7f0;display:flex;gap:8px;justify-content:flex-end">
-      <button id="copyHtmlBtn" style="border:0;border-radius:12px;padding:10px 14px;background:#06447f;color:white;font-weight:800;cursor:pointer">Copiar email bonito</button>
+    <div style="position:sticky;top:0;z-index:20;background:#ffffff;padding:12px;border-bottom:1px solid #dce7f0;display:flex;gap:8px;justify-content:flex-end;align-items:center">
+      ${fallbackNotice ? '<span style="margin-right:auto;color:#49677f;font-weight:700">O Outlook foi aberto em texto simples. Para ficar bonito, copia este layout e cola no corpo do email.</span>' : ''}
+      <button id="copyHtmlBtn" style="border:0;border-radius:12px;padding:10px 14px;background:#06447f;color:white;font-weight:800;cursor:pointer">Copiar layout bonito</button>
       <button id="openMailBtn" style="border:0;border-radius:12px;padding:10px 14px;background:#f58220;color:white;font-weight:800;cursor:pointer">Abrir Outlook texto simples</button>
     </div>
     ${html}
@@ -3882,7 +3962,7 @@ function openQuoteEmailOptionsModal(q){
   openModal('Enviar orçamento por email', `<form id="quoteEmailOptionsForm" class="form-grid email-options-form">
     <div class="span3 email-options-intro">
       <strong>Escolhe os campos que queres enviar no email</strong>
-      <span>Abre uma pré-visualização igual ao PDF para copiar e colar no Outlook.</span>
+      <span>Vai tentar abrir o Outlook já preenchido. Se o Outlook bloquear HTML, abre também o layout bonito para copiar.</span>
     </div>
 
     <div class="span3 email-options-grid">
@@ -3904,7 +3984,7 @@ function openQuoteEmailOptionsModal(q){
 
     <div class="span3 actions">
       <button class="btn ghost" type="button" id="cancelQuoteEmailBtn">Cancelar</button>
-      <button class="btn primary" type="submit">Pré-visualizar email bonito</button>
+      <button class="btn primary" type="submit">Abrir Outlook</button>
     </div>
   </form>`);
   qs('#cancelQuoteEmailBtn')?.addEventListener('click', closeModal);
@@ -3913,7 +3993,7 @@ function openQuoteEmailOptionsModal(q){
     const fd = new FormData(e.target);
     const opts = Object.fromEntries([...fd.entries()]);
     const include = key => fd.get(key) === 'on';
-    openQuoteEmailHtmlPreview(q, opts.mensagemExtra || '');
+    openOutlookHtmlEmail(q, opts.mensagemExtra || '');
   });
 }
 function openQuoteEmailWithOptions(q, include, mensagemExtra=''){
