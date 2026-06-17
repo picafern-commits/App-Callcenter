@@ -4644,3 +4644,26 @@ body.theme-dark .pedido-prefix-note{
   background:rgba(255,255,255,.04);
   border-color:rgba(255,255,255,.10);
 }
+
+
+/* v2.8.8 - Fornecedor por referência no pedido */
+.pedido-ref-row.fornecedor-por-linha{
+  display:grid;
+  grid-template-columns:220px 1fr 1fr 110px auto;
+  gap:8px;
+  align-items:center;
+}
+.pedido-ref-final{
+  background:rgba(6,68,127,.06)!important;
+  font-weight:900;
+  color:var(--brand3);
+}
+body.theme-dark .pedido-ref-final{
+  background:rgba(255,255,255,.06)!important;
+  color:var(--text);
+}
+@media(max-width:1000px){
+  .pedido-ref-row.fornecedor-por-linha{
+    grid-template-columns:1fr;
+  }
+}

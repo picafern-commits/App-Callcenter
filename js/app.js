@@ -1,4 +1,4 @@
-const APP_VERSION = '2.8.7';
+const APP_VERSION = '2.8.8';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -1472,9 +1472,16 @@ function pedidoRefsFromLegacy(p){
   return [];
 }
 function normalizePedidoRef(ref={}){
+  const fornecedor = String(ref.fornecedor || ref.supplier || '').trim();
+  const codigoFornecedor = String(ref.codigoFornecedor || ref.supplierCode || '').trim();
+  const referenciaFinal = String(ref.referencia || '').trim();
+  const referenciaOriginal = String(ref.referenciaOriginal || ref.refOriginal || stripSupplierPrefix(referenciaFinal, codigoFornecedor)).trim();
   return {
     id: ref.id || uid('REF'),
-    referencia:String(ref.referencia || '').trim(),
+    fornecedor,
+    codigoFornecedor,
+    referenciaOriginal,
+    referencia: referenciaFinal || prefixReferenceWithSupplier(referenciaOriginal, codigoFornecedor),
     quantidade:Number(ref.quantidade || ref.qtd || 1) || 1
   };
 }
@@ -1486,20 +1493,30 @@ function pedidoRefsRows(refs=[normalizePedidoRef({})]){
   </div>`;
 }
 function pedidoRefRow(ref={}, idx=0){
-  return `<div class="pedido-ref-row" data-pedido-ref-row>
-    <input class="field" name="pedidoReferencia[]" placeholder="Referência ${idx+1}" value="${esc(ref.referencia || '')}" required>
-    <input class="field" name="pedidoQuantidade[]" type="number" min="1" step="1" placeholder="Quantidade" value="${esc(ref.quantidade || 1)}" required>
+  const normalized = normalizePedidoRef(ref);
+  return `<div class="pedido-ref-row fornecedor-por-linha" data-pedido-ref-row>
+    <select class="select" name="pedidoFornecedor[]">${pedidoSupplierSelectOptions(normalized.codigoFornecedor, normalized.fornecedor)}</select>
+    <input class="field" name="pedidoReferenciaOriginal[]" placeholder="Referência ${idx+1}" value="${esc(normalized.referenciaOriginal || stripSupplierPrefix(normalized.referencia, normalized.codigoFornecedor))}" required>
+    <input class="field pedido-ref-final" name="pedidoReferencia[]" placeholder="Referência final" value="${esc(normalized.referencia || '')}" readonly>
+    <input class="field" name="pedidoQuantidade[]" type="number" min="1" step="1" placeholder="Qtd." value="${esc(normalized.quantidade || 1)}" required>
     <button class="btn danger-soft small" type="button" data-remove-pedido-ref>×</button>
   </div>`;
 }
 function collectPedidoRefs(form){
-  const refs = [...form.querySelectorAll('[name="pedidoReferencia[]"]')];
-  const qtds = [...form.querySelectorAll('[name="pedidoQuantidade[]"]')];
-  const code = String(form?.querySelector('[name="codigoFornecedor"]')?.value || '').trim();
-  return refs.map((input,idx)=>{
-    const referencia = prefixReferenceWithSupplier(input.value, code);
-    input.value = referencia;
-    return normalizePedidoRef({ referencia, quantidade:qtds[idx]?.value || 1 });
+  updateAllPedidoRefRows(form);
+  const rows = [...form.querySelectorAll('[data-pedido-ref-row]')];
+  return rows.map(row=>{
+    const supplier = parsePedidoSupplierValue(row.querySelector('[name="pedidoFornecedor[]"]')?.value || '');
+    const raw = row.querySelector('[name="pedidoReferenciaOriginal[]"]')?.value || '';
+    const finalRef = prefixReferenceWithSupplier(raw, supplier.codigoFornecedor);
+    const qtd = row.querySelector('[name="pedidoQuantidade[]"]')?.value || 1;
+    return normalizePedidoRef({
+      fornecedor:supplier.fornecedor,
+      codigoFornecedor:supplier.codigoFornecedor,
+      referenciaOriginal:raw,
+      referencia:finalRef,
+      quantidade:qtd
+    });
   }).filter(r=>r.referencia);
 }
 function transportesList(){
@@ -1508,37 +1525,27 @@ function transportesList(){
 function transporteOptions(){
   return transportesList().map(t=>`<option value="${esc(t)}"></option>`).join('');
 }
-function pedidoSupplierOptions(){
-  return sortedSuppliers(state.suppliers || []).map(s=>{
+function pedidoSupplierSelectOptions(selectedCode='', selectedName=''){
+  const selected = String(selectedCode || '').trim().toLowerCase();
+  const selectedNm = String(selectedName || '').trim().toLowerCase();
+  return `<option value="">Fornecedor</option>` + sortedSuppliers(state.suppliers || []).map(s=>{
     const name = supplierName(s);
     const code = supplierRef(s);
-    const label = code ? `${name} - ${code}` : name;
-    return `<option value="${esc(label)}"></option>`;
+    const value = code ? `${name}|${code}` : `${name}|`;
+    const isSelected = (code && code.toLowerCase() === selected) || (name && name.toLowerCase() === selectedNm);
+    return `<option value="${esc(value)}" data-code="${esc(code)}" ${isSelected?'selected':''}>${esc(code ? `${name} - ${code}` : name)}</option>`;
   }).join('');
 }
-function findPedidoSupplier(value){
-  const raw = String(value || '').trim().toLowerCase();
-  if(!raw) return null;
-  const left = raw.split('-')[0].trim();
-  return (state.suppliers || []).find(s=>{
-    const name = String(supplierName(s) || '').toLowerCase();
-    const code = String(supplierRef(s) || '').toLowerCase();
-    const label = code ? `${name} - ${code}` : name;
-    return raw === name || raw === code || raw === label || left === name || left === code || name.includes(raw) || code.includes(raw);
-  }) || null;
-}
-function supplierCodeFromValue(value){
-  const s = findPedidoSupplier(value);
-  if(s) return String(supplierRef(s) || '').trim();
+function parsePedidoSupplierValue(value){
   const raw = String(value || '').trim();
-  const maybeCode = raw.split('-').pop()?.trim() || '';
-  return maybeCode;
+  const [name='', code=''] = raw.split('|');
+  return { fornecedor:String(name || '').trim(), codigoFornecedor:String(code || '').trim() };
 }
-function supplierNameFromValue(value){
-  const s = findPedidoSupplier(value);
-  if(s) return supplierName(s);
-  const raw = String(value || '').trim();
-  return raw.includes(' - ') ? raw.split(' - ')[0].trim() : raw;
+function stripSupplierPrefix(reference, code=''){
+  const ref = String(reference || '').trim();
+  const prefix = String(code || '').trim();
+  if(prefix && ref.toLowerCase().startsWith(`${prefix.toLowerCase()}-`)) return ref.slice(prefix.length + 1).trim();
+  return ref.replace(/^\s*[A-Za-z0-9]+-\s*/, '').trim();
 }
 function prefixReferenceWithSupplier(reference, code){
   const ref = String(reference || '').trim();
@@ -1546,16 +1553,18 @@ function prefixReferenceWithSupplier(reference, code){
   if(!ref) return '';
   if(!prefix) return ref;
   if(ref.toLowerCase().startsWith(`${prefix.toLowerCase()}-`)) return ref;
-  // Remove prefixos antigos no formato CODIGO- antes de aplicar o novo.
-  const cleanRef = ref.replace(/^\s*[A-Za-z0-9]+-\s*/, '');
+  const cleanRef = stripSupplierPrefix(ref, prefix);
   return `${prefix}-${cleanRef}`;
 }
-function applySupplierPrefixToPedidoRefs(form){
-  const code = String(form?.querySelector('[name="codigoFornecedor"]')?.value || '').trim();
-  if(!code) return;
-  form.querySelectorAll('[name="pedidoReferencia[]"]').forEach(input=>{
-    input.value = prefixReferenceWithSupplier(input.value, code);
-  });
+function updatePedidoRefRow(row){
+  if(!row) return;
+  const supplier = parsePedidoSupplierValue(row.querySelector('[name="pedidoFornecedor[]"]')?.value || '');
+  const rawInput = row.querySelector('[name="pedidoReferenciaOriginal[]"]');
+  const finalInput = row.querySelector('[name="pedidoReferencia[]"]');
+  if(finalInput) finalInput.value = prefixReferenceWithSupplier(rawInput?.value || '', supplier.codigoFornecedor);
+}
+function updateAllPedidoRefRows(form){
+  form?.querySelectorAll('[data-pedido-ref-row]').forEach(updatePedidoRefRow);
 }
 
 function rememberTransporte(value){
@@ -1577,10 +1586,6 @@ function pedidoFormHtml(p=null){
     ${pedidoClientSearchHtml(clientValue)}
     <input class="field" name="codigoCliente" placeholder="Código cliente" value="${esc(p?.codigoCliente || '')}">
     <input class="field" name="morada" placeholder="Morada (opcional)" value="${esc(p?.morada || '')}">
-    <input class="field span3" name="fornecedor" id="pedidoFornecedorInput" list="pedidoFornecedorList" placeholder="Fornecedor" value="${esc(p?.fornecedor || '')}">
-    <datalist id="pedidoFornecedorList">${pedidoSupplierOptions()}</datalist>
-    <input class="field" name="codigoFornecedor" placeholder="Código fornecedor" value="${esc(p?.codigoFornecedor || '')}" readonly>
-    <div class="span3 pedido-prefix-note">Ao escolher fornecedor, o código é aplicado na referência assim: <strong>39-REFERÊNCIA</strong></div>
     <div class="span3">${pedidoRefsRows(refs)}</div>
     <input class="field span3" name="transporte" list="transportesList" placeholder="Transporte" value="${esc(p?.transporte || '')}">
     <datalist id="transportesList">${transporteOptions()}</datalist>
@@ -1636,7 +1641,7 @@ function pedidosCards(rows){
         <small>${esc([p.codigoCliente, p.morada].filter(Boolean).join(' · ') || 'Sem dados de cliente')}</small>
         <div class="quote-item-mini-list">
           <span>${refs.length} referência(s) · ${esc(pedidoMainRef(p))}</span>
-          <span>Fornecedor: ${esc(p.fornecedor || '-')} ${p.codigoFornecedor ? '(' + esc(p.codigoFornecedor) + ')' : ''}</span>
+          <span>Fornecedor(es): ${esc(uniqueSorted(refs.map(r=>r.codigoFornecedor ? `${r.fornecedor || '-'} (${r.codigoFornecedor})` : r.fornecedor).filter(Boolean)).join(' · ') || '-')}</span>
           <span>Transporte: ${esc(p.transporte || '-')}</span>
           <span>Data/Hora: ${esc(formatDatePt(p.createdAt || p.data || today()))} ${esc(p.createdTime || p.hora || '')}</span>
         </div>
@@ -3809,8 +3814,8 @@ function bindPedidoForm(form, existing=null){
       cliente:data.cliente || data.clienteSearch || '',
       codigoCliente:data.codigoCliente || clientCode(client) || '',
       morada:data.morada || client?.morada || '',
-      fornecedor:data.fornecedor || '',
-      codigoFornecedor:data.codigoFornecedor || '',
+      fornecedor:refs[0]?.fornecedor || '',
+      codigoFornecedor:refs[0]?.codigoFornecedor || '',
       referenciasPedido:refs,
       referencia:refs[0]?.referencia || '',
       quantidade:refs[0]?.quantidade || 1,
@@ -3900,14 +3905,18 @@ function bindPedidoRefsEditor(scope=document){
     addBtn.addEventListener('click',()=>{
       rows.insertAdjacentHTML('beforeend', pedidoRefRow({}, rows.querySelectorAll('[data-pedido-ref-row]').length));
       bindPedidoRefsEditor(root);
-      const last = rows.querySelector('[data-pedido-ref-row]:last-child [name="pedidoReferencia[]"]');
+      const last = rows.querySelector('[data-pedido-ref-row]:last-child [name="pedidoFornecedor[]"]');
       last?.focus();
     });
   }
-  rows?.querySelectorAll('[name="pedidoReferencia[]"]').forEach(input=>{
-    if(input.dataset.boundSupplierPrefix) return;
-    input.dataset.boundSupplierPrefix = '1';
-    input.addEventListener('blur',()=>applySupplierPrefixToPedidoRefs(root));
+  rows?.querySelectorAll('[data-pedido-ref-row]').forEach(row=>{
+    if(!row.dataset.boundPedidoRow){
+      row.dataset.boundPedidoRow = '1';
+      row.querySelector('[name="pedidoFornecedor[]"]')?.addEventListener('change',()=>updatePedidoRefRow(row));
+      row.querySelector('[name="pedidoReferenciaOriginal[]"]')?.addEventListener('input',()=>updatePedidoRefRow(row));
+      row.querySelector('[name="pedidoReferenciaOriginal[]"]')?.addEventListener('blur',()=>updatePedidoRefRow(row));
+    }
+    updatePedidoRefRow(row);
   });
   rows?.querySelectorAll('[data-remove-pedido-ref]').forEach(btn=>{
     if(btn.dataset.boundPedidoRemove) return;
@@ -3917,12 +3926,15 @@ function bindPedidoRefsEditor(scope=document){
       if(allRows.length <= 1) {
         const row = btn.closest('[data-pedido-ref-row]');
         row?.querySelectorAll('input').forEach(i=>i.value = i.name.includes('Quantidade') ? '1' : '');
+        row?.querySelector('select') && (row.querySelector('select').value = '');
+        updatePedidoRefRow(row);
         return;
       }
       btn.closest('[data-pedido-ref-row]')?.remove();
     });
   });
 }
+
 function upsertPedidoClient(data){
   const nome = String(data.cliente || data.clienteSearch || '').trim();
   const codigo = String(data.codigoCliente || '').trim();
