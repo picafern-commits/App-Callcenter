@@ -1,5 +1,8 @@
-const { app, BrowserWindow, shell, Menu, session, screen } = require('electron');
+const { app, BrowserWindow, shell, Menu, session, screen, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
+const { spawn } = require('child_process');
 
 // Electron passa a ser apenas um launcher do GitHub Pages.
 // Assim, as alterações feitas no GitHub aparecem no Electron sem recriar setup.
@@ -99,6 +102,124 @@ async function loadApp(win) {
   }
 }
 
+function safeFileName(value) {
+  return String(value || 'orcamento').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._ -]+/g, '').trim().slice(0, 120) || 'orcamento';
+}
+
+async function renderPdfFromHtml(html, outputPath) {
+  const win = new BrowserWindow({
+    show: false,
+    width: 900,
+    height: 1200,
+    webPreferences: { offscreen: true, contextIsolation: true, nodeIntegration: false }
+  });
+  try {
+    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html || ''));
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const pdf = await win.webContents.printToPDF({
+      printBackground: true,
+      pageSize: 'A4',
+      marginsType: 0
+    });
+    fs.writeFileSync(outputPath, pdf);
+  } finally {
+    if (!win.isDestroyed()) win.destroy();
+  }
+}
+
+async function renderPngFromHtml(html, outputPath) {
+  const win = new BrowserWindow({
+    show: false,
+    width: 1050,
+    height: 900,
+    webPreferences: { offscreen: true, contextIsolation: true, nodeIntegration: false }
+  });
+  try {
+    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html || ''));
+    await new Promise(resolve => setTimeout(resolve, 600));
+    const image = await win.webContents.capturePage();
+    fs.writeFileSync(outputPath, image.toPNG());
+  } finally {
+    if (!win.isDestroyed()) win.destroy();
+  }
+}
+
+function psQuote(value) {
+  return "'" + String(value || '').replace(/'/g, "''") + "'";
+}
+
+function runPowerShell(script) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
+      windowsHide: true
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', d => { stdout += d.toString(); });
+    child.stderr.on('data', d => { stderr += d.toString(); });
+    child.on('error', reject);
+    child.on('close', code => {
+      if (code === 0) resolve({ stdout, stderr });
+      else reject(new Error(stderr || stdout || `PowerShell terminou com código ${code}`));
+    });
+  });
+}
+
+async function composeOutlookEmailWithAttachments(_event, payload = {}) {
+  if (process.platform !== 'win32') {
+    shell.openExternal(`mailto:${encodeURIComponent(payload.to || '')}?subject=${encodeURIComponent(payload.subject || '')}&body=${encodeURIComponent(payload.plainBody || '')}`);
+    return { ok: false, reason: 'not-windows' };
+  }
+
+  const base = safeFileName(payload.fileBase || payload.subject || 'orcamento');
+  const dir = path.join(os.tmpdir(), 'BragalisCallcenter', `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  fs.mkdirSync(dir, { recursive: true });
+
+  const htmlPath = path.join(dir, `${base}-email.html`);
+  const pdfPath = path.join(dir, `${base}.pdf`);
+  const pngPath = path.join(dir, `${base}-tabela.png`);
+  fs.writeFileSync(htmlPath, payload.htmlBody || payload.plainBody || '', 'utf8');
+
+  try {
+    if (payload.pdfHtml) await renderPdfFromHtml(payload.pdfHtml, pdfPath);
+  } catch (err) {
+    console.warn('Falhou gerar PDF:', err);
+  }
+
+  try {
+    if (payload.tableHtml) await renderPngFromHtml(payload.tableHtml, pngPath);
+  } catch (err) {
+    console.warn('Falhou gerar PNG:', err);
+  }
+
+  const attachments = [pdfPath, pngPath].filter(p => fs.existsSync(p));
+  const attachmentPs = attachments.map(p => `$mail.Attachments.Add(${psQuote(p)}) | Out-Null`).join('\n');
+
+  const script = `
+$ErrorActionPreference = 'Stop'
+$outlook = New-Object -ComObject Outlook.Application
+$mail = $outlook.CreateItem(0)
+$mail.To = ${psQuote(payload.to || '')}
+$mail.Subject = ${psQuote(payload.subject || '')}
+$html = Get-Content -Raw -Encoding UTF8 ${psQuote(htmlPath)}
+$mail.HTMLBody = $html
+${attachmentPs}
+$mail.Display()
+`;
+
+  try {
+    await runPowerShell(script);
+    return { ok: true, attachments, dir };
+  } catch (err) {
+    console.warn('Falhou abrir Outlook por COM:', err);
+    shell.openExternal(`mailto:${encodeURIComponent(payload.to || '')}?subject=${encodeURIComponent(payload.subject || '')}&body=${encodeURIComponent(payload.plainBody || '')}`);
+    return { ok: false, reason: err.message || String(err), attachments, dir };
+  }
+}
+
+ipcMain.handle('bragalis:compose-outlook-email', composeOutlookEmailWithAttachments);
+
+
 function createWindow() {
   const profile = getWindowProfile();
   mainWindow = new BrowserWindow({
@@ -114,7 +235,8 @@ function createWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
+      sandbox: false,
+      preload: path.join(__dirname, 'preload.js'),
       spellcheck: true
     }
   });

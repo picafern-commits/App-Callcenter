@@ -1,4 +1,4 @@
-const APP_VERSION = '2.7.7';
+const APP_VERSION = '2.7.8';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -3860,6 +3860,57 @@ function quoteEmailOutlookBodyHtml(q, mensagemExtra=''){
   </div>`;
 }
 
+function quoteEmailTableImageHtml(q){
+  const items = quoteItemsFromLegacy(q);
+  const subtotal = quoteItemsTotal(items);
+  const iva = subtotal * 0.23;
+  const totalComIva = subtotal + iva;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+    body{margin:0;background:#fff;font-family:Arial,sans-serif;color:#00233b;padding:26px}
+    .wrap{width:920px;background:#fff}
+    table.parts{width:100%;border-collapse:collapse;font-size:22px;line-height:1.15}
+    table.parts th{background:#06447f;color:#fff;text-align:left;padding:18px 16px;font-weight:900}
+    table.parts td{padding:16px;border-bottom:1px solid #dce7f0;vertical-align:middle}
+    .totals{margin-left:auto;width:450px;margin-top:24px;font-size:22px}
+    .totals .row{display:flex;justify-content:space-between;border-bottom:1px solid #dce7f0;padding:11px 0}
+    .totals .grand{font-size:30px;font-weight:900;color:#06447f;padding-top:16px}
+  </style></head><body><div class="wrap">
+    <table class="parts">
+      <thead><tr><th>Nome</th><th>Referência</th><th>Unidade</th><th>Preço<br>Líquido</th><th>Total c/<br>IVA</th></tr></thead>
+      <tbody>${items.map(item=>`<tr>
+        <td>${esc(item.nome || '-')}</td>
+        <td>${esc(item.referencia || '-')}</td>
+        <td>${esc(item.unidade || '-')}</td>
+        <td>${money(item.preco)}</td>
+        <td>${money(Number(item.total || 0) * 1.23)}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <div class="totals">
+      <div class="row"><span>Subtotal líquido</span><strong>${money(subtotal)}</strong></div>
+      <div class="row"><span>IVA 23%</span><strong>${money(iva)}</strong></div>
+      <div class="row grand"><span>Total</span><strong>${money(totalComIva)}</strong></div>
+    </div>
+  </div></body></html>`;
+}
+function sanitizeFilePart(value){
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._ -]+/g,'').trim().slice(0,80) || 'orcamento';
+}
+function quoteElectronEmailPayload(q, mensagemExtra=''){
+  const v = quoteVehicleParts(q);
+  const subject = quoteEmailSubject(q);
+  const htmlBody = quoteEmailOutlookBodyHtml(q, mensagemExtra);
+  const plainBody = quoteEmailPlainText(q, mensagemExtra);
+  return {
+    to:q.email || '',
+    subject,
+    htmlBody,
+    plainBody,
+    pdfHtml:quotePdfHtml(q),
+    tableHtml:quoteEmailTableImageHtml(q),
+    fileBase:sanitizeFilePart(`Orcamento - ${v.marcaModelo || ''} - ${v.matricula || ''} - ${q.id || ''}`)
+  };
+}
+
 async function copyQuoteHtmlToClipboard(q, mensagemExtra=''){
   const html = quoteEmailHtml(q, mensagemExtra);
   const plain = quoteEmailPlainText(q, mensagemExtra);
@@ -3874,15 +3925,37 @@ async function copyQuoteHtmlToClipboard(q, mensagemExtra=''){
   }
 }
 function openOutlookHtmlEmail(q, mensagemExtra=''){
+  const payload = quoteElectronEmailPayload(q, mensagemExtra);
+
+  // Melhor modo: Electron/Windows usa Outlook COM para abrir email com HTML + PDF + PNG anexos.
+  if(window.bragalisElectron?.composeOutlookEmail){
+    window.bragalisElectron.composeOutlookEmail(payload).then(result=>{
+      if(result?.ok) {
+        toast('Outlook aberto com PDF e imagem da tabela em anexo.');
+      } else {
+        console.warn('Electron Outlook compose failed', result);
+        toast('Não consegui anexar automaticamente. Abri email normal e copiei o layout.');
+        openOutlookEmailBrowserFallback(q, mensagemExtra);
+      }
+    }).catch(err=>{
+      console.warn('Electron Outlook bridge failed', err);
+      toast('Electron/Outlook falhou. Vou abrir email normal.');
+      openOutlookEmailBrowserFallback(q, mensagemExtra);
+    });
+    return true;
+  }
+
+  openOutlookEmailBrowserFallback(q, mensagemExtra);
+  return true;
+}
+function openOutlookEmailBrowserFallback(q, mensagemExtra=''){
   const subject = quoteEmailSubject(q);
   const plain = quoteEmailPlainText(q, mensagemExtra);
   const htmlBody = quoteEmailOutlookBodyHtml(q, mensagemExtra);
   const to = q.email || '';
 
-  // Também copia o layout HTML bonito para Ctrl+V, sem impedir a abertura do Outlook.
   copyQuoteHtmlToClipboard(q, mensagemExtra).catch(()=>{});
 
-  // Tenta primeiro abrir Outlook com corpo HTML em tabela.
   const outlookUrl = `ms-outlook://compose?to=${encodeURIComponent(to)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(htmlBody)}`;
   const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(plain)}`;
 
@@ -3892,18 +3965,14 @@ function openOutlookHtmlEmail(q, mensagemExtra=''){
   document.addEventListener('visibilitychange', ()=>{ if(document.hidden) leftPage = true; }, { once:true });
 
   window.location.href = outlookUrl;
-
-  // Se o protocolo Outlook não for aceite, abre mailto normal.
   setTimeout(()=>{
     if(!leftPage) {
       window.location.href = mailto;
-      toast('Outlook HTML não abriu. Abri email em texto simples; o layout bonito foi copiado para colar.');
+      toast('Outlook HTML não abriu. Abri email em texto simples; o layout bonito foi copiado.');
     } else {
-      toast('Outlook aberto com tentativa de tabela HTML. Se aparecer texto estranho, cola o layout copiado.');
+      toast('Outlook aberto. Se a tabela não ficar bonita, cola o layout copiado.');
     }
   }, 1400);
-
-  return true;
 }
 
 function quoteEmailHtml(q, mensagemExtra=''){
@@ -4038,7 +4107,7 @@ function openQuoteEmailOptionsModal(q){
   openModal('Enviar orçamento por email', `<form id="quoteEmailOptionsForm" class="form-grid email-options-form">
     <div class="span3 email-options-intro">
       <strong>Escolhe os campos que queres enviar no email</strong>
-      <span>Tenta abrir o Outlook já com a tabela formatada. Se o Windows bloquear, abre em texto simples e copia o layout bonito.</span>
+      <span>No Electron tenta abrir o Outlook com PDF + imagem da tabela anexados. No Edge abre email e copia o layout bonito.</span>
     </div>
 
     <div class="span3 email-options-grid">
