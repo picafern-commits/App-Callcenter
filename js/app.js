@@ -4450,13 +4450,12 @@ function quotePdfHtml(q){
     .page{width:210mm;min-height:297mm;margin:0 auto;background:#fff;padding:15mm 16mm 13mm;box-shadow:0 24px 80px rgba(23,47,67,.18)}
     .doc-head{display:grid;grid-template-columns:1fr 70mm;gap:18mm;align-items:start;border-bottom:3px solid #06447f;padding-bottom:14px}
     .brand-row{display:flex;gap:14px;align-items:flex-start}.pdf-logo{width:62px;height:62px;object-fit:contain;border:1px solid #d8e5ef;border-radius:14px;padding:7px;background:#fff}
-    .company h1{margin:0 0 5px;color:#06447f;font-size:24px;letter-spacing:0}.company p,.doc-meta p,.info-card p,.terms p{margin:3px 0;color:#4e6577}
+    .company h1{margin:0 0 5px;color:#06447f;font-size:24px;letter-spacing:0}.company p,.doc-meta p,.info-card p{margin:3px 0;color:#4e6577}
     .doc-meta{text-align:right}.doc-type{font-size:27px;font-weight:900;color:#06447f;letter-spacing:0;margin:0}.doc-number{display:inline-block;margin:8px 0 10px;padding:7px 12px;border-radius:8px;background:#f58220;color:#fff;font-weight:900}
     .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}.info-card{border:1px solid #d8e5ef;border-radius:10px;padding:12px;background:#fbfdff;min-height:118px}.info-card h2{margin:0 0 8px;font-size:13px;text-transform:uppercase;color:#06447f;letter-spacing:0}.info-card strong{color:#172f43}
     .items{width:100%;border-collapse:collapse;margin-top:18px}.items th{background:#06447f;color:#fff;text-align:left;padding:10px 9px;font-size:11px}.items td{border-bottom:1px solid #e2ebf2;padding:10px 9px;vertical-align:top}.items tbody tr:nth-child(even){background:#f8fbfd}.items .num{text-align:right;white-space:nowrap}.items .desc strong{display:block;color:#172f43}.items .desc small{display:block;color:#6a7e8e;margin-top:2px}
-    .summary-area{display:grid;grid-template-columns:1fr 72mm;gap:16px;align-items:start;margin-top:16px}.terms{border:1px solid #d8e5ef;border-radius:10px;padding:12px;background:#fbfdff}.terms h3{margin:0 0 8px;font-size:13px;color:#06447f}.totals{border:1px solid #d8e5ef;border-radius:10px;overflow:hidden;background:#fff}.totals div{display:flex;justify-content:space-between;gap:14px;padding:10px 12px;border-bottom:1px solid #e2ebf2}.totals div:last-child{border-bottom:0}.totals .grand{background:#06447f;color:#fff;font-size:16px;font-weight:900}
-    .approval{display:grid;grid-template-columns:1fr 1fr;gap:18mm;margin-top:26px}.sign-box{height:70px;border-bottom:1px solid #96a9b9;display:flex;align-items:flex-end;color:#6a7e8e;padding-bottom:6px}.footer{margin-top:20px;border-top:1px solid #d8e5ef;padding-top:10px;color:#6a7e8e;font-size:10.5px;display:flex;justify-content:space-between;gap:16px}
-    @media print{body{background:white}.page{width:auto;min-height:auto;margin:0;padding:0;box-shadow:none}.print-btn{display:none!important}.doc-head{break-inside:avoid}.summary-area,.approval{break-inside:avoid}}
+    .summary-area{display:flex;justify-content:flex-end;margin-top:16px}.totals{width:72mm;border:1px solid #d8e5ef;border-radius:10px;overflow:hidden;background:#fff}.totals div{display:flex;justify-content:space-between;gap:14px;padding:10px 12px;border-bottom:1px solid #e2ebf2}.totals div:last-child{border-bottom:0}.totals .grand{background:#06447f;color:#fff;font-size:16px;font-weight:900}
+    @media print{body{background:white}.page{width:auto;min-height:auto;margin:0;padding:0;box-shadow:none}.print-btn{display:none!important}.doc-head{break-inside:avoid}.summary-area{break-inside:avoid}}
   </style></head><body><button class="print-btn" onclick="window.print()">Imprimir / Guardar PDF</button><main class="page">
     <section class="doc-head">
       <div class="brand-row">
@@ -4501,27 +4500,11 @@ function quotePdfHtml(q){
     </table>
 
     <section class="summary-area">
-      <div class="terms">
-        <h3>Condições comerciais</h3>
-        <p><strong>Prazo de entrega:</strong> ${esc(q.prazoEntrega || 'A confirmar')}</p>
-        <p><strong>Condições:</strong> ${esc(q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.')}</p>
-        <p><strong>Observações:</strong> ${esc(q.observacoes || '-')}</p>
-      </div>
       <div class="totals">
         <div><span>Subtotal líquido</span><strong>${money(subtotal)}</strong></div>
         <div><span>IVA 23%</span><strong>${money(iva)}</strong></div>
         <div class="grand"><span>Total</span><strong>${money(totalComIva)}</strong></div>
       </div>
-    </section>
-
-    <section class="approval">
-      <div><div class="sign-box">Assinatura / carimbo do cliente</div></div>
-      <div><div class="sign-box">Data de aprovação</div></div>
-    </section>
-
-    <section class="footer">
-      <span>Para avançar, responda ao email com a confirmação deste orçamento.</span>
-      <span>Documento gerado em ${esc(generatedAt)} por ${esc(company.name)}.</span>
     </section>
   </main></body></html>`;
 }
