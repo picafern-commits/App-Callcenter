@@ -1,4 +1,4 @@
-const APP_VERSION = '2.8.0';
+const APP_VERSION = '2.8.2';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -3784,153 +3784,150 @@ function quoteEmailTextTable(items){
   return [head, line, ...rows].join('\n');
 }
 
-function quoteEmailPlainText(q, mensagemExtra=''){
-  const items = quoteItemsFromLegacy(q);
-  const subtotal = quoteItemsTotal(items);
-  const iva = subtotal * 0.23;
-  const totalComIva = subtotal + iva;
-  const v = quoteVehicleParts(q);
-  return `${greetingByCurrentHour()},
-
-Segue orçamento solicitado.
-
-${mensagemExtra ? String(mensagemExtra).trim() + '\\n\\n' : ''}ORÇAMENTO ${q.id}
-
-Matrícula: ${v.matricula || '-'}
-Marca & Modelo: ${v.marcaModelo || '-'}
-Motor: ${v.motor || '-'}
-
-Referências:
-${quoteEmailTextTable(items)}
-
-Subtotal líquido: ${money(subtotal)}
-IVA 23%: ${money(iva)}
-Total: ${money(totalComIva)}
-
-Prazo de entrega: ${q.prazoEntrega || 'A confirmar'}
-Condições: ${q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.'}
-
-Com os melhores cumprimentos,
-${quoteEmailSignatureName()}`;
+function defaultQuoteEmailOptions(){
+  return {
+    includeNumero:false,
+    includeCliente:false,
+    includeMatricula:true,
+    includeMarcaModelo:true,
+    includeMotor:true,
+    includeReferencias:true,
+    includePrecoLiquido:true,
+    includeTotalLinha:true,
+    includeResumo:true,
+    includePrazo:false,
+    includeCondicoes:true,
+    includeObservacoes:false
+  };
 }
-function quoteEmailOutlookBodyHtml(q, mensagemExtra=''){
+function normalizeQuoteEmailOptions(options={}){
+  return { ...defaultQuoteEmailOptions(), ...(options || {}) };
+}
+function quoteEmailTextTableWithOptions(items, options={}){
+  const opts = normalizeQuoteEmailOptions(options);
+  const widths = { nome:28, ref:18, un:7, preco:15, total:15 };
+  const cols = [
+    ['nome','Nome',widths.nome, item=>item.nome || '-'],
+    ['ref','Referência',widths.ref, item=>item.referencia || '-'],
+    ['un','Unidade',widths.un, item=>item.unidade || '-']
+  ];
+  if(opts.includePrecoLiquido) cols.push(['preco','Preço Líquido',widths.preco, item=>money(item.preco)]);
+  if(opts.includeTotalLinha) cols.push(['total','Total c/ IVA',widths.total, item=>money(Number(item.total || 0) * 1.23)]);
+  const head = cols.map(([,label,width])=>textCell(label,width)).join('  ');
+  const line = cols.map(([,label,width])=>'-'.repeat(width)).join('  ');
+  const rows = (items || []).map(item=>cols.map(([,label,width,get])=>textCell(get(item),width)).join('  '));
+  return [head,line,...rows].join('\n');
+}
+function quoteEmailPlainText(q, mensagemExtra='', options={}){
+  const opts = normalizeQuoteEmailOptions(options);
   const items = quoteItemsFromLegacy(q);
   const subtotal = quoteItemsTotal(items);
   const iva = subtotal * 0.23;
   const totalComIva = subtotal + iva;
   const v = quoteVehicleParts(q);
-  return `
-  <div style="font-family:Arial,sans-serif;font-size:12pt;color:#00233b">
-    <p><strong>${esc(greetingByCurrentHour())},</strong></p>
-    <p>Segue orçamento solicitado.</p>
-    ${String(mensagemExtra || '').trim() ? `<p>${esc(String(mensagemExtra).trim()).replace(/\n/g,'<br>')}</p>` : ''}
-    <p>
-      <strong>Matrícula:</strong> ${esc(v.matricula || '-')}<br>
-      <strong>Marca & Modelo:</strong> ${esc(v.marcaModelo || '-')}<br>
-      <strong>Motor:</strong> ${esc(v.motor || '-')}
-    </p>
-    <table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:11pt;color:#00233b">
-      <thead>
-        <tr>
-          <th style="background:#06447f;color:#ffffff;text-align:left;padding:10px 12px;border:1px solid #06447f">Nome</th>
-          <th style="background:#06447f;color:#ffffff;text-align:left;padding:10px 12px;border:1px solid #06447f">Referência</th>
-          <th style="background:#06447f;color:#ffffff;text-align:left;padding:10px 12px;border:1px solid #06447f">Unidade</th>
-          <th style="background:#06447f;color:#ffffff;text-align:left;padding:10px 12px;border:1px solid #06447f">Preço Líquido</th>
-          <th style="background:#06447f;color:#ffffff;text-align:left;padding:10px 12px;border:1px solid #06447f">Total c/ IVA</th>
-        </tr>
-      </thead>
+  const parts = [
+    `${greetingByCurrentHour()},`,
+    '',
+    'Segue orçamento solicitado.',
+    ''
+  ];
+  if(String(mensagemExtra || '').trim()) parts.push(String(mensagemExtra).trim(), '');
+  if(opts.includeNumero) parts.push(`Orçamento: ${q.id}`, '');
+  if(opts.includeCliente) parts.push(`Cliente: ${q.cliente || '-'}`, '');
+  if(opts.includeMatricula || opts.includeMarcaModelo || opts.includeMotor){
+    parts.push('Viatura:');
+    if(opts.includeMatricula) parts.push(`Matrícula: ${v.matricula || '-'}`);
+    if(opts.includeMarcaModelo) parts.push(`Marca & Modelo: ${v.marcaModelo || '-'}`);
+    if(opts.includeMotor) parts.push(`Motor: ${v.motor || '-'}`);
+    parts.push('');
+  }
+  if(opts.includeReferencias) parts.push(quoteEmailTextTableWithOptions(items, opts), '');
+  if(opts.includeResumo){
+    parts.push(`Subtotal líquido: ${money(subtotal)}`, '', `IVA 23%: ${money(iva)}`, '', `Total: ${money(totalComIva)}`, '');
+  }
+  if(opts.includePrazo) parts.push(`Prazo de entrega: ${q.prazoEntrega || 'A confirmar'}`, '');
+  if(opts.includeCondicoes) parts.push(`Condições: ${q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.'}`, '');
+  if(opts.includeObservacoes) parts.push(`Observações: ${q.observacoes || '-'}`, '');
+  parts.push('Com os melhores cumprimentos,', quoteEmailSignatureName(), '', `Para avançar, responda a este email com a confirmação do orçamento. Documento gerado por ${companyName()}.`);
+  return parts.join('\n');
+}
+function quoteEmailOutlookBodyHtml(q, mensagemExtra='', options={}){
+  const opts = normalizeQuoteEmailOptions(options);
+  const items = quoteItemsFromLegacy(q);
+  const subtotal = quoteItemsTotal(items);
+  const iva = subtotal * 0.23;
+  const totalComIva = subtotal + iva;
+  const v = quoteVehicleParts(q);
+  const cols = [
+    `<th style="background:#06447f;color:#ffffff;text-align:left;padding:9px 11px;border:1px solid #06447f">Nome</th>`,
+    `<th style="background:#06447f;color:#ffffff;text-align:left;padding:9px 11px;border:1px solid #06447f">Referência</th>`,
+    `<th style="background:#06447f;color:#ffffff;text-align:left;padding:9px 11px;border:1px solid #06447f">Unidade</th>`
+  ];
+  if(opts.includePrecoLiquido) cols.push(`<th style="background:#06447f;color:#ffffff;text-align:left;padding:9px 11px;border:1px solid #06447f">Preço Líquido</th>`);
+  if(opts.includeTotalLinha) cols.push(`<th style="background:#06447f;color:#ffffff;text-align:left;padding:9px 11px;border:1px solid #06447f">Total c/ IVA</th>`);
+  return `<div style="font-family:Arial,sans-serif;font-size:12pt;color:#000000;line-height:1.35">
+    <p style="margin:0 0 14px">${esc(greetingByCurrentHour())},</p>
+
+    <p style="margin:0 0 20px">Segue orçamento solicitado.</p>
+
+    ${String(mensagemExtra || '').trim() ? `<p style="margin:0 0 18px">${esc(String(mensagemExtra).trim()).replace(/\n/g,'<br>')}</p>` : ''}
+
+    ${opts.includeNumero ? `<p style="margin:0 0 18px">Orçamento: ${esc(q.id || '-')}</p>` : ''}
+
+    ${opts.includeCliente ? `<p style="margin:0 0 18px">Cliente: ${esc(q.cliente || '-')}</p>` : ''}
+
+    ${(opts.includeMatricula || opts.includeMarcaModelo || opts.includeMotor) ? `<p style="margin:0 0 4px">Viatura:</p>
+    ${opts.includeMatricula ? `<p style="margin:0 0 2px">Matrícula: ${esc(v.matricula || '-')}</p>` : ''}
+    ${opts.includeMarcaModelo ? `<p style="margin:0 0 2px">Marca &amp; Modelo: ${esc(v.marcaModelo || '-')}</p>` : ''}
+    ${opts.includeMotor ? `<p style="margin:0 0 18px">Motor: ${esc(v.motor || '-')}</p>` : ''}` : ''}
+
+    ${opts.includeReferencias ? `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:11pt;color:#000000;margin:0 0 18px">
+      <thead><tr>${cols.join('')}</tr></thead>
       <tbody>
         ${items.map(item=>`<tr>
-          <td style="padding:10px 12px;border-bottom:1px solid #dce7f0">${esc(item.nome || '-')}</td>
-          <td style="padding:10px 12px;border-bottom:1px solid #dce7f0">${esc(item.referencia || '-')}</td>
-          <td style="padding:10px 12px;border-bottom:1px solid #dce7f0">${esc(item.unidade || '-')}</td>
-          <td style="padding:10px 12px;border-bottom:1px solid #dce7f0">${money(item.preco)}</td>
-          <td style="padding:10px 12px;border-bottom:1px solid #dce7f0">${money(Number(item.total || 0) * 1.23)}</td>
+          <td style="padding:8px 11px;border-bottom:1px solid #dce7f0">${esc(item.nome || '-')}</td>
+          <td style="padding:8px 11px;border-bottom:1px solid #dce7f0">${esc(item.referencia || '-')}</td>
+          <td style="padding:8px 11px;border-bottom:1px solid #dce7f0">${esc(item.unidade || '-')}</td>
+          ${opts.includePrecoLiquido ? `<td style="padding:8px 11px;border-bottom:1px solid #dce7f0">${money(item.preco)}</td>` : ''}
+          ${opts.includeTotalLinha ? `<td style="padding:8px 11px;border-bottom:1px solid #dce7f0">${money(Number(item.total || 0) * 1.23)}</td>` : ''}
         </tr>`).join('')}
       </tbody>
-    </table>
-    <table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-left:auto;margin-top:16px;width:330px;font-family:Arial,sans-serif;font-size:12pt;color:#00233b">
-      <tr><td style="padding:8px 0;border-bottom:1px solid #dce7f0">Subtotal líquido</td><td style="padding:8px 0;border-bottom:1px solid #dce7f0;text-align:right"><strong>${money(subtotal)}</strong></td></tr>
-      <tr><td style="padding:8px 0;border-bottom:1px solid #dce7f0">IVA 23%</td><td style="padding:8px 0;border-bottom:1px solid #dce7f0;text-align:right"><strong>${money(iva)}</strong></td></tr>
-      <tr><td style="padding:12px 0;font-size:16pt;font-weight:bold;color:#06447f">Total</td><td style="padding:12px 0;text-align:right;font-size:16pt;font-weight:bold;color:#06447f">${money(totalComIva)}</td></tr>
-    </table>
-    <p><strong>Prazo de entrega:</strong> ${esc(q.prazoEntrega || 'A confirmar')}</p>
-    <p><strong>Condições:</strong> ${esc(q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.')}</p>
-    <p>Com os melhores cumprimentos,<br><strong>${esc(quoteEmailSignatureName())}</strong></p>
+    </table>` : ''}
+
+    ${opts.includeResumo ? `<p style="margin:0 0 10px">Subtotal líquido: ${money(subtotal)}</p>
+    <p style="margin:0 0 10px">IVA 23%: ${money(iva)}</p>
+    <p style="margin:0 0 18px">Total: ${money(totalComIva)}</p>` : ''}
+
+    ${opts.includePrazo ? `<p style="margin:0 0 18px">Prazo de entrega: ${esc(q.prazoEntrega || 'A confirmar')}</p>` : ''}
+
+    ${opts.includeCondicoes ? `<p style="margin:0 0 18px">Condições: ${esc(q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.')}</p>` : ''}
+
+    ${opts.includeObservacoes ? `<p style="margin:0 0 18px">Observações: ${esc(q.observacoes || '-')}</p>` : ''}
+
+    <p style="margin:0 0 4px">Com os melhores cumprimentos,</p>
+    <p style="margin:0 0 18px">${esc(quoteEmailSignatureName())}</p>
+
+    <p style="margin:0">Para avançar, responda a este email com a confirmação do orçamento. Documento gerado por ${esc(companyName())}.</p>
   </div>`;
 }
-
-function quoteEmailTableImageHtml(q){
-  const items = quoteItemsFromLegacy(q);
-  const subtotal = quoteItemsTotal(items);
-  const iva = subtotal * 0.23;
-  const totalComIva = subtotal + iva;
-  return `<!doctype html><html><head><meta charset="utf-8"><style>
-    body{margin:0;background:#fff;font-family:Arial,sans-serif;color:#00233b;padding:26px}
-    .wrap{width:920px;background:#fff}
-    table.parts{width:100%;border-collapse:collapse;font-size:22px;line-height:1.15}
-    table.parts th{background:#06447f;color:#fff;text-align:left;padding:18px 16px;font-weight:900}
-    table.parts td{padding:16px;border-bottom:1px solid #dce7f0;vertical-align:middle}
-    .totals{margin-left:auto;width:450px;margin-top:24px;font-size:22px}
-    .totals .row{display:flex;justify-content:space-between;border-bottom:1px solid #dce7f0;padding:11px 0}
-    .totals .grand{font-size:30px;font-weight:900;color:#06447f;padding-top:16px}
-  </style></head><body><div class="wrap">
-    <table class="parts">
-      <thead><tr><th>Nome</th><th>Referência</th><th>Unidade</th><th>Preço<br>Líquido</th><th>Total c/<br>IVA</th></tr></thead>
-      <tbody>${items.map(item=>`<tr>
-        <td>${esc(item.nome || '-')}</td>
-        <td>${esc(item.referencia || '-')}</td>
-        <td>${esc(item.unidade || '-')}</td>
-        <td>${money(item.preco)}</td>
-        <td>${money(Number(item.total || 0) * 1.23)}</td>
-      </tr>`).join('')}</tbody>
-    </table>
-    <div class="totals">
-      <div class="row"><span>Subtotal líquido</span><strong>${money(subtotal)}</strong></div>
-      <div class="row"><span>IVA 23%</span><strong>${money(iva)}</strong></div>
-      <div class="row grand"><span>Total</span><strong>${money(totalComIva)}</strong></div>
-    </div>
-  </div></body></html>`;
+function quoteEmailHtml(q, mensagemExtra='', options={}){
+  return quoteEmailOutlookBodyHtml(q, mensagemExtra, options);
 }
-function sanitizeFilePart(value){
-  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._ -]+/g,'').trim().slice(0,80) || 'orcamento';
-}
-function quoteEmailCompactBody(q, mensagemExtra=''){
+function sanitizeFilePart(value){ return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._ -]+/g,'').trim().slice(0,80) || 'orcamento'; }
+function quoteElectronEmailPayload(q, mensagemExtra='', options={}){
   const v = quoteVehicleParts(q);
-  return `${greetingByCurrentHour()},
-
-Segue orçamento solicitado.
-
-${mensagemExtra ? String(mensagemExtra).trim() + '\n\n' : ''}Dados da viatura:
-Matrícula: ${v.matricula || '-'}
-Marca & Modelo: ${v.marcaModelo || '-'}
-Motor: ${v.motor || '-'}
-
-Em anexo envio o orçamento em PDF e a imagem da tabela de referências.
-
-Com os melhores cumprimentos,
-${quoteEmailSignatureName()}`;
-}
-
-function quoteElectronEmailPayload(q, mensagemExtra=''){
-  const v = quoteVehicleParts(q);
-  const subject = quoteEmailSubject(q);
-  const htmlBody = quoteEmailOutlookBodyHtml(q, mensagemExtra);
-  const plainBody = quoteEmailPlainText(q, mensagemExtra);
   return {
     to:q.email || '',
-    subject,
-    htmlBody,
-    plainBody,
-    pdfHtml:quotePdfHtml(q),
-    tableHtml:quoteEmailTableImageHtml(q),
+    subject:quoteEmailSubject(q),
+    htmlBody:quoteEmailOutlookBodyHtml(q, mensagemExtra, options),
+    plainBody:quoteEmailPlainText(q, mensagemExtra, options),
     fileBase:sanitizeFilePart(`Orcamento - ${v.marcaModelo || ''} - ${v.matricula || ''} - ${q.id || ''}`)
   };
 }
 
-async function copyQuoteHtmlToClipboard(q, mensagemExtra=''){
-  const html = quoteEmailHtml(q, mensagemExtra);
-  const plain = quoteEmailPlainText(q, mensagemExtra);
+async function copyQuoteHtmlToClipboard(q, mensagemExtra='', options={}){
+  const html = quoteEmailHtml(q, mensagemExtra, options);
+  const plain = quoteEmailPlainText(q, mensagemExtra, options);
   try{
     const blobHtml = new Blob([html], { type:'text/html' });
     const blobText = new Blob([plain], { type:'text/plain' });
@@ -3941,8 +3938,8 @@ async function copyQuoteHtmlToClipboard(q, mensagemExtra=''){
     return false;
   }
 }
-function openOutlookHtmlEmail(q, mensagemExtra=''){
-  const payload = quoteElectronEmailPayload(q, mensagemExtra);
+function openOutlookHtmlEmail(q, mensagemExtra='', options={}){
+  const payload = quoteElectronEmailPayload(q, mensagemExtra, options);
 
   // Novo fluxo: abre email pronto e copia o layout bonito para CTRL+V.
   // Não mete texto no corpo para não estragar a colagem da tabela.
@@ -3951,24 +3948,24 @@ function openOutlookHtmlEmail(q, mensagemExtra=''){
       if(result?.ok) toast('Email aberto. Faz CTRL+V no corpo para inserir o orçamento.');
       else {
         console.warn('Electron ready email failed', result);
-        openOutlookEmailBrowserFallback(q, mensagemExtra);
+        openOutlookEmailBrowserFallback(q, mensagemExtra, options);
       }
     }).catch(err=>{
       console.warn('Electron ready email bridge failed', err);
-      openOutlookEmailBrowserFallback(q, mensagemExtra);
+      openOutlookEmailBrowserFallback(q, mensagemExtra, options);
     });
     return true;
   }
 
-  openOutlookEmailBrowserFallback(q, mensagemExtra);
+  openOutlookEmailBrowserFallback(q, mensagemExtra, options);
   return true;
 }
-function openOutlookEmailBrowserFallback(q, mensagemExtra=''){
+function openOutlookEmailBrowserFallback(q, mensagemExtra='', options={}){
   const subject = quoteEmailSubject(q);
   const to = q.email || '';
 
   // Browser/Edge: copia HTML bonito e abre email sem corpo. Depois é CTRL+V.
-  copyQuoteHtmlToClipboard(q, mensagemExtra)
+  copyQuoteHtmlToClipboard(q, mensagemExtra, options)
     .then(copied=>{
       toast(copied ? 'Layout copiado. Faz CTRL+V no corpo do email.' : 'Email aberto. Se não copiar, usa a pré-visualização.');
     })
@@ -3978,227 +3975,6 @@ function openOutlookEmailBrowserFallback(q, mensagemExtra=''){
   window.location.href = mailto;
 }
 
-function quoteEmailHtml(q, mensagemExtra=''){
-  const items = quoteItemsFromLegacy(q);
-  const subtotal = quoteItemsTotal(items);
-  const iva = subtotal * 0.23;
-  const totalComIva = subtotal + iva;
-  const settings = state.settings || {};
-  const v = quoteVehicleParts(q);
-  return `<div style="font-family:Arial,sans-serif;color:#12344d;background:#ffffff;padding:0">
-    <div id="quoteEmailCopyArea" style="max-width:780px;margin:0 auto;background:#ffffff;padding:24px;border-radius:0;border:0">
-      <div style="position:relative;display:flex;justify-content:space-between;gap:24px;border-bottom:4px solid #06447f;padding-bottom:18px">
-        <img src="../assets/bragalis-callcenter-icon.png" alt="${esc(companyName())}" style="width:58px;height:58px;border-radius:18px;padding:7px;background:#eef6ff;border:1px solid #d7e6f2;object-fit:contain">
-        <div style="flex:1">
-          <h1 style="margin:0;color:#06447f;font-size:26px">${esc(companyName())}</h1>
-          <p style="margin:5px 0;color:#49677f">${esc(settings.companyAddress || 'Callcenter de peças automóveis')}</p>
-          <p style="margin:5px 0;color:#49677f">${settings.companyNif ? `NIF: ${esc(settings.companyNif)} · ` : ''}${esc(settings.companyPhone || '')} ${settings.companyEmail ? '· ' + esc(settings.companyEmail) : ''}</p>
-          <p style="margin:5px 0;color:#49677f">Orçamento gerado em ${esc(today())}</p>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:28px;font-weight:900;color:#f58220">ORÇAMENTO</div>
-          <p style="margin:5px 0"><strong>${esc(q.id)}</strong></p>
-          <p style="margin:5px 0">Validade: ${esc(q.validade || today())}</p>
-          <p style="margin:5px 0">Estado: ${esc(q.estado || 'Rascunho')}</p>
-        </div>
-      </div>
-
-      <p style="margin:18px 0 0;line-height:1.5;color:#12344d"><strong>${esc(greetingByCurrentHour())},</strong></p>
-      <p style="margin:8px 0 0;line-height:1.5;color:#12344d">Segue orçamento solicitado.</p>
-      ${String(mensagemExtra || '').trim() ? `<p style="margin:14px 0 0;line-height:1.5;color:#12344d">${esc(String(mensagemExtra).trim()).replace(/\n/g,'<br>')}</p>` : ''}
-
-      <div style="border:1px solid #c9d8e5;border-radius:10px;padding:14px;margin-top:20px">
-        <h2 style="margin:0 0 10px;color:#06447f">Cliente / Viatura</h2>
-        <p style="margin:5px 0;color:#49677f"><strong>${esc(q.cliente || '-')}</strong></p>
-        <p style="margin:5px 0;color:#49677f">Código cliente: ${esc(q.codigoCliente || '-')}</p>
-        <p style="margin:5px 0;color:#49677f">Matrícula: ${esc(v.matricula || '-')}</p>
-        <p style="margin:5px 0;color:#49677f">Marca & Modelo: ${esc(v.marcaModelo || '-')}</p>
-        <p style="margin:5px 0;color:#49677f">Motor: ${esc(v.motor || '-')}</p>
-      </div>
-
-      <table style="width:100%;border-collapse:collapse;margin-top:22px">
-        <thead>
-          <tr>
-            <th style="background:#06447f;color:white;text-align:left;padding:12px">Nome</th>
-            <th style="background:#06447f;color:white;text-align:left;padding:12px">Referência</th>
-            <th style="background:#06447f;color:white;text-align:left;padding:12px">Unidade</th>
-            <th style="background:#06447f;color:white;text-align:left;padding:12px">Preço Líquido</th>
-            <th style="background:#06447f;color:white;text-align:left;padding:12px">Total c/ IVA</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${items.map(item=>`<tr>
-            <td style="border-bottom:1px solid #dce7f0;padding:12px">${esc(item.nome)}</td>
-            <td style="border-bottom:1px solid #dce7f0;padding:12px">${esc(item.referencia || '-')}</td>
-            <td style="border-bottom:1px solid #dce7f0;padding:12px">${esc(item.unidade)}</td>
-            <td style="border-bottom:1px solid #dce7f0;padding:12px">${money(item.preco)}</td>
-            <td style="border-bottom:1px solid #dce7f0;padding:12px">${money(Number(item.total || 0) * 1.23)}</td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-
-      <div style="margin-left:auto;width:310px;margin-top:18px">
-        <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #dce7f0"><span>Subtotal líquido</span><strong>${money(subtotal)}</strong></div>
-        <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #dce7f0"><span>IVA 23%</span><strong>${money(iva)}</strong></div>
-        <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #dce7f0;font-size:20px;font-weight:900;color:#06447f"><span>Total</span><strong>${money(totalComIva)}</strong></div>
-      </div>
-
-      <div style="margin-top:26px;line-height:1.5">
-        <p><strong>Prazo de entrega:</strong> ${esc(q.prazoEntrega || 'A confirmar')}</p>
-        <p><strong>Condições:</strong> ${esc(q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.')}</p>
-        <p><strong>Observações:</strong> ${esc(q.observacoes || '-')}</p>
-      </div>
-
-      <div style="margin-top:30px;line-height:1.5;color:#12344d">
-        <p style="margin:0">Com os melhores cumprimentos,</p>
-        <p style="margin:4px 0 0"><strong>${esc(quoteEmailSignatureName())}</strong></p>
-      </div>
-      <div style="margin-top:24px;color:#49677f;font-size:12px;border-top:1px solid #dce7f0;padding-top:12px">
-        Para avançar, responda a este email com a confirmação do orçamento. Documento gerado por ${esc(companyName())}.
-      </div>
-    </div>
-  </div>`;
-}
-function openQuoteEmailHtmlPreview(q, mensagemExtra='', fallbackNotice=false){
-  const subject = quoteEmailSubject(q);
-  const html = quoteEmailHtml(q, mensagemExtra);
-  const win = window.open('', '_blank', 'width=920,height=900');
-  win.document.write(`<!doctype html><html lang="pt-PT"><head><meta charset="utf-8"><title>${esc(subject)}</title></head><body>
-    <div style="position:sticky;top:0;z-index:20;background:#ffffff;padding:12px;border-bottom:1px solid #dce7f0;display:flex;gap:8px;justify-content:flex-end;align-items:center">
-      ${fallbackNotice ? '<span style="margin-right:auto;color:#49677f;font-weight:700">O Outlook foi aberto. Se não aparecer com este layout, ele já foi copiado: cola no corpo do email.</span>' : ''}
-      <button id="copyHtmlBtn" style="border:0;border-radius:12px;padding:10px 14px;background:#06447f;color:white;font-weight:800;cursor:pointer">Copiar layout bonito</button>
-      <button id="openMailBtn" style="border:0;border-radius:12px;padding:10px 14px;background:#f58220;color:white;font-weight:800;cursor:pointer">Abrir Outlook texto simples</button>
-    </div>
-    ${html}
-    <script>
-      const subject = ${JSON.stringify(subject)};
-      const plain = document.getElementById('quoteEmailCopyArea').innerText;
-      document.getElementById('copyHtmlBtn').addEventListener('click', async () => {
-        const area = document.getElementById('quoteEmailCopyArea');
-        try {
-          const blobHtml = new Blob([area.outerHTML], { type: 'text/html' });
-          const blobText = new Blob([area.innerText], { type: 'text/plain' });
-          await navigator.clipboard.write([new ClipboardItem({ 'text/html': blobHtml, 'text/plain': blobText })]);
-          alert('Email bonito copiado. Agora cola no corpo do Outlook.');
-        } catch(e) {
-          const range = document.createRange();
-          range.selectNode(area);
-          const sel = window.getSelection();
-          sel.removeAllRanges();
-          sel.addRange(range);
-          document.execCommand('copy');
-          sel.removeAllRanges();
-          alert('Email copiado. Cola no corpo do Outlook.');
-        }
-      });
-      document.getElementById('openMailBtn').addEventListener('click', () => {
-        window.location.href = 'mailto:${encodeURIComponent(q.email || '')}?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(plain);
-      });
-    <\/script>
-  </body></html>`);
-  win.document.close();
-  win.focus();
-}
-function emailQuote(id){
-  const q = quoteById(id); if(!q) return;
-  openQuoteEmailOptionsModal(q);
-}
-function quoteEmailOptionCheckbox(key, label, checked=true){
-  return `<label class="email-option-pill"><input type="checkbox" name="${key}" ${checked?'checked':''}> <span>${esc(label)}</span></label>`;
-}
-function openQuoteEmailOptionsModal(q){
-  openModal('Enviar orçamento por email', `<form id="quoteEmailOptionsForm" class="form-grid email-options-form">
-    <div class="span3 email-options-intro">
-      <strong>Escolhe os campos que queres enviar no email</strong>
-      <span>Abre o Outlook/email já com destinatário e assunto. Depois faz CTRL+V no corpo para inserir o orçamento bonito.</span>
-    </div>
-
-    <div class="span3 email-options-grid">
-      ${quoteEmailOptionCheckbox('includeNumero','Nº do orçamento', true)}
-      ${quoteEmailOptionCheckbox('includeMatricula','Matrícula', true)}
-      ${quoteEmailOptionCheckbox('includeMarcaModelo','Marca & Modelo', true)}
-      ${quoteEmailOptionCheckbox('includeMotor','Motor', true)}
-      ${quoteEmailOptionCheckbox('includeReferencias','Referências / peças', true)}
-      ${quoteEmailOptionCheckbox('includePrecoLiquido','Preço líquido', true)}
-      ${quoteEmailOptionCheckbox('includeTotalLinha','Total c/ IVA por referência', true)}
-      ${quoteEmailOptionCheckbox('includeResumo','Resumo final', true)}
-      ${quoteEmailOptionCheckbox('includePrazo','Prazo de entrega', true)}
-      ${quoteEmailOptionCheckbox('includeCondicoes','Condições', true)}
-      ${quoteEmailOptionCheckbox('includeObservacoes','Observações', false)}
-      ${quoteEmailOptionCheckbox('includeCliente','Nome do cliente', false)}
-    </div>
-
-    <textarea class="span3" name="mensagemExtra" placeholder="Mensagem extra opcional"></textarea>
-
-    <div class="span3 actions">
-      <button class="btn ghost" type="button" id="cancelQuoteEmailBtn">Cancelar</button>
-      <button class="btn primary" type="submit">Abrir Outlook / Email</button>
-    </div>
-  </form>`);
-  qs('#cancelQuoteEmailBtn')?.addEventListener('click', closeModal);
-  qs('#quoteEmailOptionsForm')?.addEventListener('submit',e=>{
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const opts = Object.fromEntries([...fd.entries()]);
-    const include = key => fd.get(key) === 'on';
-    openOutlookHtmlEmail(q, opts.mensagemExtra || '');
-  });
-}
-function openQuoteEmailWithOptions(q, include, mensagemExtra=''){
-  const items = quoteItemsFromLegacy(q);
-  const subtotal = quoteItemsTotal(items);
-  const iva = subtotal * 0.23;
-  const totalComIva = subtotal + iva;
-  const v = quoteVehicleParts(q);
-  const subject = `Orçamento ${q.id} - ${v.matricula || q.viatura || quoteMainDescription(q)}`;
-
-  const blocks = ['Olá,', '', 'Segue orçamento solicitado.'];
-
-  if(String(mensagemExtra || '').trim()) {
-    blocks.push('', String(mensagemExtra).trim());
-  }
-
-  if(include('includeNumero')) {
-    blocks.push('', '==============================', `ORÇAMENTO ${q.id}`, '==============================');
-  }
-
-  if(include('includeCliente')) blocks.push('', 'CLIENTE', q.cliente || '-');
-  if(include('includeMatricula')) blocks.push('', 'MATRÍCULA', v.matricula || '-');
-  if(include('includeMarcaModelo')) blocks.push('', 'MARCA & MODELO', v.marcaModelo || '-');
-  if(include('includeMotor')) blocks.push('', 'MOTOR', v.motor || '-');
-
-  if(include('includeReferencias')) {
-    const lines = items.map((item,idx)=>{
-      const totalLinhaComIva = Number(item.total || 0) * 1.23;
-      const row = ['━━━━━━━━━━━━━━━━━━━━', `REF. ${idx+1}`, `Peça: ${item.nome || '-'}`, `Referência: ${item.referencia || '-'}`, `Unidade: ${item.unidade}`];
-      if(include('includePrecoLiquido')) row.push(`Preço líquido: ${money(item.preco)}`);
-      if(include('includeTotalLinha')) row.push(`Total c/ IVA: ${money(totalLinhaComIva)}`);
-      return row.join('\n');
-    }).join('\n\n');
-    blocks.push('', 'REFERÊNCIAS', lines);
-  }
-
-  if(include('includeResumo')) {
-    blocks.push('', '==============================', 'RESUMO', `Subtotal líquido: ${money(subtotal)}`, `IVA 23%: ${money(iva)}`, `TOTAL FINAL: ${money(totalComIva)}`, '==============================');
-  }
-
-  if(include('includePrazo')) blocks.push('', 'Prazo de entrega:', q.prazoEntrega || 'A confirmar');
-  if(include('includeCondicoes')) blocks.push('', 'Condições:', q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.');
-  if(include('includeObservacoes')) blocks.push('', 'Observações:', q.observacoes || '-');
-
-  blocks.push('', 'Qualquer questão estamos disponíveis.', '', 'Obrigado,', companyName());
-
-  const body = blocks.join('\n');
-  const mailto = `mailto:${encodeURIComponent(q.email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  try {
-    closeModal();
-    window.location.assign(mailto);
-    setTimeout(()=>toast('Se o Outlook não abriu, confirma a app predefinida de Email no Windows.'), 900);
-  } catch(err) {
-    console.warn('Mailto failed', err);
-    toast('Não foi possível abrir o email. Confirma a app predefinida de Email no Windows.');
-  }
-}
 function quotePdfHtml(q){
   const items = quoteItemsFromLegacy(q);
   const subtotal = quoteItemsTotal(items);
