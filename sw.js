@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bragalis-callcenter-v2-7-3';
+const CACHE_NAME = 'bragalis-callcenter-v2-7-4';
 const APP_SHELL = [
   './',
   './index.html',

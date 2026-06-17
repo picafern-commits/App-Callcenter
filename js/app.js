@@ -1,4 +1,4 @@
-const APP_VERSION = '2.7.3';
+const APP_VERSION = '2.7.4';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -3797,37 +3797,49 @@ Condições: ${q.condicoes || 'Preços sujeitos a disponibilidade da peça no mo
 Com os melhores cumprimentos,
 ${quoteEmailSignatureName()}`;
 }
+async function copyQuoteHtmlToClipboard(q, mensagemExtra=''){
+  const html = quoteEmailHtml(q, mensagemExtra);
+  const plain = quoteEmailPlainText(q, mensagemExtra);
+  try{
+    const blobHtml = new Blob([html], { type:'text/html' });
+    const blobText = new Blob([plain], { type:'text/plain' });
+    await navigator.clipboard.write([new ClipboardItem({ 'text/html': blobHtml, 'text/plain': blobText })]);
+    return true;
+  }catch(err){
+    console.warn('Copy HTML clipboard failed', err);
+    return false;
+  }
+}
 async function openOutlookHtmlEmail(q, mensagemExtra=''){
   const subject = quoteEmailSubject(q);
   const html = quoteEmailHtml(q, mensagemExtra);
   const plain = quoteEmailPlainText(q, mensagemExtra);
   const to = q.email || '';
 
-  // No Edge/Chrome, isto tenta abrir o cliente de email com HTML via Web Share.
-  // Em muitos Windows/Outlook, o sistema só aceita texto simples por mailto.
-  if(navigator.share && navigator.canShare) {
-    try {
-      const htmlBlob = new Blob([html], { type:'text/html' });
-      const txtBlob = new Blob([plain], { type:'text/plain' });
-      const files = [
-        new File([htmlBlob], `orcamento-${q.id}.html`, { type:'text/html' }),
-        new File([txtBlob], `orcamento-${q.id}.txt`, { type:'text/plain' })
-      ];
-      if(navigator.canShare({ files })) {
-        await navigator.share({ title:subject, text:plain, files });
-        return true;
-      }
-    } catch(err) {
-      console.warn('Web Share email HTML failed', err);
-    }
+  // Tenta copiar logo o layout bonito. Se o Outlook abrir sem HTML, basta colar.
+  const copied = await copyQuoteHtmlToClipboard(q, mensagemExtra);
+
+  // Outlook clássico/novo em Windows pode aceitar body pelo protocolo ms-outlook.
+  // Alguns ambientes ignoram HTML e convertem para texto; por isso mantemos fallback.
+  const outlookUrl = `ms-outlook://compose?to=${encodeURIComponent(to)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(html)}`;
+  const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(plain)}`;
+
+  try{
+    window.location.href = outlookUrl;
+    setTimeout(()=>{
+      // Fallback: se o protocolo ms-outlook não abrir, tenta mailto.
+      window.location.href = mailto;
+      toast(copied ? 'Outlook aberto. O layout bonito também foi copiado para colares no corpo.' : 'Outlook aberto em texto simples.');
+    }, 1100);
+  }catch(err){
+    console.warn('Outlook protocol failed', err);
+    window.location.href = mailto;
   }
 
-  // Plano principal compatível: abre Outlook já preenchido, com texto simples.
-  // O HTML igual ao PDF fica disponível para copiar/colar se o Outlook não aceitar HTML direto.
-  const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(plain)}`;
-  window.location.assign(mailto);
-  setTimeout(()=>openQuoteEmailHtmlPreview(q, mensagemExtra, true), 700);
-  return false;
+  // Abre também uma janela de apoio com o layout exatamente como o PDF.
+  // Serve para confirmar visualmente e copiar se o Windows/Outlook bloquear HTML.
+  setTimeout(()=>openQuoteEmailHtmlPreview(q, mensagemExtra, true), 1300);
+  return true;
 }
 
 function quoteEmailHtml(q, mensagemExtra=''){
@@ -3837,8 +3849,8 @@ function quoteEmailHtml(q, mensagemExtra=''){
   const totalComIva = subtotal + iva;
   const settings = state.settings || {};
   const v = quoteVehicleParts(q);
-  return `<div style="font-family:Arial,sans-serif;color:#12344d;background:#eef4f8;padding:22px">
-    <div id="quoteEmailCopyArea" style="max-width:780px;margin:0 auto;background:#ffffff;padding:34px;border-radius:18px;border:1px solid #dce7f0">
+  return `<div style="font-family:Arial,sans-serif;color:#12344d;background:#ffffff;padding:0">
+    <div id="quoteEmailCopyArea" style="max-width:780px;margin:0 auto;background:#ffffff;padding:24px;border-radius:0;border:0">
       <div style="position:relative;display:flex;justify-content:space-between;gap:24px;border-bottom:4px solid #06447f;padding-bottom:18px">
         <img src="../assets/bragalis-callcenter-icon.png" alt="${esc(companyName())}" style="width:58px;height:58px;border-radius:18px;padding:7px;background:#eef6ff;border:1px solid #d7e6f2;object-fit:contain">
         <div style="flex:1">
@@ -3917,7 +3929,7 @@ function openQuoteEmailHtmlPreview(q, mensagemExtra='', fallbackNotice=false){
   const win = window.open('', '_blank', 'width=920,height=900');
   win.document.write(`<!doctype html><html lang="pt-PT"><head><meta charset="utf-8"><title>${esc(subject)}</title></head><body>
     <div style="position:sticky;top:0;z-index:20;background:#ffffff;padding:12px;border-bottom:1px solid #dce7f0;display:flex;gap:8px;justify-content:flex-end;align-items:center">
-      ${fallbackNotice ? '<span style="margin-right:auto;color:#49677f;font-weight:700">O Outlook foi aberto em texto simples. Para ficar bonito, copia este layout e cola no corpo do email.</span>' : ''}
+      ${fallbackNotice ? '<span style="margin-right:auto;color:#49677f;font-weight:700">O Outlook foi aberto. Se não aparecer com este layout, ele já foi copiado: cola no corpo do email.</span>' : ''}
       <button id="copyHtmlBtn" style="border:0;border-radius:12px;padding:10px 14px;background:#06447f;color:white;font-weight:800;cursor:pointer">Copiar layout bonito</button>
       <button id="openMailBtn" style="border:0;border-radius:12px;padding:10px 14px;background:#f58220;color:white;font-weight:800;cursor:pointer">Abrir Outlook texto simples</button>
     </div>
@@ -3962,7 +3974,7 @@ function openQuoteEmailOptionsModal(q){
   openModal('Enviar orçamento por email', `<form id="quoteEmailOptionsForm" class="form-grid email-options-form">
     <div class="span3 email-options-intro">
       <strong>Escolhe os campos que queres enviar no email</strong>
-      <span>Vai tentar abrir o Outlook já preenchido. Se o Outlook bloquear HTML, abre também o layout bonito para copiar.</span>
+      <span>Vai tentar abrir o Outlook já com este layout. Se o Windows bloquear HTML, o layout fica copiado para colares no corpo.</span>
     </div>
 
     <div class="span3 email-options-grid">
