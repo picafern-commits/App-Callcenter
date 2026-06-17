@@ -4570,3 +4570,61 @@ body.theme-dark .quote-filter-chip{
     grid-template-columns:1fr;
   }
 }
+
+
+/* v2.8.6 - Página Pedidos */
+.pedidos-page .quote-page-actions{
+  justify-content:flex-end;
+}
+.pedido-refs-editor{
+  display:grid;
+  gap:10px;
+  padding:12px;
+  border-radius:18px;
+  border:1px solid rgba(20,92,151,.12);
+  background:rgba(255,255,255,.58);
+}
+.pedido-refs-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.pedido-refs-head strong{
+  color:var(--brand3);
+  font-weight:1000;
+}
+#pedidoRefsRows{
+  display:grid;
+  gap:8px;
+}
+.pedido-ref-row{
+  display:grid;
+  grid-template-columns:1fr 160px auto;
+  gap:8px;
+  align-items:center;
+}
+.pedido-data-card{
+  border-left:6px solid #64748b!important;
+}
+.pedido-status-confirmado{
+  border-left-color:#16a34a!important;
+}
+.pedido-status-cancelado{
+  border-left-color:#dc2626!important;
+}
+.pedido-status-pendente{
+  border-left-color:#f97316!important;
+}
+body.theme-dark .pedido-refs-editor{
+  background:rgba(255,255,255,.04);
+  border-color:rgba(255,255,255,.10);
+}
+body.theme-dark .pedido-refs-head strong{
+  color:var(--text);
+}
+@media(max-width:760px){
+  .pedido-ref-row{
+    grid-template-columns:1fr;
+  }
+}

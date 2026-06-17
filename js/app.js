@@ -1,4 +1,4 @@
-const APP_VERSION = '2.8.5';
+const APP_VERSION = '2.8.6';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -76,6 +76,7 @@ const pages = [
   { id: 'contactos', icon: ICONS.contactos, title: 'Diretório de contactos', short: 'Diretório', subtitle: 'Pesquisa rápida de clientes e fornecedores' },
   { id: 'fornecedores', icon: ICONS.fornecedores, title: 'Fornecedores', short: 'Fornecedores', subtitle: 'Lista de fornecedores e referências' },
   { id: 'rotas', icon: ICONS.rotas, title: 'Rotas', short: 'Rotas', subtitle: 'Registo de viaturas, serviços, cargas e quilómetros' },
+  { id: 'pedidos', icon: ICONS.orcamentos, title: 'Pedidos', short: 'Pedidos', subtitle: 'Pedidos de peças e referências' },
   { id: 'orcamentos', icon: ICONS.orcamentos, title: 'Orçamentos', short: 'Orçamentos', subtitle: 'Criar, enviar e acompanhar propostas' },
   { id: 'users', icon: ICONS.users, title: 'Utilizadores', short: 'Users', subtitle: 'Equipa, cargos e permissões' },
   { id: 'configs-user', icon: ICONS.configsUser, title: 'Minhas Configs', short: 'Configs', subtitle: 'Tema e preferências do utilizador' },
@@ -198,6 +199,8 @@ function ensureStateShape(appState){
     return next;
   });
   appState.contactGroups = Array.isArray(appState.contactGroups) ? appState.contactGroups : [];
+  appState.calls = Array.isArray(appState.calls) ? appState.calls : [];
+  appState.settings.transportes = Array.isArray(appState.settings.transportes) ? appState.settings.transportes : [];
   appState.suppliers = Array.isArray(appState.suppliers) ? appState.suppliers : [];
   appState.routes = Array.isArray(appState.routes) ? appState.routes : [];
   appState.vehicles = Array.isArray(appState.vehicles) ? appState.vehicles : deriveVehiclesFromRoutes(appState.routes || []);
@@ -1455,26 +1458,147 @@ function novaChamada(){
 }
 function input(name, placeholder, type='text', req=false){ return `<input class="field" name="${name}" type="${type}" placeholder="${placeholder}" ${req?'required':''}/>`; }
 
-function pedidos(){
-  return `<div class="card">
-    <div class="card-head"><h3>Pedidos de peças</h3><button class="btn primary small" data-go="nova-chamada">+ Novo pedido</button></div>
-    ${filters('searchPedidos','filterEstado')}
-    <div id="pedidosTable">${callsTable(filterCalls(), true)}</div>
+function nextPedidoId(){
+  const max = (state.calls || []).reduce((highest,p)=>{
+    const m = String(p.id || '').match(/^PED-(\d+)$/i);
+    return Math.max(highest, m ? Number(m[1]) : 0);
+  }, 0);
+  return `PED-${String(max + 1).padStart(3,'0')}`;
+}
+function pedidoRefsFromLegacy(p){
+  if(Array.isArray(p?.referenciasPedido)) return p.referenciasPedido.map(normalizePedidoRef);
+  if(Array.isArray(p?.pecas)) return p.pecas.map(normalizePedidoRef);
+  if(p?.referencia || p?.peca) return [normalizePedidoRef({ referencia:p.referencia || p.peca || '', quantidade:p.quantidade || 1 })];
+  return [];
+}
+function normalizePedidoRef(ref={}){
+  return {
+    id: ref.id || uid('REF'),
+    referencia:String(ref.referencia || '').trim(),
+    quantidade:Number(ref.quantidade || ref.qtd || 1) || 1
+  };
+}
+function pedidoRefsRows(refs=[normalizePedidoRef({})]){
+  const list = refs.length ? refs : [normalizePedidoRef({})];
+  return `<div class="pedido-refs-editor">
+    <div class="pedido-refs-head"><strong>Referências das peças</strong><button class="btn small ghost" id="addPedidoRefBtn" type="button">+ Adicionar referência</button></div>
+    <div id="pedidoRefsRows">${list.map((ref,idx)=>pedidoRefRow(ref,idx)).join('')}</div>
   </div>`;
 }
-function filters(searchId, stateId){ return `<div class="toolbar"><input id="${searchId}" class="field" placeholder="Pesquisar cliente, peça, matrícula, marca..."/><select id="${stateId}" class="select"><option value="">Todos os estados</option>${states.map(s=>`<option>${s}</option>`).join('')}</select></div>`; }
-function filterCalls(){
+function pedidoRefRow(ref={}, idx=0){
+  return `<div class="pedido-ref-row" data-pedido-ref-row>
+    <input class="field" name="pedidoReferencia[]" placeholder="Referência ${idx+1}" value="${esc(ref.referencia || '')}" required>
+    <input class="field" name="pedidoQuantidade[]" type="number" min="1" step="1" placeholder="Quantidade" value="${esc(ref.quantidade || 1)}" required>
+    <button class="btn danger-soft small" type="button" data-remove-pedido-ref>×</button>
+  </div>`;
+}
+function collectPedidoRefs(form){
+  const refs = [...form.querySelectorAll('[name="pedidoReferencia[]"]')];
+  const qtds = [...form.querySelectorAll('[name="pedidoQuantidade[]"]')];
+  return refs.map((input,idx)=>normalizePedidoRef({ referencia:input.value, quantidade:qtds[idx]?.value || 1 })).filter(r=>r.referencia);
+}
+function transportesList(){
+  return uniqueSorted([...(state.settings?.transportes || []), ...(state.calls || []).map(p=>p.transporte).filter(Boolean)]);
+}
+function transporteOptions(){
+  return transportesList().map(t=>`<option value="${esc(t)}"></option>`).join('');
+}
+function rememberTransporte(value){
+  const v = String(value || '').trim();
+  if(!v) return;
+  state.settings = state.settings || {};
+  state.settings.transportes = Array.isArray(state.settings.transportes) ? state.settings.transportes : [];
+  if(!state.settings.transportes.some(t=>String(t).toLowerCase()===v.toLowerCase())) state.settings.transportes.push(v);
+}
+function pedidoClientSearchHtml(value=''){
+  return `<input class="field span3" name="clienteSearch" id="pedidoClientSearch" list="pedidoClientList" placeholder="Escreve código ou nome do cliente" value="${esc(value)}" autocomplete="off" required>
+    <datalist id="pedidoClientList">${quoteClientOptions()}</datalist>
+    <input type="hidden" name="cliente" value="${esc(value)}">`;
+}
+function pedidoFormHtml(p=null){
+  const refs = p ? pedidoRefsFromLegacy(p) : [normalizePedidoRef({})];
+  const clientValue = p ? (p.codigoCliente ? `${p.codigoCliente} - ${p.cliente || ''}` : (p.cliente || '')) : '';
+  return `<form id="pedidoForm" class="form-grid pedido-modal-form">
+    ${pedidoClientSearchHtml(clientValue)}
+    <input class="field" name="codigoCliente" placeholder="Código cliente" value="${esc(p?.codigoCliente || '')}">
+    <input class="field" name="morada" placeholder="Morada (opcional)" value="${esc(p?.morada || '')}">
+    <div class="span3">${pedidoRefsRows(refs)}</div>
+    <input class="field span3" name="transporte" list="transportesList" placeholder="Transporte" value="${esc(p?.transporte || '')}">
+    <datalist id="transportesList">${transporteOptions()}</datalist>
+    <input class="field" name="data" type="date" value="${esc(p?.data || p?.createdAt || today())}" readonly>
+    <input class="field" name="hora" type="time" value="${esc(p?.hora || p?.createdTime || currentTimeHM())}" readonly>
+    <textarea class="span3" name="observacoes" placeholder="Observações">${esc(p?.observacoes || '')}</textarea>
+    <div class="span3 actions">
+      <button class="btn success" type="submit" data-pedido-submit="Confirmado">${p ? 'Guardar / Confirmar pedido' : 'Confirmar pedido'}</button>
+      <button class="btn danger-soft" type="button" id="cancelPedidoBtn">Cancelar pedido</button>
+    </div>
+  </form>`;
+}
+function pedidos(){
+  const rows = filterPedidos();
+  const total = state.calls.length;
+  const confirmados = state.calls.filter(p=>p.estado==='Confirmado').length;
+  const cancelados = state.calls.filter(p=>p.estado==='Cancelado').length;
+  return `<div class="pedidos-page clean-module-page">
+    <div class="card clean-main-card">
+      <div class="clean-page-head">
+        <div><span class="clean-eyebrow">Pedidos</span><h3>Pedidos de peças</h3></div>
+        <div class="clean-stats"><span><b>${total}</b> pedidos</span><span><b>${confirmados}</b> confirmados</span><span><b>${cancelados}</b> cancelados</span></div>
+      </div>
+      <div class="quote-page-actions">
+        ${canEditOperational()?`<button class="btn primary quote-new-btn" id="openNewPedidoBtn" type="button">+ Novo Pedido</button>`:''}
+      </div>
+      <div class="quote-filter-bar">
+        <input id="searchPedidos" class="field" placeholder="Pesquisar cliente, código, referência, transporte...">
+        <select id="filterEstado" class="select"><option value="">Todos os estados</option><option>Pendente</option><option>Confirmado</option><option>Cancelado</option></select>
+      </div>
+      <div id="pedidosTable">${pedidosCards(rows)}</div>
+    </div>
+  </div>`;
+}
+function filterPedidos(){
   const s = (qs('#searchPedidos')?.value || '').toLowerCase();
   const e = qs('#filterEstado')?.value || '';
-  return state.calls.filter(c => (!e || c.estado===e) && JSON.stringify(c).toLowerCase().includes(s));
+  return (state.calls || []).filter(p => (!e || p.estado===e) && JSON.stringify(p).toLowerCase().includes(s));
 }
+function pedidoMainRef(p){
+  const refs = pedidoRefsFromLegacy(p);
+  if(!refs.length) return p.referencia || '-';
+  return refs[0].referencia + (refs.length > 1 ? ` +${refs.length-1}` : '');
+}
+function pedidosCards(rows){
+  if(!rows.length) return '<div class="empty">Ainda não existem pedidos.</div>';
+  return `<div class="clean-card-list pedido-card-list">${rows.map(p=>{
+    const refs = pedidoRefsFromLegacy(p);
+    return `<article class="clean-data-card pedido-data-card pedido-status-${normalizeText(p.estado || 'Pendente').replace(/[^a-z0-9]+/g,'-')}">
+      <div class="data-card-main">
+        <span class="data-card-code big-visible-code">${esc(p.id)}</span>
+        <strong>${esc(p.cliente || '-')}</strong>
+        <small>${esc([p.codigoCliente, p.morada].filter(Boolean).join(' · ') || 'Sem dados de cliente')}</small>
+        <div class="quote-item-mini-list">
+          <span>${refs.length} referência(s) · ${esc(pedidoMainRef(p))}</span>
+          <span>Transporte: ${esc(p.transporte || '-')}</span>
+          <span>Data/Hora: ${esc(formatDatePt(p.createdAt || p.data || today()))} ${esc(p.createdTime || p.hora || '')}</span>
+        </div>
+      </div>
+      <div class="quote-value-box">${badge(p.estado || 'Pendente')}</div>
+      <div class="actions data-card-actions">
+        ${canEditOperational()?`<button class="btn small ghost" data-edit-pedido="${p.id}">${ICONS.edit}<span>Editar</span></button>
+        <button class="btn success small" data-confirm-pedido="${p.id}">Confirmar</button>
+        <button class="btn warn small" data-cancel-pedido="${p.id}">Cancelar</button>`:''}
+        ${canDelete()?`<button class="btn danger small" data-delete-call="${p.id}">Apagar</button>`:''}
+      </div>
+    </article>`;
+  }).join('')}</div>`;
+}
+
 function callsTable(rows, actions=true){
   if(!rows.length) return '<div class="empty">Ainda não existem registos.</div>';
-  return `<div class="table-wrap"><table><thead><tr><th>ID</th><th>Cliente</th><th>Viatura</th><th>Peça</th><th>Urgência</th><th>Estado</th><th>Venda</th>${actions?'<th>Ações</th>':''}</tr></thead><tbody>${rows.map(c=>`
-    <tr><td>${esc(c.id)}</td><td><strong>${esc(c.cliente)}</strong><br><span class="muted">${esc(c.telefone)}</span></td><td>${esc(c.marca)} ${esc(c.modelo)}<br><span class="muted">${esc(c.matricula||'Sem matrícula')}</span></td><td>${esc(c.peca)}<br><span class="muted">${esc(c.referencia||'Sem referência')}</span></td><td>${badge(c.urgencia)}</td><td>${badge(c.estado)}</td><td>${money(c.precoVenda)}</td>${actions?`<td><div class="actions"><button class="btn small" data-edit-call="${c.id}">Editar</button><button class="btn success small" data-quote="${c.id}">Orçamento</button>${canDelete()?`<button class="btn danger small" data-delete-call="${c.id}">Apagar</button>`:''}</div></td>`:''}</tr>`).join('')}</tbody></table></div>`;
+  return pedidosCards(rows);
 }
+
 function badge(v){
-  const map = {'Normal':'blue','Urgente':'orange','Muito urgente':'red','Novo':'blue','Em pesquisa':'orange','Orçamento enviado':'violet','Confirmado':'green','Concluído':'green','Perdido':'red','Pendente':'orange','Feito':'green','Ativo':'green','Inativo':'red','Rascunho':'blue','Cliente':'green','Fornecedor':'violet','Enviado':'green','Aceite':'green','Recusado':'red','Operador':'blue','Supervisor':'violet','Admin':'orange','Admin Master':'green'};
+  const map = {'Normal':'blue','Urgente':'orange','Muito urgente':'red','Novo':'blue','Em pesquisa':'orange','Orçamento enviado':'violet','Confirmado':'green','Cancelado':'red','Concluído':'green','Perdido':'red','Pendente':'orange','Feito':'green','Ativo':'green','Inativo':'red','Rascunho':'blue','Cliente':'green','Fornecedor':'violet','Enviado':'green','Aceite':'green','Recusado':'red','Operador':'blue','Supervisor':'violet','Admin':'orange','Admin Master':'green'};
   return `<span class="badge ${map[v]||''}">${esc(v||'-')}</span>`;
 }
 
@@ -3583,29 +3707,169 @@ function bindCallForm(){
   });
 }
 function bindPedidos(){
-  ['searchPedidos','filterEstado'].forEach(id=>qs('#'+id).addEventListener('input',()=>{ qs('#pedidosTable').innerHTML = callsTable(filterCalls(), true); bindPedidosActions(); }));
+  ['searchPedidos','filterEstado'].forEach(id=>qs('#'+id)?.addEventListener('input',()=>{ qs('#pedidosTable').innerHTML = pedidosCards(filterPedidos()); bindPedidosActions(); }));
+  qs('#openNewPedidoBtn')?.addEventListener('click',()=>openPedidoModal());
   bindPedidosActions();
 }
 function bindPedidosActions(){
   qsa('[data-delete-call]').forEach(b=>b.addEventListener('click',()=>{ if(!canDelete()) return toast('Sem permissão para apagar.'); state.calls = state.calls.filter(c=>c.id!==b.dataset.deleteCall); saveState(); renderPage('pedidos'); toast('Pedido apagado.'); }));
-  qsa('[data-edit-call]').forEach(b=>b.addEventListener('click',()=>openCallModal(b.dataset.editCall)));
+  qsa('[data-edit-pedido]').forEach(b=>b.addEventListener('click',()=>openPedidoModal(b.dataset.editPedido)));
+  qsa('[data-confirm-pedido]').forEach(b=>b.addEventListener('click',()=>updatePedidoStatus(b.dataset.confirmPedido,'Confirmado')));
+  qsa('[data-cancel-pedido]').forEach(b=>b.addEventListener('click',()=>updatePedidoStatus(b.dataset.cancelPedido,'Cancelado')));
+  qsa('[data-edit-call]').forEach(b=>b.addEventListener('click',()=>openPedidoModal(b.dataset.editCall)));
   qsa('[data-quote]').forEach(b=>b.addEventListener('click',()=>createQuoteFromCall(b.dataset.quote)));
 }
-function openCallModal(id){
-  const c = state.calls.find(x=>x.id===id); if(!c) return;
-  openModal('Editar pedido', `<form id="editCallForm" class="form-grid">${['cliente','telefone','email','matricula','marca','modelo','ano','motor','vin','peca','referencia','operador','fornecedor','precoCompra','precoVenda'].map(k=>`<input class="field" name="${k}" placeholder="${k}" value="${esc(c[k]||'')}">`).join('')}<select name="urgencia" class="select">${urgencies.map(u=>`<option ${c.urgencia===u?'selected':''}>${u}</option>`).join('')}</select><select name="estado" class="select">${states.map(s=>`<option ${c.estado===s?'selected':''}>${s}</option>`).join('')}</select><textarea class="span3" name="observacoes">${esc(c.observacoes||'')}</textarea><div class="span3"><button class="btn primary">Guardar alterações</button></div></form>`);
-  qs('#editCallForm').addEventListener('submit', e=>{ e.preventDefault(); Object.assign(c,Object.fromEntries(new FormData(e.target).entries())); c.precoCompra=Number(c.precoCompra||0); c.precoVenda=Number(c.precoVenda||0); saveState(); closeModal(); renderPage('pedidos'); toast('Pedido atualizado.'); });
+function updatePedidoStatus(id, status){
+  const p = state.calls.find(x=>x.id===id);
+  if(!p) return;
+  p.estado = status;
+  p.updatedAt = new Date().toISOString();
+  saveState();
+  renderPage('pedidos');
+  toast(status === 'Confirmado' ? 'Pedido confirmado.' : 'Pedido cancelado.');
 }
+function bindPedidoForm(form, existing=null){
+  if(!form) return;
+  bindPedidoClientSearch(form);
+  bindPedidoRefsEditor(form);
+  const transp = form.querySelector('[name="transporte"]');
+  transp?.addEventListener('input',()=>rememberTransporte(transp.value));
+  form.addEventListener('submit',e=>{
+    e.preventDefault();
+    if(!canEditOperational()) return toast('Sem permissão para guardar pedidos.');
+    const submitter = e.submitter;
+    const status = submitter?.dataset.pedidoSubmit || 'Confirmado';
+    const data = Object.fromEntries(new FormData(form).entries());
+    const refs = collectPedidoRefs(form);
+    if(!refs.length) return toast('Adiciona pelo menos uma referência.');
+    const client = upsertPedidoClient(data);
+    rememberTransporte(data.transporte);
+    const payload = {
+      cliente:data.cliente || data.clienteSearch || '',
+      codigoCliente:data.codigoCliente || clientCode(client) || '',
+      morada:data.morada || client?.morada || '',
+      referenciasPedido:refs,
+      referencia:refs[0]?.referencia || '',
+      quantidade:refs[0]?.quantidade || 1,
+      transporte:data.transporte || '',
+      data:data.data || today(),
+      hora:data.hora || currentTimeHM(),
+      createdAt: existing?.createdAt || data.data || today(),
+      createdTime: existing?.createdTime || data.hora || currentTimeHM(),
+      estado:status,
+      observacoes:data.observacoes || '',
+      tipo:'pedidoPecas'
+    };
+    if(existing){
+      Object.assign(existing, payload, { updatedAt:new Date().toISOString() });
+      toast('Pedido atualizado.');
+    } else {
+      state.calls.push({ id:nextPedidoId(), ...payload, createdByName:preferredUserName('Utilizador'), createdByEmail:state.currentUser?.email || firebaseAuth?.currentUser?.email || '' });
+      toast('Pedido criado.');
+    }
+    saveState();
+    closeModal();
+    renderPage('pedidos');
+  });
+  qs('#cancelPedidoBtn')?.addEventListener('click',()=>{
+    if(existing) {
+      existing.estado = 'Cancelado';
+      existing.updatedAt = new Date().toISOString();
+      saveState();
+      closeModal();
+      renderPage('pedidos');
+      toast('Pedido cancelado.');
+    } else {
+      closeModal();
+      toast('Criação de pedido cancelada.');
+    }
+  });
+}
+function openPedidoModal(id=''){
+  if(!canEditOperational()) return toast('Sem permissão para gerir pedidos.');
+  const existing = id ? state.calls.find(x=>x.id===id) : null;
+  openModal(existing ? `Editar pedido · ${esc(existing.id)}` : 'Novo pedido', pedidoFormHtml(existing));
+  bindPedidoForm(qs('#pedidoForm'), existing);
+}
+function bindPedidoClientSearch(scope=document){
+  const input = scope.querySelector?.('#pedidoClientSearch') || qs('#pedidoClientSearch');
+  if(input && !input.dataset.boundPedidoClientSearch) {
+    input.dataset.boundPedidoClientSearch = '1';
+    const sync = ()=>{
+      const form = input.closest('form') || document;
+      const client = findClientFromQuoteSearch(input.value);
+      const fallback = client ? client.nome : input.value.trim();
+      const cliente = form.querySelector('[name="cliente"]');
+      const code = form.querySelector('[name="codigoCliente"]');
+      const morada = form.querySelector('[name="morada"]');
+      if(cliente) cliente.value = client?.nome || fallback || '';
+      if(code) code.value = client ? clientCode(client) : code.value;
+      if(morada && client?.morada) morada.value = client.morada || '';
+    };
+    input.addEventListener('input', sync);
+    input.addEventListener('change', sync);
+    input.addEventListener('blur', sync);
+  }
+}
+function bindPedidoRefsEditor(scope=document){
+  const root = scope && scope.querySelector ? scope : document;
+  const rows = root.querySelector('#pedidoRefsRows');
+  const addBtn = root.querySelector('#addPedidoRefBtn');
+  if(addBtn && rows && !addBtn.dataset.boundPedidoAdd){
+    addBtn.dataset.boundPedidoAdd = '1';
+    addBtn.addEventListener('click',()=>{
+      rows.insertAdjacentHTML('beforeend', pedidoRefRow({}, rows.querySelectorAll('[data-pedido-ref-row]').length));
+      bindPedidoRefsEditor(root);
+    });
+  }
+  rows?.querySelectorAll('[data-remove-pedido-ref]').forEach(btn=>{
+    if(btn.dataset.boundPedidoRemove) return;
+    btn.dataset.boundPedidoRemove = '1';
+    btn.addEventListener('click',()=>{
+      const allRows = rows.querySelectorAll('[data-pedido-ref-row]');
+      if(allRows.length <= 1) {
+        const row = btn.closest('[data-pedido-ref-row]');
+        row?.querySelectorAll('input').forEach(i=>i.value = i.name.includes('Quantidade') ? '1' : '');
+        return;
+      }
+      btn.closest('[data-pedido-ref-row]')?.remove();
+    });
+  });
+}
+function upsertPedidoClient(data){
+  const nome = String(data.cliente || data.clienteSearch || '').trim();
+  const codigo = String(data.codigoCliente || '').trim();
+  const morada = String(data.morada || '').trim();
+  if(!nome && !codigo) return null;
+  let client = (state.clients || []).find(c => (codigo && clientCode(c).toLowerCase() === codigo.toLowerCase()) || (nome && String(c.nome || '').toLowerCase() === nome.toLowerCase()));
+  if(!client) {
+    client = { id:uid('CLI'), codigoCliente:codigo || `CLI-${String((state.clients || []).length + 1).padStart(3,'0')}`, nome:nome || codigo, telefone:'', email:'', emails:[], telefones:[], morada, codigoPostal:'', notas:'Criado automaticamente a partir de pedido.' };
+    state.clients.push(client);
+  } else {
+    if(nome && !client.nome) client.nome = nome;
+    if(codigo && !client.codigoCliente) client.codigoCliente = codigo;
+    if(morada) client.morada = morada;
+  }
+  return client;
+}
+function openCallModal(id){
+  return openPedidoModal(id);
+}
+
 function createQuoteFromCall(id){
   if(!canEditOperational()) return toast('Sem permissão para criar orçamento.');
   const c = state.calls.find(x=>x.id===id); if(!c) return;
-  const client = state.clients.find(x => x.nome?.toLowerCase() === c.cliente?.toLowerCase() || (c.telefone && x.telefone === c.telefone)) || {};
-  const items = [normalizeQuoteItem({ nome:c.peca, referencia:c.referencia, unidade:1, preco:Number(c.precoVenda||0) })];
+  const client = state.clients.find(x => x.nome?.toLowerCase() === c.cliente?.toLowerCase() || (c.codigoCliente && clientCode(x).toLowerCase() === String(c.codigoCliente).toLowerCase())) || {};
+  const pedidoRefs = pedidoRefsFromLegacy(c);
+  const items = pedidoRefs.length
+    ? pedidoRefs.map(r=>normalizeQuoteItem({ nome:r.referencia, referencia:r.referencia, unidade:r.quantidade, preco:0 }))
+    : [normalizeQuoteItem({ nome:c.peca || c.referencia || '', referencia:c.referencia, unidade:1, preco:Number(c.precoVenda||0) })];
   const marcaModelo = `${c.marca || ''} ${c.modelo || ''}`.trim();
   const matricula = c.matricula || '';
   const motor = c.motor || '';
   const creator = currentQuoteCreator();
-  const q = { id: nextQuoteId(), createdByName:creator.name, createdByEmail:creator.email, callId:id, cliente:c.cliente, codigoCliente:clientCode(client), telefone:c.telefone, email:c.email, matricula, marcaModelo, motor, viatura:composeQuoteVehicle({matricula, marcaModelo, motor}), items, peca:c.peca, referencia:c.referencia, quantidade:1, precoUnitario:Number(c.precoVenda||0), total:quoteItemsTotal(items), validade:today(), prazoEntrega:'A confirmar', condicoes:'Preços sujeitos a disponibilidade da peça no momento da confirmação.', observacoes:c.observacoes || '', estado:'Rascunho', createdAt:today(), history:[{ date:today(), action:'Criado a partir de pedido', by:creator.email || '' }] };
+  const first = items[0] || {};
+  const q = { id: nextQuoteId(), createdByName:creator.name, createdByEmail:creator.email, callId:id, cliente:c.cliente, codigoCliente:clientCode(client) || c.codigoCliente || '', telefone:c.telefone || '', email:c.email || '', matricula, marcaModelo, motor, viatura:composeQuoteVehicle({matricula, marcaModelo, motor}), items, peca:first.nome || '', referencia:first.referencia || '', quantidade:first.unidade || 1, precoUnitario:first.preco || 0, total:quoteItemsTotal(items), validade:today(), prazoEntrega:'A confirmar', condicoes:'Preços sujeitos a disponibilidade da peça no momento da confirmação.', observacoes:c.observacoes || '', estado:'Rascunho', createdAt:today(), history:[{ date:today(), action:'Criado a partir de pedido', by:creator.email || '' }] };
   state.quotes.push(q); c.estado='Orçamento enviado'; saveState(); toast('Orçamento criado.'); setTimeout(()=>goPage('orcamentos'), 250);
 }
 function quoteClientOptions(){
