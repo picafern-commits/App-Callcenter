@@ -4432,17 +4432,97 @@ function quotePdfHtml(q){
   const iva = subtotal * 0.23;
   const totalComIva = subtotal + iva;
   const settings = state.settings || {};
+  const v = quoteVehicleParts(q);
+  const logoUrl = new URL('../assets/bragalis-callcenter-icon.png', window.location.href).href;
+  const generatedAt = new Date().toLocaleDateString('pt-PT');
+  const company = {
+    name: companyName(),
+    nif: settings.companyNif || '',
+    address: settings.companyAddress || 'Callcenter de peças automóveis',
+    phone: settings.companyPhone || '',
+    email: settings.companyEmail || ''
+  };
   return `<!doctype html><html lang="pt-PT"><head><meta charset="utf-8"><title>Orçamento ${esc(q.id)}</title><style>
-    *{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;color:#12344d;background:#eef4f8}.page{width:210mm;min-height:297mm;margin:0 auto;background:white;padding:20mm}
-    .top{position:relative;display:flex;justify-content:space-between;gap:24px;border-bottom:4px solid #06447f;padding-bottom:18px}.brand{padding-left:78px;min-height:64px}.pdf-logo{position:absolute;left:0;top:0;width:58px;height:58px;border-radius:18px;padding:7px;background:linear-gradient(135deg,#ffffff,#eef6ff);border:1px solid #d7e6f2;box-shadow:0 10px 22px rgba(6,68,127,.16);object-fit:contain}.brand h1{margin:0;color:#06447f}.brand p,.box p{margin:5px 0;color:#49677f}.stamp{font-size:28px;font-weight:900;color:#f58220;text-align:right}.box{border:1px solid #c9d8e5;border-radius:10px;padding:14px;margin-top:20px}
-    table{width:100%;border-collapse:collapse;margin-top:22px}th{background:#06447f;color:white;text-align:left;padding:12px}td{border-bottom:1px solid #dce7f0;padding:12px}.totals{margin-left:auto;width:310px;margin-top:18px}.totals div{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #dce7f0}.totals .grand{font-size:20px;font-weight:900;color:#06447f}.notes{margin-top:26px;line-height:1.5}.footer{margin-top:40px;color:#49677f;font-size:12px;border-top:1px solid #dce7f0;padding-top:12px}@media print{body{background:white}.page{margin:0;box-shadow:none}button{display:none!important}}
-  </style></head><body><button onclick="window.print()" style="position:fixed;right:18px;top:18px;z-index:20;border:0;border-radius:12px;padding:10px 14px;background:#06447f;color:white;font-weight:800;cursor:pointer">Imprimir / Guardar PDF</button><main class="page">
-    <section class="top"><img class="pdf-logo" src="../assets/bragalis-callcenter-icon.png" alt="${esc(companyName())}"><div class="brand"><h1>${esc(companyName())}</h1><p>${esc(settings.companyAddress || 'Callcenter de peças automóveis')}</p><p>${settings.companyNif ? `NIF: ${esc(settings.companyNif)} · ` : ''}${esc(settings.companyPhone || '')} ${settings.companyEmail ? '· ' + esc(settings.companyEmail) : ''}</p><p>Orçamento gerado em ${esc(today())}</p></div><div><div class="stamp">ORÇAMENTO</div><p><strong>${esc(q.id)}</strong></p><p>Validade: ${esc(q.validade || today())}</p><p>Estado: ${esc(q.estado || 'Rascunho')}</p><p>Criado por: ${esc(quoteCreatorName(q) || '-')}</p></div></section>
-    <section class="box"><h2>Cliente</h2><p><strong>${esc(q.cliente)}</strong></p><p>Código cliente: ${esc(q.codigoCliente || '-')}</p><p>Telefone: ${esc(q.telefone || '-')} · Email: ${esc(q.email || '-')}</p><p>Matrícula: ${esc(quoteVehicleParts(q).matricula || '-')}</p><p>Marca & Modelo: ${esc(quoteVehicleParts(q).marcaModelo || '-')}</p><p>Motor: ${esc(quoteVehicleParts(q).motor || '-')}</p></section>
-    <table><thead><tr><th>Nome</th><th>Referência</th><th>Unidade</th><th>Preço Líquido</th><th>Total c/ IVA</th></tr></thead><tbody>${items.map(item=>`<tr><td>${esc(item.nome)}</td><td>${esc(item.referencia || '-')}</td><td>${esc(item.unidade)}</td><td>${money(item.preco)}</td><td>${money(Number(item.total || 0) * 1.23)}</td></tr>`).join('')}</tbody></table>
-    <section class="totals"><div><span>Subtotal líquido</span><strong>${money(subtotal)}</strong></div><div><span>IVA 23%</span><strong>${money(iva)}</strong></div><div class="grand"><span>Total</span><strong>${money(totalComIva)}</strong></div></section>
-    <section class="notes"><p><strong>Prazo de entrega:</strong> ${esc(q.prazoEntrega || 'A confirmar')}</p><p><strong>Condições:</strong> ${esc(q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.')}</p><p><strong>Observações:</strong> ${esc(q.observacoes || '-')}</p></section>
-    <section class="footer">Para avançar, responda a este email com a confirmação do orçamento. Documento gerado por ${esc(companyName())}.</section>
+    @page{size:A4;margin:12mm}
+    *{box-sizing:border-box}
+    body{margin:0;background:#e8eef4;color:#172f43;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.45}
+    .print-btn{position:fixed;right:18px;top:18px;z-index:30;border:0;border-radius:10px;padding:11px 15px;background:#06447f;color:#fff;font-weight:800;box-shadow:0 10px 28px rgba(6,68,127,.25);cursor:pointer}
+    .page{width:210mm;min-height:297mm;margin:0 auto;background:#fff;padding:15mm 16mm 13mm;box-shadow:0 24px 80px rgba(23,47,67,.18)}
+    .doc-head{display:grid;grid-template-columns:1fr 70mm;gap:18mm;align-items:start;border-bottom:3px solid #06447f;padding-bottom:14px}
+    .brand-row{display:flex;gap:14px;align-items:flex-start}.pdf-logo{width:62px;height:62px;object-fit:contain;border:1px solid #d8e5ef;border-radius:14px;padding:7px;background:#fff}
+    .company h1{margin:0 0 5px;color:#06447f;font-size:24px;letter-spacing:0}.company p,.doc-meta p,.info-card p,.terms p{margin:3px 0;color:#4e6577}
+    .doc-meta{text-align:right}.doc-type{font-size:27px;font-weight:900;color:#06447f;letter-spacing:0;margin:0}.doc-number{display:inline-block;margin:8px 0 10px;padding:7px 12px;border-radius:8px;background:#f58220;color:#fff;font-weight:900}
+    .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}.info-card{border:1px solid #d8e5ef;border-radius:10px;padding:12px;background:#fbfdff;min-height:118px}.info-card h2{margin:0 0 8px;font-size:13px;text-transform:uppercase;color:#06447f;letter-spacing:0}.info-card strong{color:#172f43}
+    .items{width:100%;border-collapse:collapse;margin-top:18px}.items th{background:#06447f;color:#fff;text-align:left;padding:10px 9px;font-size:11px}.items td{border-bottom:1px solid #e2ebf2;padding:10px 9px;vertical-align:top}.items tbody tr:nth-child(even){background:#f8fbfd}.items .num{text-align:right;white-space:nowrap}.items .desc strong{display:block;color:#172f43}.items .desc small{display:block;color:#6a7e8e;margin-top:2px}
+    .summary-area{display:grid;grid-template-columns:1fr 72mm;gap:16px;align-items:start;margin-top:16px}.terms{border:1px solid #d8e5ef;border-radius:10px;padding:12px;background:#fbfdff}.terms h3{margin:0 0 8px;font-size:13px;color:#06447f}.totals{border:1px solid #d8e5ef;border-radius:10px;overflow:hidden;background:#fff}.totals div{display:flex;justify-content:space-between;gap:14px;padding:10px 12px;border-bottom:1px solid #e2ebf2}.totals div:last-child{border-bottom:0}.totals .grand{background:#06447f;color:#fff;font-size:16px;font-weight:900}
+    .approval{display:grid;grid-template-columns:1fr 1fr;gap:18mm;margin-top:26px}.sign-box{height:70px;border-bottom:1px solid #96a9b9;display:flex;align-items:flex-end;color:#6a7e8e;padding-bottom:6px}.footer{margin-top:20px;border-top:1px solid #d8e5ef;padding-top:10px;color:#6a7e8e;font-size:10.5px;display:flex;justify-content:space-between;gap:16px}
+    @media print{body{background:white}.page{width:auto;min-height:auto;margin:0;padding:0;box-shadow:none}.print-btn{display:none!important}.doc-head{break-inside:avoid}.summary-area,.approval{break-inside:avoid}}
+  </style></head><body><button class="print-btn" onclick="window.print()">Imprimir / Guardar PDF</button><main class="page">
+    <section class="doc-head">
+      <div class="brand-row">
+        <img class="pdf-logo" src="${esc(logoUrl)}" alt="${esc(company.name)}">
+        <div class="company">
+          <h1>${esc(company.name)}</h1>
+          <p>${esc(company.address)}</p>
+          <p>${company.nif ? `NIF: ${esc(company.nif)}` : ''}${company.phone ? `${company.nif ? ' | ' : ''}Tel: ${esc(company.phone)}` : ''}</p>
+          <p>${company.email ? esc(company.email) : ''}</p>
+        </div>
+      </div>
+      <div class="doc-meta">
+        <h2 class="doc-type">ORÇAMENTO</h2>
+        <span class="doc-number">${esc(q.id || '-')}</span>
+        <p><strong>Data:</strong> ${esc(formatDatePt(q.createdAt || today()))}</p>
+        <p><strong>Validade:</strong> ${esc(formatDatePt(q.validade || today()))}</p>
+        <p><strong>Estado:</strong> ${esc(q.estado || 'Rascunho')}</p>
+        <p><strong>Responsável:</strong> ${esc(quoteCreatorName(q) || quoteEmailSignatureName() || '-')}</p>
+      </div>
+    </section>
+
+    <section class="meta-grid">
+      <div class="info-card">
+        <h2>Cliente</h2>
+        <p><strong>${esc(q.cliente || '-')}</strong></p>
+        <p>Código cliente: ${esc(q.codigoCliente || '-')}</p>
+        <p>Telefone: ${esc(q.telefone || '-')}</p>
+        <p>Email: ${esc(q.email || '-')}</p>
+      </div>
+      <div class="info-card">
+        <h2>Viatura / pedido</h2>
+        <p>Matrícula: <strong>${esc(v.matricula || '-')}</strong></p>
+        <p>Marca &amp; Modelo: ${esc(v.marcaModelo || '-')}</p>
+        <p>Motor: ${esc(v.motor || '-')}</p>
+        <p>Pedido: ${esc(q.callId || q.referencia || '-')}</p>
+      </div>
+    </section>
+
+    <table class="items">
+      <thead><tr><th>Descrição</th><th>Referência</th><th class="num">Qtd.</th><th class="num">Preço unit.</th><th class="num">Total líquido</th><th class="num">Total c/ IVA</th></tr></thead>
+      <tbody>${items.map(item=>`<tr><td class="desc"><strong>${esc(item.nome || '-')}</strong><small>${esc(item.observacoes || '')}</small></td><td>${esc(item.referencia || '-')}</td><td class="num">${esc(item.unidade)}</td><td class="num">${money(item.preco)}</td><td class="num">${money(item.total)}</td><td class="num">${money(Number(item.total || 0) * 1.23)}</td></tr>`).join('')}</tbody>
+    </table>
+
+    <section class="summary-area">
+      <div class="terms">
+        <h3>Condições comerciais</h3>
+        <p><strong>Prazo de entrega:</strong> ${esc(q.prazoEntrega || 'A confirmar')}</p>
+        <p><strong>Condições:</strong> ${esc(q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.')}</p>
+        <p><strong>Observações:</strong> ${esc(q.observacoes || '-')}</p>
+      </div>
+      <div class="totals">
+        <div><span>Subtotal líquido</span><strong>${money(subtotal)}</strong></div>
+        <div><span>IVA 23%</span><strong>${money(iva)}</strong></div>
+        <div class="grand"><span>Total</span><strong>${money(totalComIva)}</strong></div>
+      </div>
+    </section>
+
+    <section class="approval">
+      <div><div class="sign-box">Assinatura / carimbo do cliente</div></div>
+      <div><div class="sign-box">Data de aprovação</div></div>
+    </section>
+
+    <section class="footer">
+      <span>Para avançar, responda ao email com a confirmação deste orçamento.</span>
+      <span>Documento gerado em ${esc(generatedAt)} por ${esc(company.name)}.</span>
+    </section>
   </main></body></html>`;
 }
 function upsertClient(nome, telefone, email){
