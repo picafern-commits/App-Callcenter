@@ -1,4 +1,4 @@
-const APP_VERSION = '2.7.5';
+const APP_VERSION = '2.7.7';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -3768,6 +3768,22 @@ function quoteEmailSubject(q){
 function quoteEmailSignatureName(){
   return preferredUserName('Utilizador');
 }
+function textCell(value, width){
+  const text = String(value ?? '-').replace(/\s+/g,' ').trim();
+  if(text.length > width) return text.slice(0, Math.max(0,width-1)) + '…';
+  return text.padEnd(width, ' ');
+}
+function quoteEmailTextTable(items){
+  const widths = { nome:28, ref:18, un:7, preco:15, total:15 };
+  const line = `${'-'.repeat(widths.nome)}  ${'-'.repeat(widths.ref)}  ${'-'.repeat(widths.un)}  ${'-'.repeat(widths.preco)}  ${'-'.repeat(widths.total)}`;
+  const head = `${textCell('Nome', widths.nome)}  ${textCell('Referência', widths.ref)}  ${textCell('Unidade', widths.un)}  ${textCell('Preço Líquido', widths.preco)}  ${textCell('Total c/ IVA', widths.total)}`;
+  const rows = (items || []).map(item=>{
+    const totalLinhaComIva = Number(item.total || 0) * 1.23;
+    return `${textCell(item.nome || '-', widths.nome)}  ${textCell(item.referencia || '-', widths.ref)}  ${textCell(item.unidade || '-', widths.un)}  ${textCell(money(item.preco), widths.preco)}  ${textCell(money(totalLinhaComIva), widths.total)}`;
+  });
+  return [head, line, ...rows].join('\n');
+}
+
 function quoteEmailPlainText(q, mensagemExtra=''){
   const items = quoteItemsFromLegacy(q);
   const subtotal = quoteItemsTotal(items);
@@ -3785,7 +3801,7 @@ Marca & Modelo: ${v.marcaModelo || '-'}
 Motor: ${v.motor || '-'}
 
 Referências:
-${items.map((item,idx)=>`${idx+1}. ${item.nome || '-'} | Ref: ${item.referencia || '-'} | Unid: ${item.unidade} | Preço líquido: ${money(item.preco)} | Total c/ IVA: ${money(Number(item.total || 0) * 1.23)}`).join('\\n')}
+${quoteEmailTextTable(items)}
 
 Subtotal líquido: ${money(subtotal)}
 IVA 23%: ${money(iva)}
@@ -3797,6 +3813,53 @@ Condições: ${q.condicoes || 'Preços sujeitos a disponibilidade da peça no mo
 Com os melhores cumprimentos,
 ${quoteEmailSignatureName()}`;
 }
+function quoteEmailOutlookBodyHtml(q, mensagemExtra=''){
+  const items = quoteItemsFromLegacy(q);
+  const subtotal = quoteItemsTotal(items);
+  const iva = subtotal * 0.23;
+  const totalComIva = subtotal + iva;
+  const v = quoteVehicleParts(q);
+  return `
+  <div style="font-family:Arial,sans-serif;font-size:12pt;color:#00233b">
+    <p><strong>${esc(greetingByCurrentHour())},</strong></p>
+    <p>Segue orçamento solicitado.</p>
+    ${String(mensagemExtra || '').trim() ? `<p>${esc(String(mensagemExtra).trim()).replace(/\n/g,'<br>')}</p>` : ''}
+    <p>
+      <strong>Matrícula:</strong> ${esc(v.matricula || '-')}<br>
+      <strong>Marca & Modelo:</strong> ${esc(v.marcaModelo || '-')}<br>
+      <strong>Motor:</strong> ${esc(v.motor || '-')}
+    </p>
+    <table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:11pt;color:#00233b">
+      <thead>
+        <tr>
+          <th style="background:#06447f;color:#ffffff;text-align:left;padding:10px 12px;border:1px solid #06447f">Nome</th>
+          <th style="background:#06447f;color:#ffffff;text-align:left;padding:10px 12px;border:1px solid #06447f">Referência</th>
+          <th style="background:#06447f;color:#ffffff;text-align:left;padding:10px 12px;border:1px solid #06447f">Unidade</th>
+          <th style="background:#06447f;color:#ffffff;text-align:left;padding:10px 12px;border:1px solid #06447f">Preço Líquido</th>
+          <th style="background:#06447f;color:#ffffff;text-align:left;padding:10px 12px;border:1px solid #06447f">Total c/ IVA</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.map(item=>`<tr>
+          <td style="padding:10px 12px;border-bottom:1px solid #dce7f0">${esc(item.nome || '-')}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #dce7f0">${esc(item.referencia || '-')}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #dce7f0">${esc(item.unidade || '-')}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #dce7f0">${money(item.preco)}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #dce7f0">${money(Number(item.total || 0) * 1.23)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    <table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-left:auto;margin-top:16px;width:330px;font-family:Arial,sans-serif;font-size:12pt;color:#00233b">
+      <tr><td style="padding:8px 0;border-bottom:1px solid #dce7f0">Subtotal líquido</td><td style="padding:8px 0;border-bottom:1px solid #dce7f0;text-align:right"><strong>${money(subtotal)}</strong></td></tr>
+      <tr><td style="padding:8px 0;border-bottom:1px solid #dce7f0">IVA 23%</td><td style="padding:8px 0;border-bottom:1px solid #dce7f0;text-align:right"><strong>${money(iva)}</strong></td></tr>
+      <tr><td style="padding:12px 0;font-size:16pt;font-weight:bold;color:#06447f">Total</td><td style="padding:12px 0;text-align:right;font-size:16pt;font-weight:bold;color:#06447f">${money(totalComIva)}</td></tr>
+    </table>
+    <p><strong>Prazo de entrega:</strong> ${esc(q.prazoEntrega || 'A confirmar')}</p>
+    <p><strong>Condições:</strong> ${esc(q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.')}</p>
+    <p>Com os melhores cumprimentos,<br><strong>${esc(quoteEmailSignatureName())}</strong></p>
+  </div>`;
+}
+
 async function copyQuoteHtmlToClipboard(q, mensagemExtra=''){
   const html = quoteEmailHtml(q, mensagemExtra);
   const plain = quoteEmailPlainText(q, mensagemExtra);
@@ -3810,25 +3873,35 @@ async function copyQuoteHtmlToClipboard(q, mensagemExtra=''){
     return false;
   }
 }
-async function openOutlookHtmlEmail(q, mensagemExtra=''){
+function openOutlookHtmlEmail(q, mensagemExtra=''){
   const subject = quoteEmailSubject(q);
   const plain = quoteEmailPlainText(q, mensagemExtra);
+  const htmlBody = quoteEmailOutlookBodyHtml(q, mensagemExtra);
   const to = q.email || '';
+
+  // Também copia o layout HTML bonito para Ctrl+V, sem impedir a abertura do Outlook.
+  copyQuoteHtmlToClipboard(q, mensagemExtra).catch(()=>{});
+
+  // Tenta primeiro abrir Outlook com corpo HTML em tabela.
+  const outlookUrl = `ms-outlook://compose?to=${encodeURIComponent(to)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(htmlBody)}`;
   const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(plain)}`;
 
-  // Importante: abrir o email imediatamente, sem await antes.
-  // Assim o Edge/Windows reconhece que veio diretamente do clique do utilizador.
-  window.location.href = mailto;
+  let leftPage = false;
+  const markLeft = ()=>{ leftPage = true; };
+  window.addEventListener('blur', markLeft, { once:true });
+  document.addEventListener('visibilitychange', ()=>{ if(document.hidden) leftPage = true; }, { once:true });
 
-  // Depois tenta copiar o layout bonito em HTML para poderes colar no corpo do Outlook.
-  copyQuoteHtmlToClipboard(q, mensagemExtra)
-    .then(copied=>{
-      setTimeout(()=>{
-        if(copied) toast('Email aberto. Layout bonito copiado para colares no corpo, se precisares.');
-        else toast('Email aberto em texto simples.');
-      }, 700);
-    })
-    .catch(()=>{});
+  window.location.href = outlookUrl;
+
+  // Se o protocolo Outlook não for aceite, abre mailto normal.
+  setTimeout(()=>{
+    if(!leftPage) {
+      window.location.href = mailto;
+      toast('Outlook HTML não abriu. Abri email em texto simples; o layout bonito foi copiado para colar.');
+    } else {
+      toast('Outlook aberto com tentativa de tabela HTML. Se aparecer texto estranho, cola o layout copiado.');
+    }
+  }, 1400);
 
   return true;
 }
@@ -3965,7 +4038,7 @@ function openQuoteEmailOptionsModal(q){
   openModal('Enviar orçamento por email', `<form id="quoteEmailOptionsForm" class="form-grid email-options-form">
     <div class="span3 email-options-intro">
       <strong>Escolhe os campos que queres enviar no email</strong>
-      <span>Abre o Outlook já preenchido. O layout bonito fica copiado para colares no corpo, se o Outlook abrir em texto simples.</span>
+      <span>Tenta abrir o Outlook já com a tabela formatada. Se o Windows bloquear, abre em texto simples e copia o layout bonito.</span>
     </div>
 
     <div class="span3 email-options-grid">
