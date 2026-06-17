@@ -1,4 +1,4 @@
-const APP_VERSION = '2.7.4';
+const APP_VERSION = '2.7.5';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -3812,33 +3812,24 @@ async function copyQuoteHtmlToClipboard(q, mensagemExtra=''){
 }
 async function openOutlookHtmlEmail(q, mensagemExtra=''){
   const subject = quoteEmailSubject(q);
-  const html = quoteEmailHtml(q, mensagemExtra);
   const plain = quoteEmailPlainText(q, mensagemExtra);
   const to = q.email || '';
-
-  // Tenta copiar logo o layout bonito. Se o Outlook abrir sem HTML, basta colar.
-  const copied = await copyQuoteHtmlToClipboard(q, mensagemExtra);
-
-  // Outlook clássico/novo em Windows pode aceitar body pelo protocolo ms-outlook.
-  // Alguns ambientes ignoram HTML e convertem para texto; por isso mantemos fallback.
-  const outlookUrl = `ms-outlook://compose?to=${encodeURIComponent(to)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(html)}`;
   const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(plain)}`;
 
-  try{
-    window.location.href = outlookUrl;
-    setTimeout(()=>{
-      // Fallback: se o protocolo ms-outlook não abrir, tenta mailto.
-      window.location.href = mailto;
-      toast(copied ? 'Outlook aberto. O layout bonito também foi copiado para colares no corpo.' : 'Outlook aberto em texto simples.');
-    }, 1100);
-  }catch(err){
-    console.warn('Outlook protocol failed', err);
-    window.location.href = mailto;
-  }
+  // Importante: abrir o email imediatamente, sem await antes.
+  // Assim o Edge/Windows reconhece que veio diretamente do clique do utilizador.
+  window.location.href = mailto;
 
-  // Abre também uma janela de apoio com o layout exatamente como o PDF.
-  // Serve para confirmar visualmente e copiar se o Windows/Outlook bloquear HTML.
-  setTimeout(()=>openQuoteEmailHtmlPreview(q, mensagemExtra, true), 1300);
+  // Depois tenta copiar o layout bonito em HTML para poderes colar no corpo do Outlook.
+  copyQuoteHtmlToClipboard(q, mensagemExtra)
+    .then(copied=>{
+      setTimeout(()=>{
+        if(copied) toast('Email aberto. Layout bonito copiado para colares no corpo, se precisares.');
+        else toast('Email aberto em texto simples.');
+      }, 700);
+    })
+    .catch(()=>{});
+
   return true;
 }
 
@@ -3974,7 +3965,7 @@ function openQuoteEmailOptionsModal(q){
   openModal('Enviar orçamento por email', `<form id="quoteEmailOptionsForm" class="form-grid email-options-form">
     <div class="span3 email-options-intro">
       <strong>Escolhe os campos que queres enviar no email</strong>
-      <span>Vai tentar abrir o Outlook já com este layout. Se o Windows bloquear HTML, o layout fica copiado para colares no corpo.</span>
+      <span>Abre o Outlook já preenchido. O layout bonito fica copiado para colares no corpo, se o Outlook abrir em texto simples.</span>
     </div>
 
     <div class="span3 email-options-grid">
@@ -3996,7 +3987,7 @@ function openQuoteEmailOptionsModal(q){
 
     <div class="span3 actions">
       <button class="btn ghost" type="button" id="cancelQuoteEmailBtn">Cancelar</button>
-      <button class="btn primary" type="submit">Abrir Outlook</button>
+      <button class="btn primary" type="submit">Abrir Outlook / Email</button>
     </div>
   </form>`);
   qs('#cancelQuoteEmailBtn')?.addEventListener('click', closeModal);
