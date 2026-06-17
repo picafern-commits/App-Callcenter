@@ -1,4 +1,4 @@
-const APP_VERSION = '2.7.0';
+const APP_VERSION = '2.7.2';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -274,9 +274,15 @@ function updateFirebaseStatusBadge(){
   const badge = qs('#firebaseStatusBadge');
   if(badge){
     const status = firebaseStatus();
-    badge.textContent = status;
+    const label = status.includes('guardar') ? 'Firebase · A guardar...'
+      : status.includes('pendente') ? 'Firebase · Pendente'
+      : status.includes('ligado') ? 'Firebase · Guardado'
+      : status.includes('offline') ? 'Firebase · Offline'
+      : status;
+    badge.textContent = label;
     const cls = status.includes('ligado') ? 'green' : (status.includes('guardar') ? 'blue' : 'orange');
-    badge.className = `badge ${cls}`;
+    badge.className = `badge firebase-status-strong ${cls}`;
+    badge.title = lastCloudSaveAt ? `Último save: ${new Date(lastCloudSaveAt).toLocaleString('pt-PT')}` : 'Estado Firebase';
   }
 }
 
@@ -398,7 +404,7 @@ async function pushCloudState(options = {}){
     markFirebaseDirty();
     console.warn('Firebase save failed', err);
     const code = err?.code ? ` (${err.code})` : '';
-    toast(`Erro Firebase: nada foi gravado${code}. Dados limpos e prontos para nova tentativa.`);
+    toast(`Erro Firebase: ${pageTitleById(currentPage)} não foi guardado${code}.`);
     return false;
   } finally {
     cloudSaveInProgress = false;
@@ -814,7 +820,8 @@ function applyTheme(){
   const dark = currentTheme() === 'dark';
   const resolution = currentResolution();
   const resolvedResolution = effectiveResolution();
-  const themeKey = `${dark}|${resolution}|${resolvedResolution}|${isAdminMaster()}|${currentRole ? currentRole() : ''}`;
+  const remoteFast = state.settings?.remoteFastMode !== false;
+  const themeKey = `${dark}|${resolution}|${resolvedResolution}|${isAdminMaster()}|${currentRole ? currentRole() : ''}|${remoteFast}`;
   if(window.__lastAppliedThemeKey === themeKey) return;
   window.__lastAppliedThemeKey = themeKey;
   document.documentElement.classList.toggle('theme-dark', dark);
@@ -828,8 +835,8 @@ function applyTheme(){
   document.documentElement.classList.toggle('res-auto', resolution === 'auto');
   document.body.classList.toggle('res-auto', resolution === 'auto');
   ['compact','standard','wide','large'].forEach(v=>{ document.documentElement.classList.toggle(`res-${v}`, resolvedResolution===v); document.body.classList.toggle(`res-${v}`, resolvedResolution===v); });
-  document.documentElement.classList.add('remote-fast-mode');
-  document.body.classList.add('remote-fast-mode');
+  document.documentElement.classList.toggle('remote-fast-mode', remoteFast);
+  document.body.classList.toggle('remote-fast-mode', remoteFast);
   const btn = qs('#themeToggleBtn');
   if(btn) btn.textContent = dark ? 'Modo Normal' : 'Darkmode';
 }
@@ -1815,23 +1822,25 @@ function openClientDetail(id){
   const c = state.clients.find(x=>x.id===id); if(!c) return;
   const phones = normalizeClientContacts(c).telefones;
   const emails = normalizeClientContacts(c).emails;
-  const calls = state.calls.filter(x => x.cliente?.toLowerCase() === c.nome?.toLowerCase() || (x.telefone && phones.includes(x.telefone)));
   const quotes = state.quotes.filter(x => x.cliente?.toLowerCase() === c.nome?.toLowerCase() || (x.email && emails.includes(x.email)));
+  const totalQuoted = quotes.reduce((sum,q)=>sum + Number(q.total || quoteItemsTotal(quoteItemsFromLegacy(q)) || 0), 0);
+  const lastQuote = [...quotes].sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')))[0];
   openModal(`Ficha cliente · ${esc(c.nome)}`, `
-    <div class="client-detail">
+    <div class="client-detail client-detail-upgraded">
       <div class="detail-grid">
         <div><span>Código</span><strong>${esc(clientCode(c) || '-')}</strong></div>
+        <div><span>Nome</span><strong>${esc(c.nome || '-')}</strong></div>
         <div><span>Telefones</span><strong>${esc(phones.map((p,i)=>`Telefone ${i+1}: ${p}`).join(' · ') || '-')}</strong></div>
         <div><span>Emails</span><strong>${esc(emails.map((e,i)=>`Email ${i+1}: ${e}`).join(' · ') || '-')}</strong></div>
         <div><span>Morada</span><strong>${esc(c.morada || '-')}</strong></div>
         <div><span>Código postal</span><strong>${esc(c.codigoPostal || '-')}</strong></div>
-        <div><span>Pedidos</span><strong>${calls.length}</strong></div>
+        <div><span>Orçamentos</span><strong>${quotes.length}</strong></div>
+        <div><span>Total orçamentado</span><strong>${money(totalQuoted)}</strong></div>
+        <div><span>Último orçamento</span><strong>${lastQuote ? `${esc(lastQuote.id)} · ${esc(formatDatePt(lastQuote.createdAt))} · ${money(lastQuote.total)}` : '-'}</strong></div>
       </div>
       <div class="actions">${clientPrimaryEmail(c) ? `<button class="btn success" data-client-email="${c.id}">Enviar email ao cliente</button>` : '<span class="muted">Cliente sem email registado.</span>'}</div>
-      <h4>Histórico de pedidos</h4>
-      ${callsTable(calls, false)}
       <h4>Orçamentos</h4>
-      ${quotes.length ? `<div class="table-wrap"><table><thead><tr><th>ID</th><th>Peça</th><th>Total</th><th>Estado</th></tr></thead><tbody>${quotes.map(q=>`<tr><td>${esc(q.id)}</td><td>${esc(q.peca || '-')}</td><td>${money(q.total)}</td><td>${badge(q.estado)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Sem orçamentos para este cliente.</div>'}
+      ${quotes.length ? `<div class="table-wrap"><table><thead><tr><th>ID</th><th>Viatura</th><th>Total</th><th>Estado</th></tr></thead><tbody>${quotes.map(q=>`<tr><td>${esc(q.id)}</td><td>${esc(quoteVehicleLabel(q))}</td><td>${money(q.total)}</td><td>${badge(q.estado)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Sem orçamentos para este cliente.</div>'}
       <h4>Notas</h4>
       <p class="muted">${esc(c.notas || 'Sem notas registadas.')}</p>
     </div>`);
@@ -2123,10 +2132,72 @@ function bindQuoteItemsEditor(scope=document){
   });
 }
 
+function quoteDraftKey(){ return 'bragalis_quote_draft_v1'; }
+function saveQuoteDraft(form){
+  try{
+    if(!form) return;
+    const data = Object.fromEntries(new FormData(form).entries());
+    data.items = collectQuoteItems(form);
+    localStorage.setItem(quoteDraftKey(), JSON.stringify({ data, savedAt:new Date().toISOString() }));
+  }catch(err){ console.warn('quote draft save failed', err); }
+}
+function getQuoteDraft(){
+  try{ return JSON.parse(localStorage.getItem(quoteDraftKey()) || 'null'); }catch{ return null; }
+}
+function clearQuoteDraft(){
+  try{ localStorage.removeItem(quoteDraftKey()); }catch{}
+}
+function quoteCreateFormHtmlFromDraft(draft=null){
+  const data = draft?.data || {};
+  const items = Array.isArray(data.items) && data.items.length ? data.items : [normalizeQuoteItem({ nome:'', referencia:'', unidade:1, preco:0 })];
+  return `<form id="quoteForm" class="form-grid quote-modal-form">
+    ${quoteClientSearchHtml(data.codigoCliente ? `${data.codigoCliente} - ${data.cliente || ''}` : (data.cliente || ''))}
+    <input class="field" name="codigoCliente" placeholder="Código cliente" value="${esc(data.codigoCliente||'')}">
+    <input class="field" name="telefone" placeholder="Telefone" value="${esc(data.telefone||'')}">
+    <input class="field" name="email" placeholder="Email do cliente" value="${esc(data.email||'')}">
+    <input class="field span3" name="matricula" placeholder="Matrícula" value="${esc(data.matricula||'')}">
+    <input class="field span3" name="marcaModelo" placeholder="Marca & Modelo" value="${esc(data.marcaModelo||'')}">
+    <input class="field span3" name="motor" placeholder="Motor" value="${esc(data.motor||'')}">
+    <div class="span3">${quoteItemsInputs(items)}</div>
+    <select class="select" name="estado">${['Rascunho','Enviado','Aceite','Recusado'].map(s=>`<option ${String(data.estado||'Rascunho')===s?'selected':''}>${s}</option>`).join('')}</select>
+    <input class="field" name="validade" type="date" value="${esc(data.validade||today())}">
+    <input class="field" name="prazoEntrega" placeholder="Prazo de entrega" value="${esc(data.prazoEntrega||'')}">
+    <textarea class="span3" name="condicoes" placeholder="Condições comerciais">${esc(data.condicoes||'Preços sujeitos a disponibilidade da peça no momento da confirmação.')}</textarea>
+    <textarea class="span3" name="observacoes" placeholder="Notas internas">${esc(data.observacoes||'')}</textarea>
+    <div class="span3 actions quote-draft-actions">
+      <button class="btn ghost" type="button" id="clearQuoteDraftBtn">Limpar rascunho</button>
+      <button class="btn primary" type="submit">Criar orçamento</button>
+    </div>
+  </form>`;
+}
+function quoteMatchesSearch(q, query){
+  const s = String(query || '').toLowerCase().trim();
+  if(!s) return true;
+  const items = quoteItemsFromLegacy(q);
+  const v = quoteVehicleParts(q);
+  const hay = [
+    q.id, q.cliente, q.codigoCliente, q.estado, q.createdAt,
+    v.matricula, v.marcaModelo, v.motor, q.viatura,
+    ...items.flatMap(item=>[item.nome,item.referencia,item.unidade,item.preco])
+  ].join(' ').toLowerCase();
+  return hay.includes(s);
+}
+function filterQuotes(){
+  const query = qs('#quoteSearch')?.value || '';
+  const status = qs('#quoteStatusFilter')?.value || '';
+  return (state.quotes || []).filter(q => (!status || q.estado === status) && quoteMatchesSearch(q, query));
+}
+function quoteStateCounts(){
+  const states = ['Rascunho','Enviado','Aceite','Recusado'];
+  return states.map(s=>[s,(state.quotes||[]).filter(q=>q.estado===s).length]);
+}
 function orcamentos(){
   const canEdit = canEditOperational();
+  const rows = filterQuotes();
   const total = state.quotes.length;
   const totalValue = state.quotes.reduce((sum,q)=>sum + Number(q.total || quoteItemsTotal(quoteItemsFromLegacy(q)) || 0), 0);
+  const draft = getQuoteDraft();
+  const statusButtons = quoteStateCounts().map(([s,count])=>`<button class="quote-filter-chip" data-set-quote-status="${esc(s)}" type="button">${esc(s)} <b>${count}</b></button>`).join('');
   return `<div class="quotes-page clean-module-page quote-modal-page">
     <div class="card clean-main-card">
       <div class="clean-page-head">
@@ -2134,18 +2205,24 @@ function orcamentos(){
         <div class="clean-stats"><span><b>${total}</b> registos</span><span><b>${money(totalValue)}</b> total</span></div>
       </div>
       <div class="quote-page-actions">
-        ${canEdit ? `<button class="btn primary quote-new-btn" id="openNewQuoteModalBtn" type="button">+ Novo Orçamento</button>` : ''}
+        ${canEdit ? `<button class="btn primary quote-new-btn" id="openNewQuoteModalBtn" type="button">${draft ? 'Continuar Rascunho' : '+ Novo Orçamento'}</button>` : ''}
+      </div>
+      <div class="quote-filter-bar">
+        <input id="quoteSearch" class="field" placeholder="Pesquisar por matrícula, marca/modelo, motor, referência, peça, cliente ou nº orçamento">
+        <select id="quoteStatusFilter" class="select"><option value="">Todos os estados</option><option>Rascunho</option><option>Enviado</option><option>Aceite</option><option>Recusado</option></select>
+        <div class="quote-filter-chips">${statusButtons}<button class="quote-filter-chip ghost" data-set-quote-status="" type="button">Todos</button></div>
       </div>
       ${!canEdit ? '<div class="readonly-note">Modo leitura: podes consultar e enviar orçamento por email, mas não podes criar nem alterar estados.</div>' : ''}
-      ${state.quotes.length ? quotesTable() : '<div class="empty">Ainda não existem orçamentos.</div>'}
+      ${rows.length ? quotesTable(rows) : '<div class="empty">Sem orçamentos para estes filtros.</div>'}
     </div>
   </div>`;
 }
-function quotesTable(){
-  return `<div class="clean-card-list quote-card-list">${state.quotes.map(q=>{
+function quotesTable(rows=state.quotes){
+  return `<div class="clean-card-list quote-card-list">${rows.map(q=>{
     const items = quoteItemsFromLegacy(q);
     const total = Number(q.total || quoteItemsTotal(items));
-    return `<article class="clean-data-card quote-data-card">
+    const stateSlug = normalizeText(q.estado || 'Rascunho').replace(/[^a-z0-9]+/g,'-');
+    return `<article class="clean-data-card quote-data-card quote-status-${stateSlug}">
       <div class="data-card-main">
         <span class="data-card-code big-visible-code">${esc(q.id)}</span>
         <strong>${esc(q.cliente || '-')}</strong>
@@ -2774,7 +2851,18 @@ function configsUser(){
           ${resolutionOptions.map(([key,title,desc])=>`<button class="choice-card ${resolution===key?'active':''}" data-set-resolution="${key}" type="button"><strong>${esc(title)}</strong><span>${esc(desc)}</span></button>`).join('')}
         </div>
       </section>
-    </div>
+    
+      <section class="user-setting-section">
+        <div class="setting-title"><strong>Modo ligação remota</strong><span>Remove efeitos pesados para Windows remoto/Remote Desktop.</span></div>
+        <div class="theme-choice-box">
+          <div>
+            <strong>${state.settings?.remoteFastMode === false ? 'Modo remoto desligado' : 'Modo remoto ativo'}</strong>
+            <span>Menos blur, sombras e animações para a app responder mais rápido.</span>
+          </div>
+          <button class="btn primary" id="remoteFastToggleBtn" type="button">${state.settings?.remoteFastMode === false ? 'Ativar modo remoto' : 'Desativar modo remoto'}</button>
+        </div>
+      </section>
+</div>
   </div>`;
 }
 function setUserTheme(theme){
@@ -3553,26 +3641,13 @@ function composeQuoteVehicle(data){
 }
 
 function quoteCreateFormHtml(){
-  return `<form id="quoteForm" class="form-grid quote-modal-form">
-    ${quoteClientSearchHtml()}
-    <input class="field" name="codigoCliente" placeholder="Código cliente">
-    <input class="field" name="telefone" placeholder="Telefone">
-    <input class="field" name="email" placeholder="Email do cliente">
-    <input class="field span3" name="matricula" placeholder="Matrícula">
-    <input class="field span3" name="marcaModelo" placeholder="Marca & Modelo">
-    <input class="field span3" name="motor" placeholder="Motor">
-    <div class="span3">${quoteItemsInputs([normalizeQuoteItem({ nome:'', referencia:'', unidade:1, preco:0 })])}</div>
-    <select class="select" name="estado"><option>Rascunho</option><option>Enviado</option><option>Aceite</option><option>Recusado</option></select>
-    <input class="field" name="validade" type="date" value="${today()}">
-    <input class="field" name="prazoEntrega" placeholder="Prazo de entrega">
-    <textarea class="span3" name="condicoes" placeholder="Condições comerciais">Preços sujeitos a disponibilidade da peça no momento da confirmação.</textarea>
-    <textarea class="span3" name="observacoes" placeholder="Notas internas"></textarea>
-    <div class="span3"><button class="btn primary full" type="submit">Criar orçamento</button></div>
-  </form>`;
+  return quoteCreateFormHtmlFromDraft(null);
 }
+
 function openNewQuoteModal(){
   if(!canEditOperational()) return toast('Sem permissão para criar orçamentos.');
-  openModal('Novo orçamento', quoteCreateFormHtml());
+  const draft = getQuoteDraft();
+  openModal(draft ? 'Continuar rascunho de orçamento' : 'Novo orçamento', quoteCreateFormHtmlFromDraft(draft));
   bindNewQuoteForm(qs('#quoteForm'));
 }
 function bindQuoteClientSelect(scope=document){
@@ -3594,6 +3669,8 @@ function bindNewQuoteForm(form){
   if(!form) return;
   bindQuoteClientSelect(form);
   bindQuoteItemsEditor(form);
+  form.querySelector('#clearQuoteDraftBtn')?.addEventListener('click',()=>{ clearQuoteDraft(); form.reset(); toast('Rascunho limpo.'); });
+  form.addEventListener('input',()=>saveQuoteDraft(form));
   if(form.dataset.boundQuoteSubmit) return;
   form.dataset.boundQuoteSubmit = '1';
   form.addEventListener('submit',e=>{
@@ -3605,12 +3682,22 @@ function bindNewQuoteForm(form){
     const first = items[0];
     const viatura = composeQuoteVehicle(data);
     state.quotes.push({ id:uid('ORC'), createdAt:today(), estado:data.estado || 'Rascunho', ...data, viatura, items, peca:first.nome, referencia:first.referencia, quantidade:first.unidade, precoUnitario:first.preco, total: quoteItemsTotal(items), history:[{ date:today(), action:'Criado', by:state.currentUser?.email || '' }] });
-    saveState(); closeModal(); renderPage('orcamentos'); toast('Orçamento criado.');
+    clearQuoteDraft(); saveState(); closeModal(); renderPage('orcamentos'); toast('Orçamento criado.');
   });
 }
 
 function bindQuotes(){
   qs('#openNewQuoteModalBtn')?.addEventListener('click', openNewQuoteModal);
+  const refreshQuoteList = ()=>{
+    const rows = filterQuotes();
+    const holder = qs('.quote-card-list')?.parentElement || qs('#pageContent .clean-main-card');
+    const old = qs('.quote-card-list') || qs('#pageContent .clean-main-card > .empty');
+    if(old) old.outerHTML = rows.length ? quotesTable(rows) : '<div class="empty">Sem orçamentos para estes filtros.</div>';
+    bindQuotes();
+  };
+  qs('#quoteSearch')?.addEventListener('input', refreshQuoteList);
+  qs('#quoteStatusFilter')?.addEventListener('change', refreshQuoteList);
+  qsa('[data-set-quote-status]').forEach(btn=>btn.addEventListener('click',()=>{ const sel=qs('#quoteStatusFilter'); if(sel){ sel.value=btn.dataset.setQuoteStatus || ''; refreshQuoteList(); } }));
   qsa('[data-print-quote]').forEach(b=>b.addEventListener('click',()=>printQuote(b.dataset.printQuote)));
   qsa('[data-email-quote]').forEach(b=>b.addEventListener('click',()=>emailQuote(b.dataset.emailQuote)));
   qsa('[data-edit-quote]').forEach(b=>b.addEventListener('click',()=>openQuoteModal(b.dataset.editQuote)));
@@ -3670,6 +3757,120 @@ function printQuote(id){
   // Não abrir automaticamente a janela de impressão.
   // O utilizador pode imprimir/guardar PDF manualmente pela janela aberta.
 }
+function quoteEmailHtml(q, mensagemExtra=''){
+  const items = quoteItemsFromLegacy(q);
+  const subtotal = quoteItemsTotal(items);
+  const iva = subtotal * 0.23;
+  const totalComIva = subtotal + iva;
+  const settings = state.settings || {};
+  const v = quoteVehicleParts(q);
+  return `<div style="font-family:Arial,sans-serif;color:#12344d;background:#eef4f8;padding:22px">
+    <div id="quoteEmailCopyArea" style="max-width:780px;margin:0 auto;background:#ffffff;padding:34px;border-radius:18px;border:1px solid #dce7f0">
+      <div style="position:relative;display:flex;justify-content:space-between;gap:24px;border-bottom:4px solid #06447f;padding-bottom:18px">
+        <img src="../assets/bragalis-callcenter-icon.png" alt="${esc(companyName())}" style="width:58px;height:58px;border-radius:18px;padding:7px;background:#eef6ff;border:1px solid #d7e6f2;object-fit:contain">
+        <div style="flex:1">
+          <h1 style="margin:0;color:#06447f;font-size:26px">${esc(companyName())}</h1>
+          <p style="margin:5px 0;color:#49677f">${esc(settings.companyAddress || 'Callcenter de peças automóveis')}</p>
+          <p style="margin:5px 0;color:#49677f">${settings.companyNif ? `NIF: ${esc(settings.companyNif)} · ` : ''}${esc(settings.companyPhone || '')} ${settings.companyEmail ? '· ' + esc(settings.companyEmail) : ''}</p>
+          <p style="margin:5px 0;color:#49677f">Orçamento gerado em ${esc(today())}</p>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:28px;font-weight:900;color:#f58220">ORÇAMENTO</div>
+          <p style="margin:5px 0"><strong>${esc(q.id)}</strong></p>
+          <p style="margin:5px 0">Validade: ${esc(q.validade || today())}</p>
+          <p style="margin:5px 0">Estado: ${esc(q.estado || 'Rascunho')}</p>
+        </div>
+      </div>
+
+      ${String(mensagemExtra || '').trim() ? `<p style="margin:18px 0 0;line-height:1.5;color:#12344d">${esc(String(mensagemExtra).trim()).replace(/\n/g,'<br>')}</p>` : ''}
+
+      <div style="border:1px solid #c9d8e5;border-radius:10px;padding:14px;margin-top:20px">
+        <h2 style="margin:0 0 10px;color:#06447f">Cliente / Viatura</h2>
+        <p style="margin:5px 0;color:#49677f"><strong>${esc(q.cliente || '-')}</strong></p>
+        <p style="margin:5px 0;color:#49677f">Código cliente: ${esc(q.codigoCliente || '-')}</p>
+        <p style="margin:5px 0;color:#49677f">Matrícula: ${esc(v.matricula || '-')}</p>
+        <p style="margin:5px 0;color:#49677f">Marca & Modelo: ${esc(v.marcaModelo || '-')}</p>
+        <p style="margin:5px 0;color:#49677f">Motor: ${esc(v.motor || '-')}</p>
+      </div>
+
+      <table style="width:100%;border-collapse:collapse;margin-top:22px">
+        <thead>
+          <tr>
+            <th style="background:#06447f;color:white;text-align:left;padding:12px">Nome</th>
+            <th style="background:#06447f;color:white;text-align:left;padding:12px">Referência</th>
+            <th style="background:#06447f;color:white;text-align:left;padding:12px">Unidade</th>
+            <th style="background:#06447f;color:white;text-align:left;padding:12px">Preço Líquido</th>
+            <th style="background:#06447f;color:white;text-align:left;padding:12px">Total c/ IVA</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(item=>`<tr>
+            <td style="border-bottom:1px solid #dce7f0;padding:12px">${esc(item.nome)}</td>
+            <td style="border-bottom:1px solid #dce7f0;padding:12px">${esc(item.referencia || '-')}</td>
+            <td style="border-bottom:1px solid #dce7f0;padding:12px">${esc(item.unidade)}</td>
+            <td style="border-bottom:1px solid #dce7f0;padding:12px">${money(item.preco)}</td>
+            <td style="border-bottom:1px solid #dce7f0;padding:12px">${money(Number(item.total || 0) * 1.23)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+
+      <div style="margin-left:auto;width:310px;margin-top:18px">
+        <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #dce7f0"><span>Subtotal líquido</span><strong>${money(subtotal)}</strong></div>
+        <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #dce7f0"><span>IVA 23%</span><strong>${money(iva)}</strong></div>
+        <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #dce7f0;font-size:20px;font-weight:900;color:#06447f"><span>Total</span><strong>${money(totalComIva)}</strong></div>
+      </div>
+
+      <div style="margin-top:26px;line-height:1.5">
+        <p><strong>Prazo de entrega:</strong> ${esc(q.prazoEntrega || 'A confirmar')}</p>
+        <p><strong>Condições:</strong> ${esc(q.condicoes || 'Preços sujeitos a disponibilidade da peça no momento da confirmação.')}</p>
+        <p><strong>Observações:</strong> ${esc(q.observacoes || '-')}</p>
+      </div>
+
+      <div style="margin-top:40px;color:#49677f;font-size:12px;border-top:1px solid #dce7f0;padding-top:12px">
+        Para avançar, responda a este email com a confirmação do orçamento. Documento gerado por ${esc(companyName())}.
+      </div>
+    </div>
+  </div>`;
+}
+function openQuoteEmailHtmlPreview(q, mensagemExtra=''){
+  const subject = `Orçamento ${q.id} - ${quoteVehicleParts(q).matricula || q.viatura || quoteMainDescription(q)}`;
+  const html = quoteEmailHtml(q, mensagemExtra);
+  const win = window.open('', '_blank', 'width=920,height=900');
+  win.document.write(`<!doctype html><html lang="pt-PT"><head><meta charset="utf-8"><title>${esc(subject)}</title></head><body>
+    <div style="position:sticky;top:0;z-index:20;background:#ffffff;padding:12px;border-bottom:1px solid #dce7f0;display:flex;gap:8px;justify-content:flex-end">
+      <button id="copyHtmlBtn" style="border:0;border-radius:12px;padding:10px 14px;background:#06447f;color:white;font-weight:800;cursor:pointer">Copiar email bonito</button>
+      <button id="openMailBtn" style="border:0;border-radius:12px;padding:10px 14px;background:#f58220;color:white;font-weight:800;cursor:pointer">Abrir Outlook texto simples</button>
+    </div>
+    ${html}
+    <script>
+      const subject = ${JSON.stringify(subject)};
+      const plain = document.getElementById('quoteEmailCopyArea').innerText;
+      document.getElementById('copyHtmlBtn').addEventListener('click', async () => {
+        const area = document.getElementById('quoteEmailCopyArea');
+        try {
+          const blobHtml = new Blob([area.outerHTML], { type: 'text/html' });
+          const blobText = new Blob([area.innerText], { type: 'text/plain' });
+          await navigator.clipboard.write([new ClipboardItem({ 'text/html': blobHtml, 'text/plain': blobText })]);
+          alert('Email bonito copiado. Agora cola no corpo do Outlook.');
+        } catch(e) {
+          const range = document.createRange();
+          range.selectNode(area);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          document.execCommand('copy');
+          sel.removeAllRanges();
+          alert('Email copiado. Cola no corpo do Outlook.');
+        }
+      });
+      document.getElementById('openMailBtn').addEventListener('click', () => {
+        window.location.href = 'mailto:${encodeURIComponent(q.email || '')}?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(plain);
+      });
+    <\/script>
+  </body></html>`);
+  win.document.close();
+  win.focus();
+}
 function emailQuote(id){
   const q = quoteById(id); if(!q) return;
   openQuoteEmailOptionsModal(q);
@@ -3681,7 +3882,7 @@ function openQuoteEmailOptionsModal(q){
   openModal('Enviar orçamento por email', `<form id="quoteEmailOptionsForm" class="form-grid email-options-form">
     <div class="span3 email-options-intro">
       <strong>Escolhe os campos que queres enviar no email</strong>
-      <span>O Outlook/app de email abre com o texto já montado.</span>
+      <span>Abre uma pré-visualização igual ao PDF para copiar e colar no Outlook.</span>
     </div>
 
     <div class="span3 email-options-grid">
@@ -3703,7 +3904,7 @@ function openQuoteEmailOptionsModal(q){
 
     <div class="span3 actions">
       <button class="btn ghost" type="button" id="cancelQuoteEmailBtn">Cancelar</button>
-      <button class="btn primary" type="submit">Abrir Outlook / Email</button>
+      <button class="btn primary" type="submit">Pré-visualizar email bonito</button>
     </div>
   </form>`);
   qs('#cancelQuoteEmailBtn')?.addEventListener('click', closeModal);
@@ -3712,7 +3913,7 @@ function openQuoteEmailOptionsModal(q){
     const fd = new FormData(e.target);
     const opts = Object.fromEntries([...fd.entries()]);
     const include = key => fd.get(key) === 'on';
-    openQuoteEmailWithOptions(q, include, opts.mensagemExtra || '');
+    openQuoteEmailHtmlPreview(q, opts.mensagemExtra || '');
   });
 }
 function openQuoteEmailWithOptions(q, include, mensagemExtra=''){
@@ -4269,7 +4470,8 @@ function bindConfig(){
       theme:currentTheme(),
       spellcheckEnabled:fd.get('spellcheckEnabled')==='on',
       githubUrl:fd.get('githubUrl'),
-      firebaseEnabled:firebaseReady
+      firebaseEnabled:firebaseReady,
+      remoteFastMode: state.settings?.remoteFastMode !== false
     };
     saveState(); applyTheme(); refreshConfigPage('Configurações guardadas.');
   });

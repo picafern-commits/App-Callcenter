@@ -4503,3 +4503,70 @@ body.theme-dark .warehouse-simple-head[data-toggle-warehouse]::after{
   background:rgba(255,255,255,.06);
   border-color:rgba(255,255,255,.10);
 }
+
+
+/* v2.7.1 - Melhorias orçamentos, cliente, remoto e Firebase */
+.firebase-status-strong{
+  font-weight:1000!important;
+  letter-spacing:.01em;
+  box-shadow:0 8px 18px rgba(0,0,0,.08);
+}
+.quote-filter-bar{
+  display:grid;
+  grid-template-columns:minmax(240px,1fr) 180px;
+  gap:10px;
+  margin:12px 0 16px;
+}
+.quote-filter-chips{
+  grid-column:1 / -1;
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.quote-filter-chip{
+  border:1px solid rgba(20,92,151,.14);
+  background:rgba(255,255,255,.70);
+  color:var(--brand3);
+  border-radius:999px;
+  padding:8px 12px;
+  font-weight:950;
+  cursor:pointer;
+}
+.quote-filter-chip b{
+  margin-left:6px;
+  color:var(--muted);
+}
+.quote-filter-chip.ghost{
+  background:transparent;
+}
+.quote-data-card{
+  border-left:6px solid transparent!important;
+}
+.quote-status-rascunho{ border-left-color:#64748b!important; }
+.quote-status-enviado{ border-left-color:#f97316!important; }
+.quote-status-aceite{ border-left-color:#16a34a!important; }
+.quote-status-recusado{ border-left-color:#dc2626!important; }
+.quote-draft-actions{
+  display:flex;
+  gap:10px;
+  justify-content:flex-end;
+}
+.client-detail-upgraded .detail-grid{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+}
+.client-detail-upgraded .detail-grid div{
+  min-height:72px;
+}
+body.theme-dark .quote-filter-chip{
+  background:rgba(255,255,255,.05);
+  border-color:rgba(255,255,255,.10);
+  color:var(--text);
+}
+@media(max-width:900px){
+  .quote-filter-bar{
+    grid-template-columns:1fr;
+  }
+  .client-detail-upgraded .detail-grid{
+    grid-template-columns:1fr;
+  }
+}
