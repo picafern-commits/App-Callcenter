@@ -1,4 +1,4 @@
-const APP_VERSION = '2.8.2';
+const APP_VERSION = '2.8.5';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -749,6 +749,32 @@ async function initFirebase(){
   }
 }
 function uid(prefix){ return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6).toUpperCase()}`; }
+function quoteIdNumber(id){
+  const m = String(id || '').match(/^ORC-(\d+)$/i);
+  return m ? Number(m[1]) : 0;
+}
+function nextQuoteId(){
+  const max = (state.quotes || []).reduce((highest,q)=>Math.max(highest, quoteIdNumber(q.id)), 0);
+  const next = max + 1;
+  return `ORC-${String(next).padStart(3,'0')}`;
+}
+
+function currentQuoteCreator(){
+  return {
+    name: preferredUserName('Utilizador'),
+    email: state.currentUser?.email || firebaseAuth?.currentUser?.email || ''
+  };
+}
+function quoteCreatorName(q){
+  const explicit = q?.createdByName || q?.userName || q?.operador || q?.createdByUser || '';
+  if(explicit) return explicit;
+  const email = q?.createdByEmail || q?.createdBy || q?.updatedBy || q?.history?.[0]?.by || '';
+  if(email) {
+    const user = (state.users || []).find(u => String(u.email || '').toLowerCase() === String(email).toLowerCase());
+    return user?.nome || user?.name || String(email).split('@')[0];
+  }
+  return '';
+}
 function today(){ return new Date().toISOString().slice(0,10); }
 function currentTimeHM(){
   const d = new Date();
@@ -1840,7 +1866,7 @@ function openClientDetail(id){
       </div>
       <div class="actions">${clientPrimaryEmail(c) ? `<button class="btn success" data-client-email="${c.id}">Enviar email ao cliente</button>` : '<span class="muted">Cliente sem email registado.</span>'}</div>
       <h4>Orçamentos</h4>
-      ${quotes.length ? `<div class="table-wrap"><table><thead><tr><th>ID</th><th>Viatura</th><th>Total</th><th>Estado</th></tr></thead><tbody>${quotes.map(q=>`<tr><td>${esc(q.id)}</td><td>${esc(quoteVehicleLabel(q))}</td><td>${money(q.total)}</td><td>${badge(q.estado)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Sem orçamentos para este cliente.</div>'}
+      ${quotes.length ? `<div class="table-wrap"><table><thead><tr><th>ID</th><th>Viatura</th><th>Criado por</th><th>Total</th><th>Estado</th></tr></thead><tbody>${quotes.map(q=>`<tr><td>${esc(q.id)}</td><td>${esc(quoteVehicleLabel(q))}</td><td>${esc(quoteCreatorName(q) || '-')}</td><td>${money(q.total)}</td><td>${badge(q.estado)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Sem orçamentos para este cliente.</div>'}
       <h4>Notas</h4>
       <p class="muted">${esc(c.notas || 'Sem notas registadas.')}</p>
     </div>`);
@@ -2990,7 +3016,7 @@ function excelPageRegistry(){
     orcamentos: {
       key:'quotes', title:'Orçamentos', file:'orcamentos', prefix:'ORC', edit:()=>canEditOperational(),
       fields:[
-        ['id','ID'], ['createdAt','Data'], ['estado','Estado'], ['cliente','Cliente'], ['codigoCliente','Código Cliente'], ['telefone','Telefone'], ['email','Email'], ['matricula','Matrícula'], ['marcaModelo','Marca & Modelo'], ['motor','Motor'], ['viatura','Viatura'], ['items','Referências JSON'], ['peca','1ª Peça'], ['referencia','1ª Referência'], ['quantidade','1ª Unidade'], ['precoUnitario','1º Preço'], ['total','Total'], ['validade','Validade'], ['prazoEntrega','Prazo Entrega'], ['condicoes','Condições'], ['observacoes','Observações']
+        ['id','ID'], ['createdAt','Data'], ['createdByName','Criado por'], ['createdByEmail','Email do criador'], ['estado','Estado'], ['cliente','Cliente'], ['codigoCliente','Código Cliente'], ['telefone','Telefone'], ['email','Email'], ['matricula','Matrícula'], ['marcaModelo','Marca & Modelo'], ['motor','Motor'], ['viatura','Viatura'], ['items','Referências JSON'], ['peca','1ª Peça'], ['referencia','1ª Referência'], ['quantidade','1ª Unidade'], ['precoUnitario','1º Preço'], ['total','Total'], ['validade','Validade'], ['prazoEntrega','Prazo Entrega'], ['condicoes','Condições'], ['observacoes','Observações']
       ]
     },
     users: {
@@ -3578,7 +3604,8 @@ function createQuoteFromCall(id){
   const marcaModelo = `${c.marca || ''} ${c.modelo || ''}`.trim();
   const matricula = c.matricula || '';
   const motor = c.motor || '';
-  const q = { id: uid('ORC'), callId:id, cliente:c.cliente, codigoCliente:clientCode(client), telefone:c.telefone, email:c.email, matricula, marcaModelo, motor, viatura:composeQuoteVehicle({matricula, marcaModelo, motor}), items, peca:c.peca, referencia:c.referencia, quantidade:1, precoUnitario:Number(c.precoVenda||0), total:quoteItemsTotal(items), validade:today(), prazoEntrega:'A confirmar', condicoes:'Preços sujeitos a disponibilidade da peça no momento da confirmação.', observacoes:c.observacoes || '', estado:'Rascunho', createdAt:today(), history:[{ date:today(), action:'Criado a partir de pedido', by:state.currentUser?.email || '' }] };
+  const creator = currentQuoteCreator();
+  const q = { id: nextQuoteId(), createdByName:creator.name, createdByEmail:creator.email, callId:id, cliente:c.cliente, codigoCliente:clientCode(client), telefone:c.telefone, email:c.email, matricula, marcaModelo, motor, viatura:composeQuoteVehicle({matricula, marcaModelo, motor}), items, peca:c.peca, referencia:c.referencia, quantidade:1, precoUnitario:Number(c.precoVenda||0), total:quoteItemsTotal(items), validade:today(), prazoEntrega:'A confirmar', condicoes:'Preços sujeitos a disponibilidade da peça no momento da confirmação.', observacoes:c.observacoes || '', estado:'Rascunho', createdAt:today(), history:[{ date:today(), action:'Criado a partir de pedido', by:creator.email || '' }] };
   state.quotes.push(q); c.estado='Orçamento enviado'; saveState(); toast('Orçamento criado.'); setTimeout(()=>goPage('orcamentos'), 250);
 }
 function quoteClientOptions(){
@@ -3633,7 +3660,8 @@ function quoteVehicleLabel(q){
     v.marcaModelo || 'Sem marca/modelo',
     v.motor || 'Sem motor',
     v.matricula || 'Sem matrícula',
-    q.createdAt ? `Criado: ${formatDatePt(q.createdAt)}` : ''
+    q.createdAt ? `Criado: ${formatDatePt(q.createdAt)}` : '',
+    quoteCreatorName(q) ? `Por: ${quoteCreatorName(q)}` : ''
   ].filter(Boolean).join(' · ');
 }
 function composeQuoteVehicle(data){
@@ -3681,7 +3709,8 @@ function bindNewQuoteForm(form){
     if(!items.length) return toast('Adiciona pelo menos uma referência.');
     const first = items[0];
     const viatura = composeQuoteVehicle(data);
-    state.quotes.push({ id:uid('ORC'), createdAt:today(), estado:data.estado || 'Rascunho', ...data, viatura, items, peca:first.nome, referencia:first.referencia, quantidade:first.unidade, precoUnitario:first.preco, total: quoteItemsTotal(items), history:[{ date:today(), action:'Criado', by:state.currentUser?.email || '' }] });
+    const creator = currentQuoteCreator();
+    state.quotes.push({ id:nextQuoteId(), createdAt:today(), createdByName:creator.name, createdByEmail:creator.email, estado:data.estado || 'Rascunho', ...data, viatura, items, peca:first.nome, referencia:first.referencia, quantidade:first.unidade, precoUnitario:first.preco, total: quoteItemsTotal(items), history:[{ date:today(), action:'Criado', by:creator.email || '' }] });
     clearQuoteDraft(); saveState(); closeModal(); renderPage('orcamentos'); toast('Orçamento criado.');
   });
 }
@@ -3708,7 +3737,7 @@ function openQuoteModal(id){
   const q = quoteById(id); if(!q) return;
   const items = quoteItemsFromLegacy(q);
   const v = quoteVehicleParts(q);
-  openModal('Editar orçamento', `<form id="editQuoteForm" class="form-grid quote-modal-form">
+  openModal('Editar orçamento', `<form id="editQuoteForm" class="form-grid quote-modal-form"><div class="span3 readonly-note">Criado por: ${esc(quoteCreatorName(q) || '-')}</div>
     ${quoteClientSearchHtml(q.codigoCliente ? `${q.codigoCliente} - ${q.cliente || ''}` : (q.cliente || ''))}
     <input class="field" name="codigoCliente" placeholder="Código cliente" value="${esc(q.codigoCliente||'')}">
     <input class="field" name="telefone" placeholder="Telefone" value="${esc(q.telefone||'')}">
@@ -3975,6 +4004,55 @@ function openOutlookEmailBrowserFallback(q, mensagemExtra='', options={}){
   window.location.href = mailto;
 }
 
+function emailQuote(id){
+  const q = quoteById(id);
+  if(!q) return toast('Orçamento não encontrado.');
+  openQuoteEmailOptionsModal(q);
+}
+function quoteEmailOptionCheckbox(key, label, checked=true){
+  return `<label class="email-option-pill"><input type="checkbox" name="${key}" ${checked?'checked':''}> <span>${esc(label)}</span></label>`;
+}
+function openQuoteEmailOptionsModal(q){
+  openModal('Enviar orçamento por email', `<form id="quoteEmailOptionsForm" class="form-grid email-options-form">
+    <div class="span3 email-options-intro">
+      <strong>Escolhe os campos que queres enviar no email</strong>
+      <span>Abre o email com destinatário e assunto. Depois faz CTRL+V no corpo para colar exatamente este layout.</span>
+    </div>
+
+    <div class="span3 email-options-grid">
+      ${quoteEmailOptionCheckbox('includeNumero','Nº do orçamento', false)}
+      ${quoteEmailOptionCheckbox('includeMatricula','Matrícula', true)}
+      ${quoteEmailOptionCheckbox('includeMarcaModelo','Marca & Modelo', true)}
+      ${quoteEmailOptionCheckbox('includeMotor','Motor', true)}
+      ${quoteEmailOptionCheckbox('includeReferencias','Referências / peças', true)}
+      ${quoteEmailOptionCheckbox('includePrecoLiquido','Preço líquido', true)}
+      ${quoteEmailOptionCheckbox('includeTotalLinha','Total c/ IVA por referência', true)}
+      ${quoteEmailOptionCheckbox('includeResumo','Resumo final', true)}
+      ${quoteEmailOptionCheckbox('includePrazo','Prazo de entrega', false)}
+      ${quoteEmailOptionCheckbox('includeCondicoes','Condições', true)}
+      ${quoteEmailOptionCheckbox('includeObservacoes','Observações', false)}
+      ${quoteEmailOptionCheckbox('includeCliente','Nome do cliente', false)}
+    </div>
+
+    <textarea class="span3" name="mensagemExtra" placeholder="Mensagem extra opcional"></textarea>
+
+    <div class="span3 actions">
+      <button class="btn ghost" type="button" id="cancelQuoteEmailBtn">Cancelar</button>
+      <button class="btn primary" type="submit">Abrir Outlook / Email</button>
+    </div>
+  </form>`);
+  qs('#cancelQuoteEmailBtn')?.addEventListener('click', closeModal);
+  qs('#quoteEmailOptionsForm')?.addEventListener('submit',e=>{
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const options = {};
+    ['includeNumero','includeCliente','includeMatricula','includeMarcaModelo','includeMotor','includeReferencias','includePrecoLiquido','includeTotalLinha','includeResumo','includePrazo','includeCondicoes','includeObservacoes']
+      .forEach(key=>{ options[key] = fd.get(key) === 'on'; });
+    closeModal();
+    openOutlookHtmlEmail(q, fd.get('mensagemExtra') || '', options);
+  });
+}
+
 function quotePdfHtml(q){
   const items = quoteItemsFromLegacy(q);
   const subtotal = quoteItemsTotal(items);
@@ -3986,7 +4064,7 @@ function quotePdfHtml(q){
     .top{position:relative;display:flex;justify-content:space-between;gap:24px;border-bottom:4px solid #06447f;padding-bottom:18px}.brand{padding-left:78px;min-height:64px}.pdf-logo{position:absolute;left:0;top:0;width:58px;height:58px;border-radius:18px;padding:7px;background:linear-gradient(135deg,#ffffff,#eef6ff);border:1px solid #d7e6f2;box-shadow:0 10px 22px rgba(6,68,127,.16);object-fit:contain}.brand h1{margin:0;color:#06447f}.brand p,.box p{margin:5px 0;color:#49677f}.stamp{font-size:28px;font-weight:900;color:#f58220;text-align:right}.box{border:1px solid #c9d8e5;border-radius:10px;padding:14px;margin-top:20px}
     table{width:100%;border-collapse:collapse;margin-top:22px}th{background:#06447f;color:white;text-align:left;padding:12px}td{border-bottom:1px solid #dce7f0;padding:12px}.totals{margin-left:auto;width:310px;margin-top:18px}.totals div{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #dce7f0}.totals .grand{font-size:20px;font-weight:900;color:#06447f}.notes{margin-top:26px;line-height:1.5}.footer{margin-top:40px;color:#49677f;font-size:12px;border-top:1px solid #dce7f0;padding-top:12px}@media print{body{background:white}.page{margin:0;box-shadow:none}button{display:none!important}}
   </style></head><body><button onclick="window.print()" style="position:fixed;right:18px;top:18px;z-index:20;border:0;border-radius:12px;padding:10px 14px;background:#06447f;color:white;font-weight:800;cursor:pointer">Imprimir / Guardar PDF</button><main class="page">
-    <section class="top"><img class="pdf-logo" src="../assets/bragalis-callcenter-icon.png" alt="${esc(companyName())}"><div class="brand"><h1>${esc(companyName())}</h1><p>${esc(settings.companyAddress || 'Callcenter de peças automóveis')}</p><p>${settings.companyNif ? `NIF: ${esc(settings.companyNif)} · ` : ''}${esc(settings.companyPhone || '')} ${settings.companyEmail ? '· ' + esc(settings.companyEmail) : ''}</p><p>Orçamento gerado em ${esc(today())}</p></div><div><div class="stamp">ORÇAMENTO</div><p><strong>${esc(q.id)}</strong></p><p>Validade: ${esc(q.validade || today())}</p><p>Estado: ${esc(q.estado || 'Rascunho')}</p></div></section>
+    <section class="top"><img class="pdf-logo" src="../assets/bragalis-callcenter-icon.png" alt="${esc(companyName())}"><div class="brand"><h1>${esc(companyName())}</h1><p>${esc(settings.companyAddress || 'Callcenter de peças automóveis')}</p><p>${settings.companyNif ? `NIF: ${esc(settings.companyNif)} · ` : ''}${esc(settings.companyPhone || '')} ${settings.companyEmail ? '· ' + esc(settings.companyEmail) : ''}</p><p>Orçamento gerado em ${esc(today())}</p></div><div><div class="stamp">ORÇAMENTO</div><p><strong>${esc(q.id)}</strong></p><p>Validade: ${esc(q.validade || today())}</p><p>Estado: ${esc(q.estado || 'Rascunho')}</p><p>Criado por: ${esc(quoteCreatorName(q) || '-')}</p></div></section>
     <section class="box"><h2>Cliente</h2><p><strong>${esc(q.cliente)}</strong></p><p>Código cliente: ${esc(q.codigoCliente || '-')}</p><p>Telefone: ${esc(q.telefone || '-')} · Email: ${esc(q.email || '-')}</p><p>Matrícula: ${esc(quoteVehicleParts(q).matricula || '-')}</p><p>Marca & Modelo: ${esc(quoteVehicleParts(q).marcaModelo || '-')}</p><p>Motor: ${esc(quoteVehicleParts(q).motor || '-')}</p></section>
     <table><thead><tr><th>Nome</th><th>Referência</th><th>Unidade</th><th>Preço Líquido</th><th>Total c/ IVA</th></tr></thead><tbody>${items.map(item=>`<tr><td>${esc(item.nome)}</td><td>${esc(item.referencia || '-')}</td><td>${esc(item.unidade)}</td><td>${money(item.preco)}</td><td>${money(Number(item.total || 0) * 1.23)}</td></tr>`).join('')}</tbody></table>
     <section class="totals"><div><span>Subtotal líquido</span><strong>${money(subtotal)}</strong></div><div><span>IVA 23%</span><strong>${money(iva)}</strong></div><div class="grand"><span>Total</span><strong>${money(totalComIva)}</strong></div></section>
