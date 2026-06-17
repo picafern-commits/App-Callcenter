@@ -58,6 +58,10 @@ const ICONS = {
   fornecedores: svgIcon('M3 21h18M5 21V7l7-4 7 4v14M9 9h6M9 13h6M9 17h6'),
   rotas: svgIcon('M14 18V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12h11M14 9h3l4 4v5h-7M5 18a2 2 0 1 0 4 0 2 2 0 0 0-4 0m10 0a2 2 0 1 0 4 0 2 2 0 0 0-4 0'),
   orcamentos: svgIcon('M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8M8 9h2'),
+  pedidos: svgIcon('M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01'),
+  agenda: svgIcon('M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2'),
+  stock: svgIcon('M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16M3.3 7 12 12l8.7-5M12 22V12'),
+  relatorios: svgIcon('M3 3v18h18M8 17V9M13 17V5M18 17v-6'),
   users: svgIcon('M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75'),
   configsUser: svgIcon('M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8'),
   config: svgIcon('M12 1.75l2.1 2.24 3.02-.2.82 2.9 2.74 1.27-1.1 2.82 1.1 2.82-2.74 1.27-.82 2.9-3.02-.2L12 22.25l-2.1-2.24-3.02.2-.82-2.9-2.74-1.27 1.1-2.82-1.1-2.82 2.74-1.27.82-2.9 3.02.2L12 1.75zM12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7'),
@@ -72,12 +76,16 @@ const ICONS = {
 
 const pages = [
   { id: 'dashboard', icon: ICONS.dashboard, title: 'Dashboard', short: 'Portal', subtitle: 'Painel principal da operação' },
+  { id: 'nova-chamada', icon: ICONS.pedidos, title: 'Novo pedido', short: 'Novo', subtitle: 'Registar pedido de peça' },
   { id: 'clientes', icon: ICONS.clientes, title: 'Clientes', short: 'Clientes', subtitle: 'Fichas, histórico e contactos' },
   { id: 'contactos', icon: ICONS.contactos, title: 'Diretório de contactos', short: 'Diretório', subtitle: 'Pesquisa rápida de clientes e fornecedores' },
   { id: 'fornecedores', icon: ICONS.fornecedores, title: 'Fornecedores', short: 'Fornecedores', subtitle: 'Lista de fornecedores e referências' },
   { id: 'rotas', icon: ICONS.rotas, title: 'Rotas', short: 'Rotas', subtitle: 'Registo de viaturas, serviços, cargas e quilómetros' },
-  { id: 'pedidos', icon: ICONS.orcamentos, title: 'Pedidos', short: 'Pedidos', subtitle: 'Pedidos de peças e referências' },
+  { id: 'pedidos', icon: ICONS.pedidos, title: 'Pedidos', short: 'Pedidos', subtitle: 'Pedidos de peças e referências' },
   { id: 'orcamentos', icon: ICONS.orcamentos, title: 'Orçamentos', short: 'Orçamentos', subtitle: 'Criar, enviar e acompanhar propostas' },
+  { id: 'agenda', icon: ICONS.agenda, title: 'Agenda', short: 'Agenda', subtitle: 'Follow-ups e tarefas pendentes' },
+  { id: 'stock', icon: ICONS.stock, title: 'Stock', short: 'Stock', subtitle: 'Catálogo e disponibilidade de peças' },
+  { id: 'relatorios', icon: ICONS.relatorios, title: 'Relatórios', short: 'Relatórios', subtitle: 'Indicadores comerciais e operação' },
   { id: 'users', icon: ICONS.users, title: 'Utilizadores', short: 'Users', subtitle: 'Equipa, cargos e permissões' },
   { id: 'configs-user', icon: ICONS.configsUser, title: 'Minhas Configs', short: 'Configs', subtitle: 'Tema e preferências do utilizador' },
   { id: 'config', icon: ICONS.config, title: 'Configurações', short: 'Admin', subtitle: 'GitHub, Electron, Firebase e backups' }
@@ -899,14 +907,16 @@ function normalizeUserPermissions(user){
   const migrated = {};
   managed.forEach(p=>{
     const existing = source[p.id] || {};
+    const hasPagePermissions = hasOwn(source, p.id);
+    const oldActionsForPage = oldActionAccess[p.id] || {};
     const oldView = hasOwn(oldPageAccess, p.id) ? oldPageAccess[p.id] === true : roleDefault.view;
     migrated[p.id] = {
       // Se ainda não houver permissões gravadas para este user, deixa a página visível.
       // Depois de guardares permissões, o campo view passa a mandar.
-      view: hasOwn(existing,'view') ? existing.view === true : (hasNewPermissions ? false : oldView),
-      add: hasOwn(existing,'add') ? existing.add === true : (hasOwn(oldActionAccess,'add') ? oldActionAccess.add === true : roleDefault.add),
-      edit: hasOwn(existing,'edit') ? existing.edit === true : (hasOwn(oldActionAccess,'edit') ? oldActionAccess.edit === true : roleDefault.edit),
-      delete: hasOwn(existing,'delete') ? existing.delete === true : (hasOwn(oldActionAccess,'delete') ? oldActionAccess.delete === true : roleDefault.delete)
+      view: hasOwn(existing,'view') ? existing.view === true : (hasNewPermissions && hasPagePermissions ? false : oldView),
+      add: hasOwn(existing,'add') ? existing.add === true : (hasOwn(oldActionsForPage,'add') ? oldActionsForPage.add === true : roleDefault.add),
+      edit: hasOwn(existing,'edit') ? existing.edit === true : (hasOwn(oldActionsForPage,'edit') ? oldActionsForPage.edit === true : roleDefault.edit),
+      delete: hasOwn(existing,'delete') ? existing.delete === true : (hasOwn(oldActionsForPage,'delete') ? oldActionsForPage.delete === true : roleDefault.delete)
     };
   });
   return migrated;
@@ -4774,28 +4784,35 @@ async function saveUserProfileToFirestore(user){
 async function saveAllUserPermissionsToFirestore(users){
   if(!firebaseReady || !firebaseDb || !firebaseAuth?.currentUser || firebaseAuth.currentUser.isAnonymous) return false;
   const editableUsers = (users || []).filter(u => (u.role || 'Operador') !== 'Admin Master');
-  let batch = firebaseDb.batch();
-  let ops = 0;
-  editableUsers.forEach(user=>{
+  let saved = 0;
+  const errors = [];
+  for(const user of editableUsers){
     user.permissions = normalizeUserPermissions(user);
     user.pageAccess = {};
     user.actionAccess = {};
+    if(!user.id) user.id = uid('USR');
     const ref = firebaseDb.collection(FIREBASE_COLLECTIONS.users).doc(user.id);
-    batch.set(ref, sanitizeRowForFirestore({
-      ...user,
-      email:String(user.email || '').toLowerCase(),
-      permissions:user.permissions,
-      pageAccess:{},
-      actionAccess:{},
-      permissionsUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      permissionsUpdatedBy: state.currentUser?.email || firebaseAuth.currentUser?.email || '',
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      updatedBy: state.currentUser?.email || firebaseAuth.currentUser?.email || ''
-    }), { merge:true });
-    ops++;
-  });
-  if(ops) await promiseTimeout(batch.commit(), 9000);
-  return true;
+    try {
+      await promiseTimeout(ref.set(sanitizeRowForFirestore({
+        ...user,
+        email:String(user.email || '').toLowerCase(),
+        permissions:user.permissions,
+        pageAccess:{},
+        actionAccess:{},
+        permissionsUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        permissionsUpdatedBy: state.currentUser?.email || firebaseAuth.currentUser?.email || '',
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedBy: state.currentUser?.email || firebaseAuth.currentUser?.email || ''
+      }), { merge:true }), 6500);
+      saved++;
+    } catch(err) {
+      errors.push({ user, err });
+      console.warn(`Permissões não gravadas para ${user.email || user.id}`, err);
+    }
+  }
+  if(errors.length && saved === 0) throw errors[0].err;
+  if(errors.length) toast(`${saved} permissões guardadas; ${errors.length} utilizador(es) ficaram pendentes.`);
+  return saved > 0 || editableUsers.length === 0;
 }
 
 async function findExistingFirebaseUserProfile(email){
