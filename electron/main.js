@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, Menu, session, screen, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, Menu, session, screen, ipcMain, clipboard, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -240,6 +240,33 @@ $mail.Display()
     }
   }
 }
+
+
+async function openReadyEmailAndCopyLayout(_event, payload = {}) {
+  const html = payload.htmlBody || payload.plainBody || '';
+  const text = payload.plainBody || '';
+  const mailto = `mailto:${encodeURIComponent(payload.to || '')}?subject=${encodeURIComponent(payload.subject || '')}`;
+
+  try {
+    clipboard.write({
+      html,
+      text
+    });
+  } catch (err) {
+    console.warn('Falhou copiar HTML para clipboard:', err);
+    try { clipboard.writeText(text || html.replace(/<[^>]+>/g, ' ')); } catch {}
+  }
+
+  try {
+    await shell.openExternal(mailto);
+    return { ok: true, mode: 'mailto-clipboard' };
+  } catch (err) {
+    console.warn('Falhou abrir mailto:', err);
+    return { ok: false, reason: err.message || String(err) };
+  }
+}
+
+ipcMain.handle('bragalis:open-ready-email-copy-layout', openReadyEmailAndCopyLayout);
 
 ipcMain.handle('bragalis:compose-outlook-email', composeOutlookEmailWithAttachments);
 

@@ -1,4 +1,4 @@
-const APP_VERSION = '2.7.9';
+const APP_VERSION = '2.8.0';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -3944,21 +3944,17 @@ async function copyQuoteHtmlToClipboard(q, mensagemExtra=''){
 function openOutlookHtmlEmail(q, mensagemExtra=''){
   const payload = quoteElectronEmailPayload(q, mensagemExtra);
 
-  // Melhor modo: Electron/Windows usa Outlook COM para abrir email com HTML + PDF + PNG anexos.
-  if(window.bragalisElectron?.composeOutlookEmail){
-    window.bragalisElectron.composeOutlookEmail(payload).then(result=>{
-      if(result?.ok) {
-        toast('Outlook aberto com PDF e imagem da tabela em anexo.');
-      } else if(result?.fallback === 'mailto') {
-        toast('Outlook novo aberto. A pasta com PDF e imagem foi aberta para anexares.');
-      } else {
-        console.warn('Electron Outlook compose failed', result);
-        toast('Não consegui anexar automaticamente. Abri email normal e copiei o layout.');
+  // Novo fluxo: abre email pronto e copia o layout bonito para CTRL+V.
+  // Não mete texto no corpo para não estragar a colagem da tabela.
+  if(window.bragalisElectron?.openReadyEmailAndCopyLayout){
+    window.bragalisElectron.openReadyEmailAndCopyLayout(payload).then(result=>{
+      if(result?.ok) toast('Email aberto. Faz CTRL+V no corpo para inserir o orçamento.');
+      else {
+        console.warn('Electron ready email failed', result);
         openOutlookEmailBrowserFallback(q, mensagemExtra);
       }
     }).catch(err=>{
-      console.warn('Electron Outlook bridge failed', err);
-      toast('Electron/Outlook falhou. Vou abrir email normal.');
+      console.warn('Electron ready email bridge failed', err);
       openOutlookEmailBrowserFallback(q, mensagemExtra);
     });
     return true;
@@ -3969,29 +3965,17 @@ function openOutlookHtmlEmail(q, mensagemExtra=''){
 }
 function openOutlookEmailBrowserFallback(q, mensagemExtra=''){
   const subject = quoteEmailSubject(q);
-  const plain = quoteEmailPlainText(q, mensagemExtra);
-  const htmlBody = quoteEmailOutlookBodyHtml(q, mensagemExtra);
   const to = q.email || '';
 
-  copyQuoteHtmlToClipboard(q, mensagemExtra).catch(()=>{});
+  // Browser/Edge: copia HTML bonito e abre email sem corpo. Depois é CTRL+V.
+  copyQuoteHtmlToClipboard(q, mensagemExtra)
+    .then(copied=>{
+      toast(copied ? 'Layout copiado. Faz CTRL+V no corpo do email.' : 'Email aberto. Se não copiar, usa a pré-visualização.');
+    })
+    .catch(()=>toast('Email aberto. Se o layout não colar, usa a pré-visualização.'));
 
-  const outlookUrl = `ms-outlook://compose?to=${encodeURIComponent(to)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(htmlBody)}`;
-  const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(plain)}`;
-
-  let leftPage = false;
-  const markLeft = ()=>{ leftPage = true; };
-  window.addEventListener('blur', markLeft, { once:true });
-  document.addEventListener('visibilitychange', ()=>{ if(document.hidden) leftPage = true; }, { once:true });
-
-  window.location.href = outlookUrl;
-  setTimeout(()=>{
-    if(!leftPage) {
-      window.location.href = mailto;
-      toast('Outlook HTML não abriu. Abri email em texto simples; o layout bonito foi copiado.');
-    } else {
-      toast('Outlook aberto. Se a tabela não ficar bonita, cola o layout copiado.');
-    }
-  }, 1400);
+  const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}`;
+  window.location.href = mailto;
 }
 
 function quoteEmailHtml(q, mensagemExtra=''){
@@ -4126,7 +4110,7 @@ function openQuoteEmailOptionsModal(q){
   openModal('Enviar orçamento por email', `<form id="quoteEmailOptionsForm" class="form-grid email-options-form">
     <div class="span3 email-options-intro">
       <strong>Escolhe os campos que queres enviar no email</strong>
-      <span>No Electron tenta abrir o Outlook com PDF + imagem da tabela anexados. No Edge abre email e copia o layout bonito.</span>
+      <span>Abre o Outlook/email já com destinatário e assunto. Depois faz CTRL+V no corpo para inserir o orçamento bonito.</span>
     </div>
 
     <div class="span3 email-options-grid">
