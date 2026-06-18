@@ -4745,3 +4745,24 @@ body.theme-dark .pedido-final-box strong{
     grid-template-columns:1fr!important;
   }
 }
+
+
+/* v2.9.0 - Pedidos lado a lado + listas limpas */
+.pedido-card-list{
+  display:grid!important;
+  grid-template-columns:repeat(auto-fit, minmax(360px, 1fr))!important;
+  gap:12px!important;
+  align-items:stretch!important;
+}
+.pedido-card-list .pedido-data-card{
+  width:100%!important;
+  height:100%!important;
+}
+.pedido-final-box div div{
+  padding-left:0!important;
+}
+@media(max-width:760px){
+  .pedido-card-list{
+    grid-template-columns:1fr!important;
+  }
+}

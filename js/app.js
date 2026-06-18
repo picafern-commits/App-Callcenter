@@ -1,4 +1,4 @@
-const APP_VERSION = '2.8.9';
+const APP_VERSION = '2.9.0';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -1582,8 +1582,8 @@ function updatePedidoRefsSummary(form){
   const data = rows.map(getPedidoRefRowData).filter(r=>r.referencia || r.referenciaOriginal);
   const refsBox = form?.querySelector('#pedidoFinalRefsList');
   const qtdBox = form?.querySelector('#pedidoQuantidadesList');
-  if(refsBox) refsBox.innerHTML = data.length ? data.map((r,i)=>`<div>${i+1}. ${esc(r.referencia || '-')}</div>`).join('') : '<span class="muted">Sem referências.</span>';
-  if(qtdBox) qtdBox.innerHTML = data.length ? data.map((r,i)=>`<div>${i+1}. ${esc(r.quantidade || 1)}</div>`).join('') : '<span class="muted">Sem quantidades.</span>';
+  if(refsBox) refsBox.innerHTML = data.length ? data.map(r=>`<div>${esc(r.referencia || '-')}</div>`).join('') : '<span class="muted">Sem referências.</span>';
+  if(qtdBox) qtdBox.innerHTML = data.length ? data.map(r=>`<div>${esc(r.quantidade || 1)}</div>`).join('') : '<span class="muted">Sem quantidades.</span>';
 }
 function updateAllPedidoRefRows(form){
   updatePedidoRefsSummary(form);
@@ -1614,7 +1614,7 @@ function pedidoFormHtml(p=null){
     <input class="field" name="hora" type="time" value="${esc(p?.hora || p?.createdTime || currentTimeHM())}" readonly>
     <textarea class="span3" name="observacoes" placeholder="Observações">${esc(p?.observacoes || '')}</textarea>
     <div class="span3 actions">
-      <button class="btn success" type="submit" data-pedido-submit="Confirmado">${p ? 'Guardar / Confirmar pedido' : 'Confirmar pedido'}</button>
+      <button class="btn success" type="submit" data-pedido-submit="${esc(p?.estado || 'Pendente')}">${p ? 'Guardar pedido' : 'Guardar pedido'}</button>
       <button class="btn danger-soft" type="button" id="cancelPedidoBtn">Cancelar pedido</button>
     </div>
   </form>`;
@@ -3847,7 +3847,7 @@ function bindPedidoForm(form, existing=null){
     e.preventDefault();
     if(!canEditOperational()) return toast('Sem permissão para guardar pedidos.');
     const submitter = e.submitter;
-    const status = submitter?.dataset.pedidoSubmit || 'Confirmado';
+    const status = submitter?.dataset.pedidoSubmit || existing?.estado || 'Pendente';
     const data = Object.fromEntries(new FormData(form).entries());
     const refs = collectPedidoRefs(form);
     if(!refs.length) return toast('Adiciona pelo menos uma referência.');
