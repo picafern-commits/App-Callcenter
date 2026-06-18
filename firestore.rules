@@ -1,89 +1,170 @@
-<!doctype html>
-<html lang="pt-PT">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Bragalis Callcenter</title>
-  <script>
-    (function(){
-      try{
-        var theme=localStorage.getItem('bragalis_user_theme_v1');
-        var res=localStorage.getItem('bragalis_resolution_v1') || 'standard';
-        var scheme=localStorage.getItem('bragalis_color_scheme_v1') || 'az';
-        if(theme==='dark') document.documentElement.classList.add('theme-dark');
-        document.documentElement.classList.add('res-'+res);
-        document.documentElement.classList.add('scheme-'+scheme);
-      }catch(e){}
-    })();
-  </script>
-  <link rel="stylesheet" href="../css/styles.css" />
-  <link rel="manifest" href="../manifest.webmanifest">
-  <meta name="theme-color" content="#06447f">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="application-name" content="Bragalis Callcenter">
-  <link rel="apple-touch-icon" href="../assets/bragalis-callcenter-icon.png">
-  <link rel="icon" href="../assets/bragalis-callcenter-icon.png">
-</head>
-<body class="auth-boot">
-  <div id="loginScreen" class="login-screen">
-    <div class="login-card glass">
-      <div class="brand-mark">BC</div>
-      <h1>Bragalis Callcenter</h1>
-      <p>Gestão profissional do Callcenter Bragalis.</p>
-      <label>Email</label>
-      <input id="loginEmail" type="email" placeholder="admin@empresa.pt" autocomplete="email" />
-      <label>Password</label>
-      <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password" />
-      <label class="checkline"><input id="rememberLogin" type="checkbox" /> Memorizar email</label>
-      <button id="loginBtn" class="btn primary full">Entrar</button>
-      <small>Demo local: qualquer email e password entram. Preparado para trocar por Firebase Auth.</small>
-    </div>
-  </div>
+rules_version = '2';
 
-  <div id="appShell" class="app-shell hidden">
-    <header class="shell-header">
-      <div class="header-brand">
-        <div class="brand-mark small">BC</div>
-        <div>
-          <strong>Bragalis</strong>
-          <span>CallCenter</span>
-        </div>
-      </div>
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
 
-      <div class="header-copy">
-        <h2 id="pageTitle">Dashboard</h2>
-        <span id="pageSubtitle">Central de controlo do callcenter</span>
-      </div>
+    function masterEmail() {
+      return signedIn() && request.auth.token.email == 'pica.fern@gmail.com';
+    }
 
-      <div class="top-actions">
-        <button id="homeBtn" class="btn ghost">Início</button>
-        <span id="userBadge" class="user-badge">Admin</span>
-        <button id="logoutBtn" class="btn danger-soft">Fechar app</button>
-      </div>
-    </header>
+    function userDoc() {
+      return get(/databases/$(database)/documents/utilizadores/$(request.auth.uid));
+    }
 
-    <div class="nav-strip-wrap">
-      <nav id="navMenu" class="nav-strip"></nav>
-    </div>
+    function hasUserDoc() {
+      return signedIn() && exists(/databases/$(database)/documents/utilizadores/$(request.auth.uid));
+    }
 
-    <main class="main">
-      <section id="pageContent" class="content"></section>
-    </main>
-  </div>
+    function isActive() {
+      return masterEmail() || (hasUserDoc() && userDoc().data.status == 'Ativo');
+    }
 
-  <div id="modalRoot" class="modal-root hidden"></div>
-  <div id="toast" class="toast hidden"></div>
+    function role() {
+      return masterEmail() ? 'Admin Master' : (hasUserDoc() ? userDoc().data.role : 'Pendente');
+    }
 
-  <script>window.DEFAULT_PAGE = 'users';</script>
-  <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function(){
-      navigator.serviceWorker.register('../sw.js').catch(function(err){
-        console.warn('Service Worker não registado:', err);
-      });
-    });
+    function canManage() {
+      return isActive() && (role() in ['Admin Master', 'Admin']);
+    }
+
+    function canOperate() {
+      return isActive() && (role() in ['Admin Master', 'Admin', 'Supervisor', 'Operador']);
+    }
+
+    function hasPermissionMap() {
+      return hasUserDoc() && ('permissions' in userDoc().data);
+    }
+
+    function explicitPermission(page, action) {
+      return hasPermissionMap()
+        && (page in userDoc().data.permissions)
+        && (action in userDoc().data.permissions[page])
+        && userDoc().data.permissions[page][action] == true;
+    }
+
+    function roleDefaultPermission(action) {
+      return role() in ['Admin Master', 'Admin']
+        || (role() == 'Supervisor' && action in ['view', 'add', 'edit'])
+        || (role() == 'Operador' && action in ['view', 'add']);
+    }
+
+    function canPage(page, action) {
+      return isActive() && (
+        role() in ['Admin Master', 'Admin']
+        || explicitPermission(page, action)
+        || (!hasPermissionMap() && roleDefaultPermission(action))
+      );
+    }
+
+    function ownPresenceUpdate(document) {
+      return signedIn()
+        && (
+          document == request.auth.uid
+          || (resource.data.email == request.auth.token.email)
+        )
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'online',
+          'lastSeen',
+          'currentPage',
+          'sessionId',
+          'userAgent',
+          'updatedAt'
+        ]);
+    }
+
+    match /meta/{document} {
+      allow read: if signedIn();
+      allow write: if canManage();
+    }
+
+    match /utilizadores/{document} {
+      allow read: if signedIn();
+      allow create: if (signedIn() && document == request.auth.uid) || masterEmail() || (isActive() && role() == 'Admin Master');
+      allow update: if masterEmail() || (isActive() && role() == 'Admin Master') || ownPresenceUpdate(document);
+      allow delete: if masterEmail() || (isActive() && role() == 'Admin Master');
+    }
+
+    match /clientes/{document} {
+      allow read: if canPage('clientes', 'view');
+      allow create: if canPage('clientes', 'add');
+      allow update: if canPage('clientes', 'edit');
+      allow delete: if canPage('clientes', 'delete');
+    }
+
+    match /fornecedores/{document} {
+      allow read: if canPage('fornecedores', 'view');
+      allow create: if canPage('fornecedores', 'add');
+      allow update: if canPage('fornecedores', 'edit');
+      allow delete: if canPage('fornecedores', 'delete');
+    }
+
+
+    match /viaturas/{document} {
+      allow read: if canPage('rotas', 'view');
+      allow create: if canPage('rotas', 'add');
+      allow update: if canPage('rotas', 'edit');
+      allow delete: if canPage('rotas', 'delete');
+    }
+
+    match /rotas/{document} {
+      allow read: if canPage('rotas', 'view');
+      allow create: if canPage('rotas', 'add');
+      allow update: if canPage('rotas', 'edit');
+      allow delete: if canPage('rotas', 'delete');
+    }
+
+    match /orcamentos/{document} {
+      allow read: if canPage('orcamentos', 'view');
+      allow create: if canPage('orcamentos', 'add');
+      allow update: if canPage('orcamentos', 'edit');
+      allow delete: if canPage('orcamentos', 'delete');
+    }
+
+    match /pedidos/{document} {
+      allow read: if canPage('pedidos', 'view');
+      allow create: if canPage('pedidos', 'add');
+      allow update: if canPage('pedidos', 'edit');
+      allow delete: if canPage('pedidos', 'delete');
+    }
+
+    match /agenda/{document} {
+      allow read: if canPage('agenda', 'view');
+      allow create: if canPage('agenda', 'add');
+      allow update: if canPage('agenda', 'edit');
+      allow delete: if canPage('agenda', 'delete');
+    }
+
+    match /stock/{document} {
+      allow read: if canPage('stock', 'view');
+      allow create: if canPage('stock', 'add');
+      allow update: if canPage('stock', 'edit');
+      allow delete: if canPage('stock', 'delete');
+    }
+
+    match /diretorioContactos/{document} {
+      allow read: if canPage('contactos', 'view');
+      allow create: if canPage('contactos', 'add');
+      allow update: if canPage('contactos', 'edit');
+      allow delete: if canPage('contactos', 'delete');
+    }
+
+
+    match /auditoria/{document} {
+      allow read: if canManage();
+      allow create, update: if canOperate();
+      allow delete: if canManage();
+    }
+
+    match /backups/{document} {
+      allow read, write: if canManage();
+    }
+
+    match /appState/{document} {
+      allow read: if signedIn();
+      allow write: if canManage();
+    }
   }
-</script>
-  <script src="../js/app.js"></script>
-</body>
-</html>
+}

@@ -1,4 +1,4 @@
-const APP_VERSION = '2.9.1';
+const APP_VERSION = '2.9.3';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -127,7 +127,9 @@ function seedData() {
       resolution: 'auto',
       spellcheckEnabled: true,
       backupEnabled: true,
-      lastAutoBackupDate: ''
+      lastAutoBackupDate: '',
+      cardLayout: 'grid',
+      cardSize: 'normal'
     },
     currentUser: null,
     calls: [
@@ -191,6 +193,8 @@ function loadState() {
 function ensureStateShape(appState){
   const base = seedData();
   appState.settings = { ...base.settings, ...(appState.settings || {}) };
+  if(!['grid','list'].includes(appState.settings.cardLayout)) appState.settings.cardLayout = 'grid';
+  if(!['compact','normal','large'].includes(appState.settings.cardSize)) appState.settings.cardSize = 'normal';
   appState.auditLogs = Array.isArray(appState.auditLogs) ? appState.auditLogs : [];
   appState.backups = Array.isArray(appState.backups) ? appState.backups : [];
   appState.users = (appState.users || []).map(u => {
@@ -850,7 +854,9 @@ function applyTheme(){
   const resolution = currentResolution();
   const resolvedResolution = effectiveResolution();
   const remoteFast = state.settings?.remoteFastMode !== false;
-  const themeKey = `${dark}|${resolution}|${resolvedResolution}|${isAdminMaster()}|${currentRole ? currentRole() : ''}|${remoteFast}`;
+  const cardLayout = ['grid','list'].includes(state.settings?.cardLayout) ? state.settings.cardLayout : 'grid';
+  const cardSize = ['compact','normal','large'].includes(state.settings?.cardSize) ? state.settings.cardSize : 'normal';
+  const themeKey = `${dark}|${resolution}|${resolvedResolution}|${isAdminMaster()}|${currentRole ? currentRole() : ''}|${remoteFast}|${cardLayout}|${cardSize}`;
   if(window.__lastAppliedThemeKey === themeKey) return;
   window.__lastAppliedThemeKey = themeKey;
   document.documentElement.classList.toggle('theme-dark', dark);
@@ -866,6 +872,10 @@ function applyTheme(){
   ['compact','standard','wide','large'].forEach(v=>{ document.documentElement.classList.toggle(`res-${v}`, resolvedResolution===v); document.body.classList.toggle(`res-${v}`, resolvedResolution===v); });
   document.documentElement.classList.toggle('remote-fast-mode', remoteFast);
   document.body.classList.toggle('remote-fast-mode', remoteFast);
+  ['cards-layout-grid','cards-layout-list'].forEach(cls=>{ document.documentElement.classList.remove(cls); document.body.classList.remove(cls); });
+  ['cards-size-compact','cards-size-normal','cards-size-large'].forEach(cls=>{ document.documentElement.classList.remove(cls); document.body.classList.remove(cls); });
+  document.documentElement.classList.add(`cards-layout-${cardLayout}`, `cards-size-${cardSize}`);
+  document.body.classList.add(`cards-layout-${cardLayout}`, `cards-size-${cardSize}`);
   const btn = qs('#themeToggleBtn');
   if(btn) btn.textContent = dark ? 'Modo Normal' : 'Darkmode';
 }
@@ -3180,8 +3190,69 @@ function configAccordion(title, subtitle, html, options={}){
     <div class="config-accordion-body">${html}</div>
   </details>`;
 }
+function cardsVisualSettingsCard(){
+  if(!isAdminMaster()) return '';
+  const cardLayout = state.settings?.cardLayout || 'grid';
+  const cardSize = state.settings?.cardSize || 'normal';
+  return `<div class="card span-all cards-visual-settings-card">
+    <div class="card-head">
+      <div>
+        <h3>Formato dos cards para todos os users</h3>
+        <span class="muted">Estas opções são globais. O Admin guarda aqui e todos os utilizadores recebem o mesmo visual.</span>
+      </div>
+      <span class="badge blue">Global</span>
+    </div>
+    <form id="cardsVisualForm" class="form-grid">
+      <label class="span2 config-choice-card">
+        <span>Formato dos cards</span>
+        <select class="select" name="cardLayout">
+          <option value="grid" ${cardLayout==='grid'?'selected':''}>Grelha / lado a lado</option>
+          <option value="list" ${cardLayout==='list'?'selected':''}>Seguido / lista</option>
+        </select>
+      </label>
+      <label class="config-choice-card">
+        <span>Tamanho</span>
+        <select class="select" name="cardSize">
+          <option value="compact" ${cardSize==='compact'?'selected':''}>Compacto</option>
+          <option value="normal" ${cardSize==='normal'?'selected':''}>Normal</option>
+          <option value="large" ${cardSize==='large'?'selected':''}>Grande</option>
+        </select>
+      </label>
+      <div class="span3 visual-preview-note">
+        Atual: <strong>${cardLayout==='list'?'Cards seguidos / lista':'Cards em grelha / lado a lado'}</strong> · <strong>${cardSize==='compact'?'Compacto':cardSize==='large'?'Grande':'Normal'}</strong>
+      </div>
+      <div class="span3 actions">
+        <button class="btn primary" type="submit">Guardar visual dos cards</button>
+      </div>
+    </form>
+  </div>`;
+}
+
 function generalSettingsCard(){
-  return `<div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div><form id="settingsForm" class="form-grid"><input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}"><input class="field" name="companyNif" placeholder="NIF" value="${esc(state.settings.companyNif || '')}"><input class="field span3" name="companyAddress" placeholder="Morada" value="${esc(state.settings.companyAddress || '')}"><input class="field" name="companyPhone" placeholder="Telefone empresa" value="${esc(state.settings.companyPhone || '')}"><input class="field" name="companyEmail" placeholder="Email empresa" value="${esc(state.settings.companyEmail || '')}"><input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}"><label class="checkline span2 spellcheck-toggle"><input type="checkbox" name="spellcheckEnabled" ${spellcheckEnabled()?'checked':''}> Correção ortográfica ativa</label><input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}"><div class="span3"><button class="btn primary">Guardar configurações</button></div></form></div>`;
+  const cardLayout = state.settings?.cardLayout || 'grid';
+  const cardSize = state.settings?.cardSize || 'normal';
+  return `<div class="card"><div class="card-head"><h3>Configurações da app</h3><span class="badge blue">v${APP_VERSION}</span></div>
+    <form id="settingsForm" class="form-grid">
+      <input class="field span2" name="companyName" placeholder="Nome da empresa" value="${esc(state.settings.companyName)}">
+      <input class="field" name="companyNif" placeholder="NIF" value="${esc(state.settings.companyNif || '')}">
+      <input class="field span3" name="companyAddress" placeholder="Morada" value="${esc(state.settings.companyAddress || '')}">
+      <input class="field" name="companyPhone" placeholder="Telefone empresa" value="${esc(state.settings.companyPhone || '')}">
+      <input class="field" name="companyEmail" placeholder="Email empresa" value="${esc(state.settings.companyEmail || '')}">
+      <input class="field" name="dailyBackupHour" type="time" value="${esc(state.settings.dailyBackupHour)}">
+      <label class="checkline span2 spellcheck-toggle"><input type="checkbox" name="spellcheckEnabled" ${spellcheckEnabled()?'checked':''}> Correção ortográfica ativa</label>
+      <select class="select" name="cardLayout">
+        <option value="grid" ${cardLayout==='grid'?'selected':''}>Cards em grelha / lado a lado</option>
+        <option value="list" ${cardLayout==='list'?'selected':''}>Cards seguidos / lista</option>
+      </select>
+      <select class="select" name="cardSize">
+        <option value="compact" ${cardSize==='compact'?'selected':''}>Cards compactos</option>
+        <option value="normal" ${cardSize==='normal'?'selected':''}>Cards normais</option>
+        <option value="large" ${cardSize==='large'?'selected':''}>Cards grandes</option>
+      </select>
+      <div class="span3 readonly-note">Estas opções são globais: o Admin guarda aqui e todos os users recebem o mesmo formato dos cards.</div>
+      <input class="field span3" name="githubUrl" placeholder="URL GitHub Pages" value="${esc(state.settings.githubUrl)}">
+      <div class="span3"><button class="btn primary">Guardar configurações</button></div>
+    </form></div>`;
 }
 function firebaseSettingsCard(){
   return `<div class="card"><div class="card-head"><h3>Firebase</h3><span id="firebaseStatusBadge" class="badge ${firebaseReady?'green':'orange'}">${esc(firebaseStatus())}</span></div><p class="muted">A Firebase liga automaticamente ao iniciar sessão. Alterações são guardadas localmente e sincronizadas automaticamente quando houver sessão Firebase com permissões.</p><div class="firebase-status-line"><strong>${firebaseAuth?.currentUser ? 'Sessão Firebase ativa' : 'Sem sessão Firebase ativa'}</strong><span>${firebaseAuth?.currentUser?.isAnonymous ? 'Modo leitura automática. Para escrever na Firebase, entra com uma conta Firebase válida.' : (firebaseAuth?.currentUser?.email || 'A app tenta ligar automaticamente.')}</span></div><div class="actions"><button class="btn primary" id="reconnectFirebaseBtn" type="button">Ligar Firebase</button><button class="btn" id="syncFirebaseBtn" type="button">Sincronizar agora</button><button class="btn" id="exportJsonBtn" type="button">Exportar JSON</button><button class="btn warn" id="resetDemoBtn" type="button">Reset demo</button></div></div>`;
@@ -3217,6 +3288,7 @@ function productionCleanCard(){
 function config(){
   const sections = [
     configAccordion('Geral', 'Empresa, GitHub e correção ortográfica.', generalSettingsCard(), {open:true, icon:'🏢'}),
+    configAccordion('Visual dos Cards', 'Formato em grelha/lista e tamanho global para todos os utilizadores.', cardsVisualSettingsCard(), {open:true, icon:'🧩'}),
     configAccordion('Firebase / Sincronização', 'Sincronizar e exportar dados.', firebaseSettingsCard(), {icon:'☁️'}),
     configAccordion('Diretório', 'Ordem dos armazéns e organização do diretório.', warehouseOrderSettingsCard(), {icon:'📇'}),
     configAccordion('Utilizadores e permissões', 'Permissões por utilizador, página e ação.', permissionsSettingsCard(), {icon:'🛡️'}),
@@ -5109,12 +5181,29 @@ function bindConfig(){
       dailyBackupHour:fd.get('dailyBackupHour'),
       theme:currentTheme(),
       spellcheckEnabled:fd.get('spellcheckEnabled')==='on',
+      cardLayout: ['grid','list'].includes(fd.get('cardLayout')) ? fd.get('cardLayout') : 'grid',
+      cardSize: ['compact','normal','large'].includes(fd.get('cardSize')) ? fd.get('cardSize') : 'normal',
       githubUrl:fd.get('githubUrl'),
       firebaseEnabled:firebaseReady,
       remoteFastMode: state.settings?.remoteFastMode !== false
     };
     saveState(); applyTheme(); refreshConfigPage('Configurações guardadas.');
   });
+  const cardsVisualForm = qs('#cardsVisualForm');
+  if(cardsVisualForm) cardsVisualForm.addEventListener('submit',e=>{
+    e.preventDefault();
+    if(!isAdminMaster()) return toast('Só o Admin Master pode alterar o visual global.');
+    const fd = new FormData(e.target);
+    state.settings = {
+      ...(state.settings || {}),
+      cardLayout: ['grid','list'].includes(fd.get('cardLayout')) ? fd.get('cardLayout') : 'grid',
+      cardSize: ['compact','normal','large'].includes(fd.get('cardSize')) ? fd.get('cardSize') : 'normal'
+    };
+    saveState('Visual dos cards atualizado');
+    applyTheme();
+    refreshConfigPage('Visual dos cards guardado para todos os users.');
+  });
+
   const permissionsForm = qs('#permissionsForm');
   if(permissionsForm) permissionsForm.addEventListener('submit', async e=>{
     e.preventDefault();
