@@ -1,61 +1,44 @@
-{
-  "name": "bragalis-callcenter",
-  "version": "2.9.1",
-  "description": "App Bragalis Callcenter",
-  "main": "electron/main.js",
-  "scripts": {
-    "start": "electron .",
-    "dev": "electron .",
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder",
-    "dist:win": "electron-builder --win --x64",
-    "pack:win": "electron-builder --dir --win --x64",
-    "start:github": "set APP_URL=https://picafern-commits.github.io/App-Callcenter/html/login.html&& electron ."
-  },
-  "author": "",
-  "license": "UNLICENSED",
-  "devDependencies": {
-    "electron": "latest",
-    "electron-builder": "latest"
-  },
-  "build": {
-    "appId": "pt.bragalis.callcenter",
-    "productName": "Bragalis Callcenter",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "html/**/*",
-      "css/**/*",
-      "js/**/*",
-      "assets/**/*",
-      "electron/**/*",
-      "package.json"
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "assets/bragalis-callcenter.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Bragalis Callcenter",
-      "artifactName": "Bragalis-CallCenter-Setup-${version}.${ext}",
-      "installerIcon": "assets/bragalis-callcenter.ico",
-      "uninstallerIcon": "assets/bragalis-callcenter.ico",
-      "installerHeaderIcon": "assets/bragalis-callcenter.ico"
-    },
-    "asar": true,
-    "compression": "maximum"
-  },
-  "productName": "Bragalis Callcenter"
-}
+@echo off
+setlocal
+cd /d "%~dp0"
+
+echo.
+echo ==========================================
+echo  AutoParts CallCenter - Criar instalador
+echo ==========================================
+echo.
+
+set "NPM_CMD=npm"
+where npm >nul 2>nul
+if errorlevel 1 if exist "C:\Program Files\nodejs\npm.cmd" set "NPM_CMD=C:\Program Files\nodejs\npm.cmd"
+if errorlevel 1 if not exist "%NPM_CMD%" (
+  echo Nao encontrei o Node.js / npm neste computador.
+  echo Instala primeiro o Node.js LTS: https://nodejs.org/
+  echo.
+  pause
+  exit /b 1
+)
+
+echo A instalar dependencias...
+call "%NPM_CMD%" install --cache ".\.npm-cache"
+if errorlevel 1 (
+  echo.
+  echo Falhou a instalacao das dependencias.
+  pause
+  exit /b 1
+)
+
+echo.
+echo A criar setup Windows...
+call "%NPM_CMD%" run setup
+if errorlevel 1 (
+  echo.
+  echo Falhou a criacao do setup.
+  pause
+  exit /b 1
+)
+
+echo.
+echo Instalador criado na pasta dist.
+echo.
+pause
