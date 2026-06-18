@@ -1,4 +1,4 @@
-const APP_VERSION = '2.9.3';
+const APP_VERSION = '2.9.5';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -1661,20 +1661,33 @@ function pedidoMainRef(p){
   if(!refs.length) return p.referencia || '-';
   return refs[0].referencia + (refs.length > 1 ? ` +${refs.length-1}` : '');
 }
+function pedidoCreatorName(p){
+  const explicit = p?.createdByName || p?.userName || p?.operador || p?.createdByUser || '';
+  if(explicit) return explicit;
+  const email = p?.createdByEmail || p?.createdBy || p?.updatedBy || p?.history?.[0]?.by || '';
+  if(email) {
+    const user = (state.users || []).find(u => String(u.email || '').toLowerCase() === String(email).toLowerCase());
+    return user?.nome || user?.name || String(email).split('@')[0];
+  }
+  return '';
+}
 function pedidosCards(rows){
   if(!rows.length) return '<div class="empty">Ainda não existem pedidos.</div>';
   return `<div class="clean-card-list pedido-card-list">${rows.map(p=>{
     const refs = pedidoRefsFromLegacy(p);
+    const creator = pedidoCreatorName(p);
+    const fornecedorResumo = uniqueSorted(refs.map(r=>r.codigoFornecedor ? `${r.fornecedor || '-'} (${r.codigoFornecedor})` : r.fornecedor).filter(Boolean)).join(' · ') || '-';
     return `<article class="clean-data-card pedido-data-card pedido-status-${normalizeText(p.estado || 'Pendente').replace(/[^a-z0-9]+/g,'-')}">
+      <div class="card-user-highlight">${ICONS.users}<span>Pedido criado por</span><strong>${esc(creator || '-')}</strong></div>
       <div class="data-card-main">
         <span class="data-card-code big-visible-code">${esc(p.id)}</span>
-        <strong>${esc(p.cliente || '-')}</strong>
-        <small>${esc([p.codigoCliente, p.morada].filter(Boolean).join(' · ') || 'Sem dados de cliente')}</small>
-        <div class="quote-item-mini-list">
-          <span>${refs.length} referência(s) · ${esc(pedidoMainRef(p))}</span>
-          <span>Fornecedor(es): ${esc(uniqueSorted(refs.map(r=>r.codigoFornecedor ? `${r.fornecedor || '-'} (${r.codigoFornecedor})` : r.fornecedor).filter(Boolean)).join(' · ') || '-')}</span>
-          <span>Transporte: ${esc(p.transporte || '-')}</span>
-          <span>Data/Hora: ${esc(formatDatePt(p.createdAt || p.data || today()))} ${esc(p.createdTime || p.hora || '')}</span>
+        <strong class="card-primary-title">${esc(p.cliente || '-')}</strong>
+        <small class="card-secondary-line">${esc([p.codigoCliente, p.morada].filter(Boolean).join(' · ') || 'Sem dados de cliente')}</small>
+        <div class="card-info-grid pedido-info-grid">
+          <span><b>Referências</b><em>${refs.length} · ${esc(pedidoMainRef(p))}</em></span>
+          <span><b>Fornecedor</b><em>${esc(fornecedorResumo)}</em></span>
+          <span><b>Transporte</b><em>${esc(p.transporte || '-')}</em></span>
+          <span><b>Data/Hora</b><em>${esc(formatDatePt(p.createdAt || p.data || today()))} ${esc(p.createdTime || p.hora || '')}</em></span>
         </div>
       </div>
       <div class="quote-value-box">${badge(p.estado || 'Pendente')}</div>
@@ -1812,7 +1825,7 @@ function fornecedores(){
         <div><span class="clean-eyebrow">Fornecedores</span><h3>Lista A-Z</h3></div>
         <div class="clean-stats"><span><b>${rows.length}</b> registos</span></div>
       </div>
-      ${canEdit ? `<div class="quote-page-actions"><button class="btn primary quote-new-btn" type="button" data-create-entity="supplier">+ Adicionar registo</button></div>` : '<div class="readonly-note">Modo leitura: podes consultar os fornecedores, sem adicionar nem editar.</div>'}
+      ${canEdit ? `<div class="quote-page-actions supplier-page-actions"><button class="btn primary quote-new-btn" type="button" data-create-entity="supplier">+ Adicionar registo</button><button class="btn ghost quote-new-btn" type="button" id="supplierBackTopBtn">↑ Topo</button></div>` : '<div class="readonly-note">Modo leitura: podes consultar os fornecedores, sem adicionar nem editar.</div>'}
       <div class="clean-search-row"><input id="supplierSearch" class="field" placeholder="Pesquisar por fornecedor ou código de ficha"></div>
       <div id="suppliersTable">${suppliersTable(rows)}</div>
     </div>
@@ -2283,8 +2296,89 @@ function quoteMainDescription(q){
   const extra = items.length > 1 ? ` +${items.length - 1} ref.` : '';
   return `${first.nome || first.referencia || '-'}${extra}`;
 }
-function quoteItemsInputs(items){
+function quoteListArray(value){
+  if(Array.isArray(value)) return value.map(v=>String(v || '').trim()).filter(Boolean);
+  if(typeof value === 'string' && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      if(Array.isArray(parsed)) return parsed.map(v=>String(v || '').trim()).filter(Boolean);
+    } catch {}
+    return value.split('\n').map(v=>String(v || '').trim()).filter(Boolean);
+  }
+  return [];
+}
+function quoteListFromItems(items, field){
+  return (items || []).map(item=>{
+    if(field === 'refs') return String(item.referencia || item.nome || '').trim();
+    if(field === 'qtds') return String(item.unidade || item.quantidade || 1).trim();
+    return '';
+  }).filter(Boolean);
+}
+function quoteListSnapshot(source={}, items=[]){
+  const refs = quoteListArray(source.listaReferencias || source.quoteListRefsSnapshot || source.quoteListRefs);
+  const qtds = quoteListArray(source.listaQuantidades || source.quoteListQtySnapshot || source.quoteListQtys);
+  return {
+    refs: refs.length ? refs : quoteListFromItems(items, 'refs'),
+    qtds: qtds.length ? qtds : quoteListFromItems(items, 'qtds'),
+    updatedAt: source.listaAtualizadaAt || source.quoteListUpdatedAtSnapshot || '',
+    updatedBy: source.listaAtualizadaPor || source.quoteListUpdatedBySnapshot || ''
+  };
+}
+function quoteListBoxHtml(id, values, emptyText){
+  return `<div id="${id}">${values?.length ? values.map(v=>`<div>${esc(v)}</div>`).join('') : `<span class="muted">${esc(emptyText)}</span>`}</div>`;
+}
+function quoteListHiddenInputs(snapshot){
+  return `<input type="hidden" name="quoteListRefsSnapshot" value="${esc(JSON.stringify(snapshot.refs || []))}">
+    <input type="hidden" name="quoteListQtySnapshot" value="${esc(JSON.stringify(snapshot.qtds || []))}">
+    <input type="hidden" name="quoteListUpdatedAtSnapshot" value="${esc(snapshot.updatedAt || '')}">
+    <input type="hidden" name="quoteListUpdatedBySnapshot" value="${esc(snapshot.updatedBy || '')}">`;
+}
+function readQuoteListSnapshot(form, items=[]){
+  const refs = quoteListArray(form?.querySelector('[name="quoteListRefsSnapshot"]')?.value || '');
+  const qtds = quoteListArray(form?.querySelector('[name="quoteListQtySnapshot"]')?.value || '');
+  return {
+    listaReferencias: refs,
+    listaQuantidades: qtds,
+    listaAtualizadaAt: form?.querySelector('[name="quoteListUpdatedAtSnapshot"]')?.value || '',
+    listaAtualizadaPor: form?.querySelector('[name="quoteListUpdatedBySnapshot"]')?.value || ''
+  };
+}
+function setQuoteListHidden(form, snapshot){
+  const refsInput = form?.querySelector('[name="quoteListRefsSnapshot"]');
+  const qtyInput = form?.querySelector('[name="quoteListQtySnapshot"]');
+  const atInput = form?.querySelector('[name="quoteListUpdatedAtSnapshot"]');
+  const byInput = form?.querySelector('[name="quoteListUpdatedBySnapshot"]');
+  if(refsInput) refsInput.value = JSON.stringify(snapshot.refs || []);
+  if(qtyInput) qtyInput.value = JSON.stringify(snapshot.qtds || []);
+  if(atInput) atInput.value = snapshot.updatedAt || '';
+  if(byInput) byInput.value = snapshot.updatedBy || '';
+}
+function renderQuoteListSnapshot(form, snapshot){
+  const refsBox = form?.querySelector('#quoteFinalRefsList');
+  const qtdBox = form?.querySelector('#quoteQuantidadesList');
+  const stamp = form?.querySelector('#quoteListUpdatedStamp');
+  if(refsBox) refsBox.innerHTML = snapshot.refs?.length ? snapshot.refs.map(v=>`<div>${esc(v)}</div>`).join('') : '<span class="muted">Lista ainda não atualizada.</span>';
+  if(qtdBox) qtdBox.innerHTML = snapshot.qtds?.length ? snapshot.qtds.map(v=>`<div>${esc(v)}</div>`).join('') : '<span class="muted">Sem quantidades.</span>';
+  if(stamp) stamp.textContent = snapshot.updatedAt ? `Último update: ${formatDatePt(snapshot.updatedAt.slice(0,10))} · ${snapshot.updatedBy || '-'}` : 'Ainda sem update guardado.';
+}
+function updateQuoteListByAdmin(form){
+  if(!isAdminMaster()) return toast('Só o Admin Master pode atualizar esta lista.');
+  const items = collectQuoteItems(form);
+  const snapshot = {
+    refs: quoteListFromItems(items, 'refs'),
+    qtds: quoteListFromItems(items, 'qtds'),
+    updatedAt: new Date().toISOString(),
+    updatedBy: preferredUserName('Admin')
+  };
+  setQuoteListHidden(form, snapshot);
+  renderQuoteListSnapshot(form, snapshot);
+  saveQuoteDraft(form);
+  toast('Lista do orçamento atualizada. Guarda o orçamento para ficar gravado.');
+}
+
+function quoteItemsInputs(items, source={}){
   const rows = (items && items.length ? items : [normalizeQuoteItem({})]);
+  const snapshot = quoteListSnapshot(source, rows);
   return `<div class="quote-items-editor" id="quoteItemsEditor">
     <div class="quote-items-head">
       <strong>Referências / peças</strong>
@@ -2295,6 +2389,17 @@ function quoteItemsInputs(items){
     </div>
     <div id="quoteItemsRows">
       ${rows.map((item,idx)=>quoteItemRow(item, idx)).join('')}
+    </div>
+    <div class="quote-admin-list-panel">
+      <div class="pedido-final-summary quote-final-summary">
+        <div class="pedido-final-box"><strong>Lista de Referências</strong>${quoteListBoxHtml('quoteFinalRefsList', snapshot.refs, 'Lista ainda não atualizada.')}</div>
+        <div class="pedido-final-box"><strong>Quantidades</strong>${quoteListBoxHtml('quoteQuantidadesList', snapshot.qtds, 'Sem quantidades.')}</div>
+      </div>
+      <div class="quote-list-update-row">
+        <span id="quoteListUpdatedStamp">${snapshot.updatedAt ? `Último update: ${formatDatePt(snapshot.updatedAt.slice(0,10))} · ${esc(snapshot.updatedBy || '-')}` : 'Ainda sem update guardado.'}</span>
+        ${isAdminMaster()?`<button class="btn primary small" type="button" id="updateQuoteListBtn">Atualizar lista</button>`:`<span class="badge orange">Só Admin Master atualiza</span>`}
+      </div>
+      ${quoteListHiddenInputs(snapshot)}
     </div>
     <div class="quote-items-total"><span>Total orçamento</span><b id="quoteItemsLiveTotal">${money(quoteItemsTotal(rows))}</b></div>
   </div>`;
@@ -2360,6 +2465,11 @@ function bindQuoteItemsEditor(scope=document){
     input.dataset.boundQuoteInput = '1';
     input.addEventListener('input',()=>refreshQuoteItemsTotal(rows));
   });
+  const updateListBtn = rootEl.querySelector('#updateQuoteListBtn');
+  if(updateListBtn && !updateListBtn.dataset.boundQuoteListUpdate){
+    updateListBtn.dataset.boundQuoteListUpdate = '1';
+    updateListBtn.addEventListener('click',()=>updateQuoteListByAdmin(rootEl.querySelector('form') || rootEl.closest?.('form') || qs('#quoteForm') || qs('#editQuoteForm')));
+  }
 }
 
 function quoteDraftKey(){ return 'bragalis_quote_draft_v1'; }
@@ -2388,7 +2498,7 @@ function quoteCreateFormHtmlFromDraft(draft=null){
     <input class="field span3" name="matricula" placeholder="Matrícula" value="${esc(data.matricula||'')}">
     <input class="field span3" name="marcaModelo" placeholder="Marca & Modelo" value="${esc(data.marcaModelo||'')}">
     <input class="field span3" name="motor" placeholder="Motor" value="${esc(data.motor||'')}">
-    <div class="span3">${quoteItemsInputs(items)}</div>
+    <div class="span3">${quoteItemsInputs(items, data)}</div>
     <select class="select" name="estado">${['Rascunho','Enviado','Aceite','Recusado'].map(s=>`<option ${String(data.estado||'Rascunho')===s?'selected':''}>${s}</option>`).join('')}</select>
     <input class="field" name="validade" type="date" value="${esc(data.validade||today())}">
     <input class="field" name="prazoEntrega" placeholder="Prazo de entrega" value="${esc(data.prazoEntrega||'')}">
@@ -2452,12 +2562,18 @@ function quotesTable(rows=state.quotes){
     const items = quoteItemsFromLegacy(q);
     const total = Number(q.total || quoteItemsTotal(items));
     const stateSlug = normalizeText(q.estado || 'Rascunho').replace(/[^a-z0-9]+/g,'-');
+    const creator = quoteCreatorName(q);
     return `<article class="clean-data-card quote-data-card quote-status-${stateSlug}">
+      <div class="card-user-highlight quote-user-highlight">${ICONS.users}<span>Orçamento criado por</span><strong>${esc(creator || '-')}</strong></div>
       <div class="data-card-main">
         <span class="data-card-code big-visible-code">${esc(q.id)}</span>
-        <strong>${esc(q.cliente || '-')}</strong>
-        <small>${esc(quoteVehicleLabel(q))}</small>
-        <div class="quote-item-mini-list"><span>${items.length} referência(s) · ${esc(quoteMainDescription(q))}</span></div>
+        <strong class="card-primary-title">${esc(q.cliente || '-')}</strong>
+        <small class="card-secondary-line">${esc(quoteVehicleLabel(q))}</small>
+        <div class="card-info-grid quote-info-grid">
+          <span><b>Referências</b><em>${items.length} · ${esc(quoteMainDescription(q))}</em></span>
+          <span><b>Validade</b><em>${esc(formatDatePt(q.validade || q.createdAt || today()))}</em></span>
+          <span><b>Total</b><em>${money(total)}</em></span>
+        </div>
       </div>
       <div class="quote-value-box">
         <b>${money(total)}</b>
@@ -4052,6 +4168,17 @@ function bindPedidoRefsEditor(scope=document){
       row.querySelector('[name="pedidoFornecedor[]"]')?.addEventListener('input',()=>updatePedidoRefsSummary(root));
       row.querySelector('[name="pedidoFornecedor[]"]')?.addEventListener('change',()=>updatePedidoRefsSummary(root));
       row.querySelector('[name="pedidoReferenciaOriginal[]"]')?.addEventListener('input',()=>updatePedidoRefsSummary(root));
+      row.querySelector('[name="pedidoReferenciaOriginal[]"]')?.addEventListener('keydown',ev=>{
+        if(ev.key !== 'Tab' || ev.shiftKey) return;
+        const input = ev.currentTarget;
+        if(!String(input.value || '').trim()) return;
+        ev.preventDefault();
+        rows.insertAdjacentHTML('beforeend', pedidoRefRow({}, rows.querySelectorAll('[data-pedido-ref-row]').length));
+        bindPedidoRefsEditor(root);
+        const last = rows.querySelector('[data-pedido-ref-row]:last-child [name="pedidoFornecedor[]"]');
+        last?.focus();
+        updatePedidoRefsSummary(root);
+      });
       row.querySelector('[name="pedidoQuantidade[]"]')?.addEventListener('input',()=>updatePedidoRefsSummary(root));
     }
   });
@@ -4211,7 +4338,8 @@ function bindNewQuoteForm(form){
     const first = items[0];
     const viatura = composeQuoteVehicle(data);
     const creator = currentQuoteCreator();
-    state.quotes.push({ id:nextQuoteId(), createdAt:today(), createdByName:creator.name, createdByEmail:creator.email, estado:data.estado || 'Rascunho', ...data, viatura, items, peca:first.nome, referencia:first.referencia, quantidade:first.unidade, precoUnitario:first.preco, total: quoteItemsTotal(items), history:[{ date:today(), action:'Criado', by:creator.email || '' }] });
+    const listSnapshot = readQuoteListSnapshot(e.target, items);
+    state.quotes.push({ id:nextQuoteId(), createdAt:today(), createdByName:creator.name, createdByEmail:creator.email, estado:data.estado || 'Rascunho', ...data, ...listSnapshot, viatura, items, peca:first.nome, referencia:first.referencia, quantidade:first.unidade, precoUnitario:first.preco, total: quoteItemsTotal(items), history:[{ date:today(), action:'Criado', by:creator.email || '' }] });
     clearQuoteDraft(); saveState(); closeModal(); renderPage('orcamentos'); toast('Orçamento criado.');
   });
 }
@@ -4246,7 +4374,7 @@ function openQuoteModal(id){
     <input class="field span3" name="matricula" placeholder="Matrícula" value="${esc(v.matricula)}">
     <input class="field span3" name="marcaModelo" placeholder="Marca & Modelo" value="${esc(v.marcaModelo)}">
     <input class="field span3" name="motor" placeholder="Motor" value="${esc(v.motor)}">
-    <div class="span3">${quoteItemsInputs(items)}</div>
+    <div class="span3">${quoteItemsInputs(items, q)}</div>
     <select class="select" name="estado">${['Rascunho','Enviado','Aceite','Recusado'].map(s=>`<option ${q.estado===s?'selected':''}>${s}</option>`).join('')}</select>
     <input class="field" name="validade" type="date" value="${esc(q.validade||today())}">
     <input class="field" name="prazoEntrega" placeholder="Prazo de entrega" value="${esc(q.prazoEntrega||'')}">
@@ -4263,7 +4391,8 @@ function openQuoteModal(id){
     const newItems = collectQuoteItems(e.target);
     if(!newItems.length) return toast('Adiciona pelo menos uma referência.');
     const first = newItems[0];
-    Object.assign(q, data, {
+    const listSnapshot = readQuoteListSnapshot(e.target, newItems);
+    Object.assign(q, data, listSnapshot, {
       viatura:composeQuoteVehicle(data),
       items:newItems,
       peca:first.nome,
@@ -5078,6 +5207,11 @@ function openFollowCreateModal(){
 }
 function bindEntities(){
   bindClientMultiContacts(document);
+  qs('#supplierBackTopBtn')?.addEventListener('click',()=>{
+    const content = qs('#pageContent') || document.scrollingElement || document.documentElement;
+    if(content?.scrollTo) content.scrollTo({ top:0, behavior:'smooth' });
+    else window.scrollTo({ top:0, behavior:'smooth' });
+  });
   qsa('[data-create-entity]').forEach(b=>b.addEventListener('click',()=>openCreateEntityModal(b.dataset.createEntity)));
   const map = { client:[state.clients,'clients'], supplier:[state.suppliers,'suppliers'], stock:[state.stock,'stock'], user:[state.users,'users'], follow:[state.followups,'followups'] };
   qsa('[data-delete-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.deleteEntity.split(':'); if(!canDelete()) return toast('Sem permissão para apagar.'); if(type==='user' && !isAdminMaster()) return toast('Só o Admin Master pode alterar utilizadores.'); const target=map[type]; state[target[1]] = target[0].filter(x=>x.id!==id); saveState(); renderPage(currentPage); toast('Registo apagado.'); }));
