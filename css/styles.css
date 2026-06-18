@@ -4667,3 +4667,81 @@ body.theme-dark .pedido-ref-final{
     grid-template-columns:1fr;
   }
 }
+
+
+/* v2.8.9 - Passo 1 Pedidos: cards compactos + detalhe + fornecedor escrito */
+.pedido-card-list{
+  gap:8px!important;
+}
+.pedido-data-card{
+  padding:10px 12px!important;
+  min-height:auto!important;
+}
+.pedido-data-card .big-visible-code{
+  font-size:14px!important;
+  padding:6px 8px!important;
+}
+.pedido-data-card .data-card-main strong{
+  font-size:14px!important;
+}
+.pedido-data-card .data-card-main small{
+  font-size:11px!important;
+}
+.pedido-data-card .quote-item-mini-list{
+  gap:3px!important;
+  margin-top:4px!important;
+  font-size:11px!important;
+}
+.pedido-data-card .data-card-actions .btn{
+  min-height:28px!important;
+  padding:6px 8px!important;
+  font-size:11px!important;
+}
+.pedido-data-card .quote-value-box{
+  min-width:90px!important;
+}
+.pedido-ref-row.fornecedor-por-linha{
+  display:grid;
+  grid-template-columns:220px 1fr 110px auto!important;
+  gap:8px;
+  align-items:center;
+}
+.pedido-final-summary{
+  display:grid;
+  grid-template-columns:1fr 180px;
+  gap:10px;
+  margin-top:10px;
+}
+.pedido-final-box{
+  padding:10px 12px;
+  border-radius:14px;
+  border:1px solid rgba(20,92,151,.12);
+  background:rgba(6,68,127,.045);
+  min-height:74px;
+}
+.pedido-final-box strong{
+  display:block;
+  margin-bottom:6px;
+  color:var(--brand3);
+  font-weight:1000;
+}
+.pedido-final-box div div{
+  padding:3px 0;
+  font-weight:850;
+}
+.pedido-detail-view h4{
+  margin:18px 0 10px;
+}
+body.theme-dark .pedido-final-box{
+  background:rgba(255,255,255,.05);
+  border-color:rgba(255,255,255,.10);
+}
+body.theme-dark .pedido-final-box strong{
+  color:var(--text);
+}
+@media(max-width:920px){
+  .pedido-ref-row.fornecedor-por-linha,
+  .pedido-final-summary{
+    grid-template-columns:1fr!important;
+  }
+}

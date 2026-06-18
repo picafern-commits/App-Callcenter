@@ -1,4 +1,4 @@
-const APP_VERSION = '2.8.8';
+const APP_VERSION = '2.8.9';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -1489,15 +1489,20 @@ function pedidoRefsRows(refs=[normalizePedidoRef({})]){
   const list = refs.length ? refs : [normalizePedidoRef({})];
   return `<div class="pedido-refs-editor">
     <div class="pedido-refs-head"><strong>Referências das peças</strong><button class="btn small ghost" id="addPedidoRefBtn" type="button">+ Adicionar referência</button></div>
+    <datalist id="pedidoFornecedorList">${pedidoSupplierInputOptions()}</datalist>
     <div id="pedidoRefsRows">${list.map((ref,idx)=>pedidoRefRow(ref,idx)).join('')}</div>
+    <div class="pedido-final-summary">
+      <div class="pedido-final-box"><strong>Referência Final</strong><div id="pedidoFinalRefsList"></div></div>
+      <div class="pedido-final-box"><strong>Quantidade</strong><div id="pedidoQuantidadesList"></div></div>
+    </div>
   </div>`;
 }
 function pedidoRefRow(ref={}, idx=0){
   const normalized = normalizePedidoRef(ref);
+  const supplierLabel = normalized.fornecedor ? (normalized.codigoFornecedor ? `${normalized.fornecedor} - ${normalized.codigoFornecedor}` : normalized.fornecedor) : '';
   return `<div class="pedido-ref-row fornecedor-por-linha" data-pedido-ref-row>
-    <select class="select" name="pedidoFornecedor[]">${pedidoSupplierSelectOptions(normalized.codigoFornecedor, normalized.fornecedor)}</select>
+    <input class="field" name="pedidoFornecedor[]" list="pedidoFornecedorList" placeholder="Fornecedor" value="${esc(supplierLabel)}">
     <input class="field" name="pedidoReferenciaOriginal[]" placeholder="Referência ${idx+1}" value="${esc(normalized.referenciaOriginal || stripSupplierPrefix(normalized.referencia, normalized.codigoFornecedor))}" required>
-    <input class="field pedido-ref-final" name="pedidoReferencia[]" placeholder="Referência final" value="${esc(normalized.referencia || '')}" readonly>
     <input class="field" name="pedidoQuantidade[]" type="number" min="1" step="1" placeholder="Qtd." value="${esc(normalized.quantidade || 1)}" required>
     <button class="btn danger-soft small" type="button" data-remove-pedido-ref>×</button>
   </div>`;
@@ -1505,19 +1510,7 @@ function pedidoRefRow(ref={}, idx=0){
 function collectPedidoRefs(form){
   updateAllPedidoRefRows(form);
   const rows = [...form.querySelectorAll('[data-pedido-ref-row]')];
-  return rows.map(row=>{
-    const supplier = parsePedidoSupplierValue(row.querySelector('[name="pedidoFornecedor[]"]')?.value || '');
-    const raw = row.querySelector('[name="pedidoReferenciaOriginal[]"]')?.value || '';
-    const finalRef = prefixReferenceWithSupplier(raw, supplier.codigoFornecedor);
-    const qtd = row.querySelector('[name="pedidoQuantidade[]"]')?.value || 1;
-    return normalizePedidoRef({
-      fornecedor:supplier.fornecedor,
-      codigoFornecedor:supplier.codigoFornecedor,
-      referenciaOriginal:raw,
-      referencia:finalRef,
-      quantidade:qtd
-    });
-  }).filter(r=>r.referencia);
+  return rows.map(row=>normalizePedidoRef(getPedidoRefRowData(row))).filter(r=>r.referencia);
 }
 function transportesList(){
   return uniqueSorted([...(state.settings?.transportes || []), ...(state.calls || []).map(p=>p.transporte).filter(Boolean)]);
@@ -1525,21 +1518,34 @@ function transportesList(){
 function transporteOptions(){
   return transportesList().map(t=>`<option value="${esc(t)}"></option>`).join('');
 }
-function pedidoSupplierSelectOptions(selectedCode='', selectedName=''){
-  const selected = String(selectedCode || '').trim().toLowerCase();
-  const selectedNm = String(selectedName || '').trim().toLowerCase();
-  return `<option value="">Fornecedor</option>` + sortedSuppliers(state.suppliers || []).map(s=>{
+function pedidoSupplierInputOptions(){
+  return sortedSuppliers(state.suppliers || []).map(s=>{
     const name = supplierName(s);
     const code = supplierRef(s);
-    const value = code ? `${name}|${code}` : `${name}|`;
-    const isSelected = (code && code.toLowerCase() === selected) || (name && name.toLowerCase() === selectedNm);
-    return `<option value="${esc(value)}" data-code="${esc(code)}" ${isSelected?'selected':''}>${esc(code ? `${name} - ${code}` : name)}</option>`;
+    const label = code ? `${name} - ${code}` : name;
+    return `<option value="${esc(label)}"></option>`;
   }).join('');
+}
+function findPedidoSupplier(value){
+  const raw = String(value || '').trim().toLowerCase();
+  if(!raw) return null;
+  const parts = raw.split(' - ').map(x=>x.trim());
+  return (state.suppliers || []).find(s=>{
+    const name = String(supplierName(s) || '').toLowerCase();
+    const code = String(supplierRef(s) || '').toLowerCase();
+    const label = code ? `${name} - ${code}` : name;
+    return raw === name || raw === code || raw === label || parts.includes(name) || parts.includes(code) || name.includes(raw) || code.includes(raw);
+  }) || null;
 }
 function parsePedidoSupplierValue(value){
   const raw = String(value || '').trim();
-  const [name='', code=''] = raw.split('|');
-  return { fornecedor:String(name || '').trim(), codigoFornecedor:String(code || '').trim() };
+  const supplier = findPedidoSupplier(raw);
+  if(supplier) return { fornecedor:supplierName(supplier), codigoFornecedor:String(supplierRef(supplier) || '').trim() };
+  if(raw.includes(' - ')) {
+    const parts = raw.split(' - ');
+    return { fornecedor:parts.slice(0,-1).join(' - ').trim(), codigoFornecedor:parts.at(-1).trim() };
+  }
+  return { fornecedor:raw, codigoFornecedor:'' };
 }
 function stripSupplierPrefix(reference, code=''){
   const ref = String(reference || '').trim();
@@ -1556,17 +1562,32 @@ function prefixReferenceWithSupplier(reference, code){
   const cleanRef = stripSupplierPrefix(ref, prefix);
   return `${prefix}-${cleanRef}`;
 }
+function getPedidoRefRowData(row){
+  const supplier = parsePedidoSupplierValue(row?.querySelector('[name="pedidoFornecedor[]"]')?.value || '');
+  const raw = row?.querySelector('[name="pedidoReferenciaOriginal[]"]')?.value || '';
+  const qtd = row?.querySelector('[name="pedidoQuantidade[]"]')?.value || 1;
+  return {
+    fornecedor:supplier.fornecedor,
+    codigoFornecedor:supplier.codigoFornecedor,
+    referenciaOriginal:raw,
+    referencia:prefixReferenceWithSupplier(raw, supplier.codigoFornecedor),
+    quantidade:Number(qtd || 1) || 1
+  };
+}
 function updatePedidoRefRow(row){
-  if(!row) return;
-  const supplier = parsePedidoSupplierValue(row.querySelector('[name="pedidoFornecedor[]"]')?.value || '');
-  const rawInput = row.querySelector('[name="pedidoReferenciaOriginal[]"]');
-  const finalInput = row.querySelector('[name="pedidoReferencia[]"]');
-  if(finalInput) finalInput.value = prefixReferenceWithSupplier(rawInput?.value || '', supplier.codigoFornecedor);
+  return getPedidoRefRowData(row);
+}
+function updatePedidoRefsSummary(form){
+  const rows = [...(form?.querySelectorAll('[data-pedido-ref-row]') || [])];
+  const data = rows.map(getPedidoRefRowData).filter(r=>r.referencia || r.referenciaOriginal);
+  const refsBox = form?.querySelector('#pedidoFinalRefsList');
+  const qtdBox = form?.querySelector('#pedidoQuantidadesList');
+  if(refsBox) refsBox.innerHTML = data.length ? data.map((r,i)=>`<div>${i+1}. ${esc(r.referencia || '-')}</div>`).join('') : '<span class="muted">Sem referências.</span>';
+  if(qtdBox) qtdBox.innerHTML = data.length ? data.map((r,i)=>`<div>${i+1}. ${esc(r.quantidade || 1)}</div>`).join('') : '<span class="muted">Sem quantidades.</span>';
 }
 function updateAllPedidoRefRows(form){
-  form?.querySelectorAll('[data-pedido-ref-row]').forEach(updatePedidoRefRow);
+  updatePedidoRefsSummary(form);
 }
-
 function rememberTransporte(value){
   const v = String(value || '').trim();
   if(!v) return;
@@ -1648,6 +1669,7 @@ function pedidosCards(rows){
       </div>
       <div class="quote-value-box">${badge(p.estado || 'Pendente')}</div>
       <div class="actions data-card-actions">
+        <button class="btn small ghost" data-view-pedido="${p.id}">${ICONS.view}<span>Ver</span></button>
         ${canEditOperational()?`<button class="btn small ghost" data-edit-pedido="${p.id}">${ICONS.edit}<span>Editar</span></button>
         <button class="btn success small" data-confirm-pedido="${p.id}">Confirmar</button>
         <button class="btn warn small" data-cancel-pedido="${p.id}">Cancelar</button>`:''}
@@ -3778,11 +3800,33 @@ function bindPedidos(){
 }
 function bindPedidosActions(){
   qsa('[data-delete-call]').forEach(b=>b.addEventListener('click',()=>{ if(!canDelete()) return toast('Sem permissão para apagar.'); state.calls = state.calls.filter(c=>c.id!==b.dataset.deleteCall); saveState(); renderPage('pedidos'); toast('Pedido apagado.'); }));
+  qsa('[data-view-pedido]').forEach(b=>b.addEventListener('click',()=>openPedidoDetail(b.dataset.viewPedido)));
   qsa('[data-edit-pedido]').forEach(b=>b.addEventListener('click',()=>openPedidoModal(b.dataset.editPedido)));
   qsa('[data-confirm-pedido]').forEach(b=>b.addEventListener('click',()=>updatePedidoStatus(b.dataset.confirmPedido,'Confirmado')));
   qsa('[data-cancel-pedido]').forEach(b=>b.addEventListener('click',()=>updatePedidoStatus(b.dataset.cancelPedido,'Cancelado')));
   qsa('[data-edit-call]').forEach(b=>b.addEventListener('click',()=>openPedidoModal(b.dataset.editCall)));
   qsa('[data-quote]').forEach(b=>b.addEventListener('click',()=>createQuoteFromCall(b.dataset.quote)));
+}
+function openPedidoDetail(id){
+  const p = state.calls.find(x=>x.id===id);
+  if(!p) return toast('Pedido não encontrado.');
+  const refs = pedidoRefsFromLegacy(p);
+  openModal(`Pedido · ${esc(p.id)}`, `<div class="pedido-detail-view">
+    <div class="detail-grid">
+      <div><span>Cliente</span><strong>${esc(p.cliente || '-')}</strong></div>
+      <div><span>Código</span><strong>${esc(p.codigoCliente || '-')}</strong></div>
+      <div><span>Morada</span><strong>${esc(p.morada || '-')}</strong></div>
+      <div><span>Transporte</span><strong>${esc(p.transporte || '-')}</strong></div>
+      <div><span>Data/Hora</span><strong>${esc(formatDatePt(p.createdAt || p.data || today()))} ${esc(p.createdTime || p.hora || '')}</strong></div>
+      <div><span>Estado</span><strong>${esc(p.estado || 'Pendente')}</strong></div>
+    </div>
+    <h4>Referências</h4>
+    <div class="table-wrap">
+      <table><thead><tr><th>Fornecedor</th><th>Código</th><th>Referência original</th><th>Referência final</th><th>Qtd.</th></tr></thead>
+      <tbody>${refs.map(r=>`<tr><td>${esc(r.fornecedor || '-')}</td><td>${esc(r.codigoFornecedor || '-')}</td><td>${esc(r.referenciaOriginal || stripSupplierPrefix(r.referencia, r.codigoFornecedor) || '-')}</td><td><strong>${esc(r.referencia || '-')}</strong></td><td>${esc(r.quantidade || 1)}</td></tr>`).join('')}</tbody></table>
+    </div>
+    ${p.observacoes ? `<h4>Observações</h4><p class="muted">${esc(p.observacoes)}</p>` : ''}
+  </div>`);
 }
 function updatePedidoStatus(id, status){
   const p = state.calls.find(x=>x.id===id);
@@ -3796,7 +3840,6 @@ function updatePedidoStatus(id, status){
 function bindPedidoForm(form, existing=null){
   if(!form) return;
   bindPedidoClientSearch(form);
-  bindPedidoSupplier(form);
   bindPedidoRefsEditor(form);
   const transp = form.querySelector('[name="transporte"]');
   transp?.addEventListener('input',()=>rememberTransporte(transp.value));
@@ -3879,23 +3922,6 @@ function bindPedidoClientSearch(scope=document){
     input.addEventListener('blur', sync);
   }
 }
-function bindPedidoSupplier(scope=document){
-  const form = scope?.querySelector ? scope : document;
-  const input = form.querySelector?.('#pedidoFornecedorInput') || qs('#pedidoFornecedorInput');
-  if(!input || input.dataset.boundPedidoSupplier) return;
-  input.dataset.boundPedidoSupplier = '1';
-  const codeInput = form.querySelector('[name="codigoFornecedor"]');
-  const sync = ()=>{
-    const supplier = findPedidoSupplier(input.value);
-    const code = supplier ? supplierRef(supplier) : supplierCodeFromValue(input.value);
-    const name = supplier ? supplierName(supplier) : supplierNameFromValue(input.value);
-    if(supplier && input.value !== `${name} - ${code}`) input.value = code ? `${name} - ${code}` : name;
-    if(codeInput) codeInput.value = code || '';
-    applySupplierPrefixToPedidoRefs(form);
-  };
-  input.addEventListener('change', sync);
-  input.addEventListener('blur', sync);
-}
 function bindPedidoRefsEditor(scope=document){
   const root = scope && scope.querySelector ? scope : document;
   const rows = root.querySelector('#pedidoRefsRows');
@@ -3907,16 +3933,17 @@ function bindPedidoRefsEditor(scope=document){
       bindPedidoRefsEditor(root);
       const last = rows.querySelector('[data-pedido-ref-row]:last-child [name="pedidoFornecedor[]"]');
       last?.focus();
+      updatePedidoRefsSummary(root);
     });
   }
   rows?.querySelectorAll('[data-pedido-ref-row]').forEach(row=>{
     if(!row.dataset.boundPedidoRow){
       row.dataset.boundPedidoRow = '1';
-      row.querySelector('[name="pedidoFornecedor[]"]')?.addEventListener('change',()=>updatePedidoRefRow(row));
-      row.querySelector('[name="pedidoReferenciaOriginal[]"]')?.addEventListener('input',()=>updatePedidoRefRow(row));
-      row.querySelector('[name="pedidoReferenciaOriginal[]"]')?.addEventListener('blur',()=>updatePedidoRefRow(row));
+      row.querySelector('[name="pedidoFornecedor[]"]')?.addEventListener('input',()=>updatePedidoRefsSummary(root));
+      row.querySelector('[name="pedidoFornecedor[]"]')?.addEventListener('change',()=>updatePedidoRefsSummary(root));
+      row.querySelector('[name="pedidoReferenciaOriginal[]"]')?.addEventListener('input',()=>updatePedidoRefsSummary(root));
+      row.querySelector('[name="pedidoQuantidade[]"]')?.addEventListener('input',()=>updatePedidoRefsSummary(root));
     }
-    updatePedidoRefRow(row);
   });
   rows?.querySelectorAll('[data-remove-pedido-ref]').forEach(btn=>{
     if(btn.dataset.boundPedidoRemove) return;
@@ -3926,13 +3953,14 @@ function bindPedidoRefsEditor(scope=document){
       if(allRows.length <= 1) {
         const row = btn.closest('[data-pedido-ref-row]');
         row?.querySelectorAll('input').forEach(i=>i.value = i.name.includes('Quantidade') ? '1' : '');
-        row?.querySelector('select') && (row.querySelector('select').value = '');
-        updatePedidoRefRow(row);
+        updatePedidoRefsSummary(root);
         return;
       }
       btn.closest('[data-pedido-ref-row]')?.remove();
+      updatePedidoRefsSummary(root);
     });
   });
+  updatePedidoRefsSummary(root);
 }
 
 function upsertPedidoClient(data){
