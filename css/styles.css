@@ -4766,3 +4766,56 @@ body.theme-dark .pedido-final-box strong{
     grid-template-columns:1fr!important;
   }
 }
+
+
+/* v2.9.1 - Formulários em modal + Pedidos ligeiramente maiores */
+.modal-stack-form{
+  display:grid;
+  gap:10px;
+}
+.modal-grid-form{
+  gap:10px;
+}
+.entity-modal-page.single-list,
+.clients-page.single-list,
+.suppliers-page.single-list,
+.contacts-page.single-list,
+.routes-page.single-list,
+.agenda-page.single-list{
+  grid-template-columns:1fr!important;
+}
+.vehicles-inline-box{
+  margin:10px 0 14px;
+}
+.pedido-card-list{
+  grid-template-columns:repeat(auto-fit, minmax(420px, 1fr))!important;
+  gap:16px!important;
+}
+.pedido-data-card{
+  padding:16px 18px!important;
+}
+.pedido-data-card .big-visible-code{
+  font-size:16px!important;
+  padding:7px 10px!important;
+}
+.pedido-data-card .data-card-main strong{
+  font-size:16px!important;
+}
+.pedido-data-card .data-card-main small{
+  font-size:12px!important;
+}
+.pedido-data-card .quote-item-mini-list{
+  font-size:12px!important;
+  gap:5px!important;
+  margin-top:7px!important;
+}
+.pedido-data-card .data-card-actions .btn{
+  min-height:32px!important;
+  padding:7px 10px!important;
+  font-size:12px!important;
+}
+@media(max-width:900px){
+  .pedido-card-list{
+    grid-template-columns:1fr!important;
+  }
+}

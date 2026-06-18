@@ -1,4 +1,4 @@
-const APP_VERSION = '2.9.0';
+const APP_VERSION = '2.9.1';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -1780,81 +1780,53 @@ function clientes(){
   const total = state.clients.length;
   const withEmail = state.clients.filter(c=>normalizeClientContacts(c).emails.length).length;
   const withPhone = state.clients.filter(c=>normalizeClientContacts(c).telefones.length).length;
-  const addCard = canEdit ? `<div class="card compact-form-card clean-side-card">
-      <div class="card-head clean-card-head"><div><h3>Novo cliente</h3><span class="muted">Registo rápido</span></div></div>
-      <form id="clientForm" class="simple-stack-form">
-        ${clientFormHtml({})}
-        <button class="btn primary full" type="submit">Guardar cliente</button>
-      </form>
-    </div>` : '';
-  return `<div class="grid ${canEdit ? 'two split-form-list clean-page-layout' : 'single-list'} clients-page clean-module-page">
-    ${addCard}
+  return `<div class="grid single-list clients-page clean-module-page">
     <div class="card clean-main-card">
       <div class="clean-page-head">
         <div><span class="clean-eyebrow">Clientes</span><h3>Base de clientes</h3></div>
         <div class="clean-stats"><span><b>${total}</b> total</span><span><b>${withEmail}</b> email</span><span><b>${withPhone}</b> telefone</span></div>
       </div>
-      ${!canEdit ? '<div class="readonly-note">Modo leitura: podes consultar dados e enviar emails, mas não podes adicionar nem editar clientes.</div>' : ''}
+      ${canEdit ? `<div class="quote-page-actions"><button class="btn primary quote-new-btn" type="button" data-create-entity="client">+ Adicionar registo</button></div>` : '<div class="readonly-note">Modo leitura: podes consultar dados e enviar emails, mas não podes adicionar nem editar clientes.</div>'}
       <div class="clean-search-row"><input id="clientSearch" class="field" placeholder="Pesquisar cliente, código, telefone, email, morada ou código postal"></div>
       <div id="clientsTable">${clientsTable(state.clients)}</div>
     </div>
   </div>`;
 }
+
 function fornecedores(){
   const canEdit = canEditOperational();
   const rows = sortedSuppliers(state.suppliers);
-  const addCard = canEdit ? `<div class="card compact-form-card clean-side-card">
-      <div class="card-head clean-card-head"><div><h3>Novo fornecedor</h3><span class="muted">Marca + código</span></div></div>
-      <form id="supplierForm" class="simple-stack-form">
-        <input class="field" name="nomeMarca" placeholder="Nome do fornecedor / marca" required>
-        <input class="field" name="codigoFicha" placeholder="Código de ficha" required>
-        <button class="btn primary full" type="submit">Guardar fornecedor</button>
-      </form>
-    </div>` : '';
-  return `<div class="grid ${canEdit ? 'two split-form-list clean-page-layout' : 'single-list'} suppliers-page clean-module-page">
-    ${addCard}
+  return `<div class="grid single-list suppliers-page clean-module-page">
     <div class="card supplier-list-card clean-main-card">
       <div class="clean-page-head">
         <div><span class="clean-eyebrow">Fornecedores</span><h3>Lista A-Z</h3></div>
         <div class="clean-stats"><span><b>${rows.length}</b> registos</span></div>
       </div>
-      ${!canEdit ? '<div class="readonly-note">Modo leitura: podes consultar os fornecedores, sem adicionar nem editar.</div>' : ''}
+      ${canEdit ? `<div class="quote-page-actions"><button class="btn primary quote-new-btn" type="button" data-create-entity="supplier">+ Adicionar registo</button></div>` : '<div class="readonly-note">Modo leitura: podes consultar os fornecedores, sem adicionar nem editar.</div>'}
       <div class="clean-search-row"><input id="supplierSearch" class="field" placeholder="Pesquisar por fornecedor ou código de ficha"></div>
       <div id="suppliersTable">${suppliersTable(rows)}</div>
     </div>
   </div>`;
 }
+
 function contactos(){
   const warehouses = uniqueWarehouses();
   const sections = uniqueSections();
   const canEdit = canEditOperational();
   const totalContacts = contactCount();
-  const addCard = canEdit ? `<div class="card directory-add-card compact-form-card clean-side-card">
-      <div class="card-head clean-card-head"><div><h3>Contacto rápido</h3><span class="muted">Armazém → Secção</span></div></div>
-      <form id="quickContactForm" class="simple-stack-form directory-simple-form">
-        <input class="field" name="armazem" list="warehouseList" placeholder="Armazém" required>
-        <datalist id="warehouseList">${warehouses.map(w=>`<option value="${esc(w)}"></option>`).join('')}</datalist>
-        <input class="field" name="seccao" list="sectionList" placeholder="Secção" required>
-        <datalist id="sectionList">${sections.map(sec=>`<option value="${esc(sec)}"></option>`).join('')}</datalist>
-        <input class="field" name="nome" placeholder="Nome do contacto" required>
-        <div class="mini-two-fields"><input class="field" name="telemovel" placeholder="Telemóvel"><input class="field" name="telefone" placeholder="Telefone"></div>
-        <input class="field" name="email" type="email" placeholder="Email">
-        <button class="btn primary full" type="submit">Guardar contacto</button>
-      </form>
-    </div>` : '';
-  return `<div class="grid ${canEdit ? 'two split-form-list clean-page-layout' : 'single-list'} contacts-page directory-clean-page clean-module-page">
-    ${addCard}
+  return `<div class="grid single-list contacts-page directory-clean-page clean-module-page">
     <div class="card directory-main-card clean-main-card">
       <div class="clean-page-head">
         <div><span class="clean-eyebrow">Diretório</span><h3>Armazéns e secções</h3></div>
         <div class="clean-stats"><span><b>${warehouses.length}</b> armazéns</span><span><b>${sections.length}</b> secções</span><span><b>${totalContacts}</b> contactos</span></div>
       </div>
-      ${!canEdit ? '<div class="readonly-note">Modo leitura: podes consultar contactos, ligar ou enviar email, mas não podes adicionar nem editar.</div>' : ''}
+      ${canEdit ? `<div class="quote-page-actions"><button class="btn primary quote-new-btn" type="button" id="openQuickContactBtn">+ Adicionar registo</button></div>` : '<div class="readonly-note">Modo leitura: podes consultar contactos, ligar ou enviar email, mas não podes adicionar nem editar.</div>'}
       <div class="clean-search-row"><input id="contactSearch" class="field" placeholder="Pesquisar armazém, secção, nome, telefone ou email"></div>
       <div id="contactsTable">${contactGroupsView(filterContactGroups())}</div>
     </div>
   </div>`;
 }
+
 function normalizeContactDirectory(){
   state.contactGroups = (state.contactGroups || []).map(group => {
     const seccao = group.seccao || group.nome || 'Geral';
@@ -2247,8 +2219,19 @@ function usersTable(rows){
   return `<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Email</th><th>Role</th><th>Estado</th><th>Online</th>${actions?'<th>Ações</th>':''}</tr></thead><tbody>${rows.map(u=>`<tr class="${isUserOnline(u)?'user-online-row':''}"><td><strong>${esc(u.nome || '-')}</strong></td><td>${esc(u.email || '-')}</td><td>${badge(u.role || '-')}</td><td>${badge(u.status || '-')}</td><td><span class="badge ${isUserOnline(u)?'green':'blue'}">${esc(userPresenceLabel(u))}</span></td>${actions?`<td><div class="actions">${u.status==='Pendente'?`<button class="btn success small" data-approve-user="${u.id}">Aprovar</button>`:''}<button class="btn small" data-edit-entity="user:${u.id}">Editar</button><button class="btn danger small" data-delete-entity="user:${u.id}">Apagar</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`;
 }
 function entityPage(title, formId, fields, rows, cols, type){
-  return `<div class="grid two"><div class="card"><div class="card-head"><h3>Adicionar ${title}</h3></div><form id="${formId}" class="form-grid">${fields.map(f=>`<input class="field ${f[0]==='notas'?'span3':''}" name="${f[0]}" placeholder="${f[1]}">`).join('')}<div class="span3"><button class="btn primary" type="submit">Guardar</button></div></form></div><div class="card"><div class="card-head"><h3>Lista</h3><span class="muted">${rows.length} registos</span></div>${entityTable(rows, cols, type)}</div></div>`;
+  const canEdit = canEditOperational();
+  return `<div class="grid single-list entity-modal-page clean-module-page">
+    <div class="card clean-main-card">
+      <div class="clean-page-head">
+        <div><span class="clean-eyebrow">${esc(title)}</span><h3>Lista</h3></div>
+        <div class="clean-stats"><span><b>${rows.length}</b> registos</span></div>
+      </div>
+      ${canEdit ? `<div class="quote-page-actions"><button class="btn primary quote-new-btn" type="button" data-create-entity="${esc(type)}">+ Adicionar registo</button></div>` : '<div class="readonly-note">Modo leitura: podes consultar, mas não podes adicionar nem editar.</div>'}
+      ${entityTable(rows, cols, type)}
+    </div>
+  </div>`;
 }
+
 function entityTable(rows, cols, type){
   if(!rows.length) return '<div class="empty">Sem registos.</div>';
   return `<div class="table-wrap"><table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}<th>Ações</th></tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c])}</td>`).join('')}<td><div class="actions">${canEditOperational()?`<button class="btn small" data-edit-entity="${type}:${r.id}">Editar</button>`:'<span class="muted">Consulta</span>'}${canDelete()?`<button class="btn danger small" data-delete-entity="${type}:${r.id}">Apagar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`;
@@ -2546,51 +2529,16 @@ function rotas(){
   const vehicles = uniqueSorted([...routeVehicles().map(v=>v.viatura), ...all.map(r=>r.viatura)]);
   const drivers = uniqueSorted(all.map(r=>r.condutor));
   const totalKm = rows.reduce((sum,r)=>sum + routeKm(r), 0);
-  const addCard = canEdit ? `<div class="routes-left-column">
-    <div class="card compact-form-card clean-side-card">
-      <div class="card-head clean-card-head"><div><h3>Nova rota</h3><span class="muted">Escolhe a viatura e a matrícula entra sozinha</span></div></div>
-      <form id="routeForm" class="simple-stack-form route-form">
-        <select class="select" name="viatura" id="routeVehicleSelect" required>
-          <option value="">Selecionar viatura</option>
-          ${vehicleOptions()}
-        </select>
-        <input class="field" name="matricula" id="routePlateInput" placeholder="Matrícula">
-        <input class="field" name="data" type="date" value="${today()}" required>
-        <input class="field" name="pedidoPor" list="routeRequesterList" placeholder="Pedido por">
-        <datalist id="routeRequesterList">${routeMemoryOptions('pedidoPor')}</datalist>
-        <input class="field" name="destino" list="routeDestinationList" placeholder="Destino / serviço" required>
-        <datalist id="routeDestinationList">${routeMemoryOptions('destino')}</datalist>
-        <select class="select" name="periodo"><option>Manhã</option><option>Tarde</option><option>M</option><option>Dia</option></select>
-        <input class="field" name="carga" placeholder="Carga">
-        <input class="field" name="condutor" list="routeDriverList" placeholder="Condutor">
-        <datalist id="routeDriverList">${routeMemoryOptions('condutor')}</datalist>
-        <div class="mini-two-fields"><input class="field" name="kmInicio" type="number" placeholder="KM início"><input class="field" name="kmFim" type="number" placeholder="KM fim"></div>
-        <div class="mini-two-fields"><input class="field" name="horaInicio" placeholder="Hora início"><input class="field" name="horaFim" placeholder="Hora fim"></div>
-        <textarea name="observacoes" placeholder="Observações"></textarea>
-        <button class="btn primary full" type="submit">Guardar rota</button>
-      </form>
-    </div>
-
-    <div class="card compact-form-card clean-side-card vehicle-file-card">
-      <div class="card-head clean-card-head"><div><h3>Ficha viatura</h3><span class="muted">Criar viatura para usar no select</span></div></div>
-      <form id="vehicleForm" class="simple-stack-form vehicle-form">
-        <input class="field" name="viatura" placeholder="Nome da viatura" required>
-        <input class="field" name="matricula" placeholder="Matrícula" required>
-        <div class="mini-two-fields"><input class="field" name="marca" placeholder="Marca"><input class="field" name="modelo" placeholder="Modelo"></div>
-        <textarea name="observacoes" placeholder="Observações"></textarea>
-        <button class="btn primary full" type="submit">Guardar viatura</button>
-      </form>
-      ${vehiclesMiniTable()}
-    </div>
-  </div>` : '';
-  return `<div class="grid ${canEdit ? 'two split-form-list clean-page-layout routes-layout' : 'single-list'} routes-page clean-module-page">
-    ${addCard}
+  return `<div class="grid single-list routes-page clean-module-page">
     <div class="card clean-main-card routes-main-card">
       <div class="clean-page-head">
         <div><span class="clean-eyebrow">Rotas</span><h3>Mapa de serviços</h3></div>
         <div class="clean-stats"><span><b>${rows.length}</b> registos</span><span><b>${totalKm}</b> km</span><span><b>${vehicles.length}</b> viaturas</span></div>
       </div>
-      ${!canEdit ? '<div class="readonly-note">Modo leitura: podes consultar rotas, mas não podes adicionar nem editar.</div>' : ''}
+      ${canEdit ? `<div class="quote-page-actions">
+        <button class="btn primary quote-new-btn" id="openRouteCreateBtn" type="button">+ Adicionar registo</button>
+        <button class="btn ghost quote-new-btn" id="openVehicleCreateBtn" type="button">+ Adicionar viatura</button>
+      </div>` : '<div class="readonly-note">Modo leitura: podes consultar rotas, mas não podes adicionar nem editar.</div>'}
       <div class="routes-filter-row">
         <input id="routeSearch" class="field" placeholder="Pesquisar viatura, matrícula, destino, condutor, pedido...">
         <select id="routeVehicleFilter" class="select"><option value="">Todas as viaturas</option>${vehicles.map(v=>`<option>${esc(v)}</option>`).join('')}</select>
@@ -2605,10 +2553,12 @@ function rotas(){
         </div>
         <button class="btn danger" id="deleteAllRoutesBtn" type="button">Apagar todos os registos</button>
       </div>` : ''}
+      <div class="vehicles-inline-box">${canEdit ? vehiclesMiniTable() : ''}</div>
       <div id="routesTable">${routesTable(rows)}</div>
     </div>
   </div>`;
 }
+
 function routeKm(r){
   const saved = Number(r.kmPercorridos || 0);
   if(saved) return saved;
@@ -2664,7 +2614,84 @@ function formatDatePt(iso){
   const parts = String(iso).split('-');
   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : iso;
 }
+function routeCreateFormHtml(){
+  return `<form id="routeForm" class="simple-stack-form route-form modal-stack-form">
+    <select class="select" name="viatura" id="routeVehicleSelect" required>
+      <option value="">Selecionar viatura</option>
+      ${vehicleOptions()}
+    </select>
+    <input class="field" name="matricula" id="routePlateInput" placeholder="Matrícula">
+    <input class="field" name="data" type="date" value="${today()}" required>
+    <input class="field" name="pedidoPor" list="routeRequesterList" placeholder="Pedido por">
+    <datalist id="routeRequesterList">${routeMemoryOptions('pedidoPor')}</datalist>
+    <input class="field" name="destino" list="routeDestinationList" placeholder="Destino / serviço" required>
+    <datalist id="routeDestinationList">${routeMemoryOptions('destino')}</datalist>
+    <select class="select" name="periodo"><option>Manhã</option><option>Tarde</option><option>M</option><option>Dia</option></select>
+    <input class="field" name="carga" placeholder="Carga">
+    <input class="field" name="condutor" list="routeDriverList" placeholder="Condutor">
+    <datalist id="routeDriverList">${routeMemoryOptions('condutor')}</datalist>
+    <div class="mini-two-fields"><input class="field" name="kmInicio" type="number" placeholder="KM início"><input class="field" name="kmFim" type="number" placeholder="KM fim"></div>
+    <div class="mini-two-fields"><input class="field" name="horaInicio" placeholder="Hora início"><input class="field" name="horaFim" placeholder="Hora fim"></div>
+    <textarea name="observacoes" placeholder="Observações"></textarea>
+    <button class="btn primary full" type="submit">Guardar rota</button>
+  </form>`;
+}
+function vehicleCreateFormHtml(){
+  return `<form id="vehicleForm" class="simple-stack-form vehicle-form modal-stack-form">
+    <input class="field" name="viatura" placeholder="Nome da viatura" required>
+    <input class="field" name="matricula" placeholder="Matrícula" required>
+    <div class="mini-two-fields"><input class="field" name="marca" placeholder="Marca"><input class="field" name="modelo" placeholder="Modelo"></div>
+    <textarea name="observacoes" placeholder="Observações"></textarea>
+    <button class="btn primary full" type="submit">Guardar viatura</button>
+  </form>`;
+}
+function openRouteCreateModal(){
+  if(!canEditOperational()) return toast('Sem permissão para guardar rotas.');
+  openModal('Nova rota', routeCreateFormHtml());
+  bindRouteCreateForm(qs('#routeForm'));
+}
+function openVehicleCreateModal(){
+  if(!canEditOperational()) return toast('Sem permissão para guardar viaturas.');
+  openModal('Adicionar viatura', vehicleCreateFormHtml());
+  bindVehicleCreateForm(qs('#vehicleForm'));
+}
+function bindRouteCreateForm(form){
+  if(!form) return;
+  const vehicleSelect = form.querySelector('#routeVehicleSelect');
+  if(vehicleSelect) vehicleSelect.addEventListener('change',()=>{
+    const vehicle = vehicleByName(vehicleSelect.value);
+    const plate = form.querySelector('#routePlateInput');
+    if(plate && vehicle?.matricula) plate.value = vehicle.matricula;
+  });
+  form.addEventListener('submit',e=>{
+    e.preventDefault();
+    if(!canEditOperational()) return toast('Sem permissão para guardar rotas.');
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    const route = normalizeRouteData({ id:uid('ROT'), ...data });
+    state.routes = Array.isArray(state.routes) ? state.routes : [];
+    state.routes.push(route);
+    upsertVehicleFromRoute(route);
+    saveState(); closeModal(); renderPage('rotas'); toast('Rota guardada.');
+  });
+}
+function bindVehicleCreateForm(form){
+  if(!form) return;
+  form.addEventListener('submit',e=>{
+    e.preventDefault();
+    if(!canEditOperational()) return toast('Sem permissão para guardar viaturas.');
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    state.vehicles = Array.isArray(state.vehicles) ? state.vehicles : [];
+    const cleanName = String(data.viatura || '').trim();
+    const existing = state.vehicles.find(v=>normalizeText(v.viatura)===normalizeText(cleanName) || (data.matricula && normalizeText(v.matricula)===normalizeText(data.matricula)));
+    const payload = { id: existing?.id || uid('VEI'), viatura:cleanName, matricula:String(data.matricula||'').trim(), marca:String(data.marca||'').trim(), modelo:String(data.modelo||'').trim(), observacoes:String(data.observacoes||'').trim() };
+    if(existing) Object.assign(existing, payload);
+    else state.vehicles.push(payload);
+    saveState(); closeModal(); renderPage('rotas'); toast('Viatura guardada.');
+  });
+}
 function bindRoutes(){
+  qs('#openRouteCreateBtn')?.addEventListener('click', openRouteCreateModal);
+  qs('#openVehicleCreateBtn')?.addEventListener('click', openVehicleCreateModal);
   ['routeSearch','routeVehicleFilter','routeDriverFilter','routeDateFrom','routeDateTo'].forEach(id=>{
     const el = qs('#'+id);
     if(el) el.addEventListener('input',()=>{ qs('#routesTable').innerHTML = routesTable(filterRoutes()); bindRouteActions(); });
@@ -2881,8 +2908,19 @@ function openRouteModal(id){
 }
 
 function agenda(){
-  return `<div class="grid two"><div class="card"><div class="card-head"><h3>Novo follow-up</h3></div><form id="followForm" class="form-grid"><input class="field" type="date" name="date" value="${today()}"><input class="field" type="time" name="time"><input class="field" name="title" placeholder="Título"><input class="field span2" name="related" placeholder="Relacionado com"><select class="select" name="status"><option>Pendente</option><option>Feito</option></select><textarea class="span3" name="notes" placeholder="Notas"></textarea><div class="span3"><button class="btn primary">Guardar</button></div></form></div><div class="card"><div class="card-head"><h3>Agenda</h3></div>${entityTable(state.followups, ['date','time','title','related','status'], 'follow')}</div></div>`;
+  const canEdit = canEditOperational();
+  return `<div class="grid single-list agenda-page clean-module-page">
+    <div class="card clean-main-card">
+      <div class="clean-page-head">
+        <div><span class="clean-eyebrow">Agenda</span><h3>Follow-ups</h3></div>
+        <div class="clean-stats"><span><b>${state.followups.length}</b> registos</span></div>
+      </div>
+      ${canEdit ? `<div class="quote-page-actions"><button class="btn primary quote-new-btn" type="button" id="openFollowCreateBtn">+ Adicionar registo</button></div>` : ''}
+      ${entityTable(state.followups, ['date','time','title','related','status'], 'follow')}
+    </div>
+  </div>`;
 }
+
 function relatorios(){
   const totalVenda = state.calls.reduce((a,c)=>a+Number(c.precoVenda||0),0);
   const totalCompra = state.calls.reduce((a,c)=>a+Number(c.precoCompra||0),0);
@@ -4553,6 +4591,7 @@ function openEditContactModal(groupId, contactId){
 }
 
 function bindContactDirectory(){
+  qs('#openQuickContactBtn')?.addEventListener('click', openQuickContactCreateModal);
   const quickForm = qs('#quickContactForm');
   if(quickForm) quickForm.addEventListener('submit',e=>{
     e.preventDefault();
@@ -4847,8 +4886,127 @@ function upsertAppUser(user){
   const currentEmail = String(state.currentUser?.email || firebaseAuth?.currentUser?.email || '').toLowerCase();
   if(currentEmail && currentEmail === String(user.email || '').toLowerCase()) syncCurrentUserName();
 }
+function createEntityFormHtml(type){
+  if(type==='client') return `<form id="entityCreateForm" data-create-type="client" class="simple-stack-form modal-stack-form">${clientFormHtml({})}<button class="btn primary full" type="submit">Guardar cliente</button></form>`;
+  if(type==='supplier') return `<form id="entityCreateForm" data-create-type="supplier" class="simple-stack-form modal-stack-form">
+    <input class="field" name="nomeMarca" placeholder="Nome do fornecedor / marca" required>
+    <input class="field" name="codigoFicha" placeholder="Código de ficha" required>
+    <button class="btn primary full" type="submit">Guardar fornecedor</button>
+  </form>`;
+  if(type==='stock') return `<form id="entityCreateForm" data-create-type="stock" class="form-grid modal-grid-form">
+    ${[['referencia','Referência'],['nome','Nome da peça'],['marca','Marca'],['modelo','Modelo compatível'],['estado','Nova / Usada / Recondicionada'],['local','Localização'],['custo','Preço custo'],['venda','Preço venda'],['qtd','Quantidade']].map(f=>`<input class="field" name="${f[0]}" placeholder="${f[1]}">`).join('')}
+    <div class="span3"><button class="btn primary" type="submit">Guardar registo</button></div>
+  </form>`;
+  return '';
+}
+function createEntityTitle(type){
+  return type==='client' ? 'Adicionar cliente' : type==='supplier' ? 'Adicionar fornecedor' : type==='stock' ? 'Adicionar stock' : 'Adicionar registo';
+}
+function openCreateEntityModal(type){
+  if(!canEditOperational()) return toast('Sem permissão para guardar.');
+  const html = createEntityFormHtml(type);
+  if(!html) return toast('Tipo de registo não suportado.');
+  openModal(createEntityTitle(type), html);
+  bindClientMultiContacts(qs('#entityCreateForm'));
+  bindCreateEntityForm(qs('#entityCreateForm'));
+}
+function bindCreateEntityForm(form){
+  if(!form || form.dataset.boundCreateEntity) return;
+  form.dataset.boundCreateEntity = '1';
+  form.addEventListener('submit', async e=>{
+    e.preventDefault();
+    if(!canEditOperational()) return toast('Sem permissão para guardar.');
+    const type = form.dataset.createType;
+    const map = { client:['clients','CLI'], supplier:['suppliers','FOR'], stock:['stock','STK'] };
+    const target = map[type];
+    if(!target) return toast('Tipo de registo inválido.');
+    const [key,prefix] = target;
+    let row = { id:uid(prefix), ...Object.fromEntries(new FormData(form).entries()) };
+    if(type==='client') row = { ...row, ...collectClientContacts(form) };
+    state[key] = Array.isArray(state[key]) ? state[key] : [];
+    state[key].push(row);
+    if(key==='suppliers') sortSuppliersState();
+    try{
+      const ok = await saveSingleRowToFirebase(key, row);
+      if(!ok) saveState();
+      closeModal();
+      renderPage(currentPage);
+      toast('Registo guardado.');
+    }catch(err){
+      console.warn('Firebase save failed', err);
+      state[key] = state[key].filter(x=>x.id!==row.id);
+      closeModal();
+      renderPage(currentPage);
+      toast('Erro ao guardar registo.');
+    }
+  });
+}
+function quickContactCreateFormHtml(){
+  const warehouses = uniqueWarehouses();
+  const sections = uniqueSections();
+  return `<form id="quickContactCreateForm" class="simple-stack-form directory-simple-form modal-stack-form">
+    <input class="field" name="armazem" list="warehouseList" placeholder="Armazém" required>
+    <datalist id="warehouseList">${warehouses.map(w=>`<option value="${esc(w)}"></option>`).join('')}</datalist>
+    <input class="field" name="seccao" list="sectionList" placeholder="Secção" required>
+    <datalist id="sectionList">${sections.map(sec=>`<option value="${esc(sec)}"></option>`).join('')}</datalist>
+    <input class="field" name="nome" placeholder="Nome do contacto" required>
+    <div class="mini-two-fields"><input class="field" name="telemovel" placeholder="Telemóvel"><input class="field" name="telefone" placeholder="Telefone"></div>
+    <input class="field" name="email" type="email" placeholder="Email">
+    <button class="btn primary full" type="submit">Guardar contacto</button>
+  </form>`;
+}
+function openQuickContactCreateModal(){
+  if(!canEditOperational()) return toast('Sem permissão para alterar contactos.');
+  openModal('Adicionar contacto', quickContactCreateFormHtml());
+  bindQuickContactCreateForm(qs('#quickContactCreateForm'));
+}
+function bindQuickContactCreateForm(form){
+  if(!form) return;
+  form.addEventListener('submit',e=>{
+    e.preventDefault();
+    if(!canEditOperational()) return toast('Sem permissão para alterar contactos.');
+    normalizeContactDirectory();
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    const armazem = (data.armazem || '').trim();
+    const seccao = (data.seccao || '').trim();
+    if(!armazem || !seccao || !data.nome?.trim()) return toast('Preenche armazém, secção e nome.');
+    let group = (state.contactGroups || []).find(g => contactWarehouse(g).toLowerCase() === armazem.toLowerCase() && contactSection(g).toLowerCase() === seccao.toLowerCase());
+    if(!group){
+      group = { id:uid('DIR'), armazem, seccao, nome:seccao, aberto:false, contactos:[] };
+      state.contactGroups.push(group);
+    }
+    group.contactos = group.contactos || [];
+    group.contactos.push({
+      id:uid('CNT'),
+      nome:(data.nome || '').trim(),
+      telemovel:(data.telemovel || '').trim(),
+      telefone:(data.telefone || '').trim(),
+      email:(data.email || '').trim()
+    });
+    group.aberto = true;
+    setDirectoryRuntimeOpen(group.id, true);
+    saveState(); closeModal(); renderPage('contactos'); toast('Contacto adicionado.');
+  });
+}
+function followCreateFormHtml(){
+  return `<form id="followForm" class="form-grid modal-grid-form">
+    <input class="field" type="date" name="date" value="${today()}">
+    <input class="field" type="time" name="time">
+    <input class="field" name="title" placeholder="Título">
+    <input class="field span2" name="related" placeholder="Relacionado com">
+    <select class="select" name="status"><option>Pendente</option><option>Feito</option></select>
+    <textarea class="span3" name="notes" placeholder="Notas"></textarea>
+    <div class="span3"><button class="btn primary">Guardar</button></div>
+  </form>`;
+}
+function openFollowCreateModal(){
+  if(!canEditOperational()) return toast('Sem permissão para guardar.');
+  openModal('Novo follow-up', followCreateFormHtml());
+  bindFollowForm();
+}
 function bindEntities(){
   bindClientMultiContacts(document);
+  qsa('[data-create-entity]').forEach(b=>b.addEventListener('click',()=>openCreateEntityModal(b.dataset.createEntity)));
   const map = { client:[state.clients,'clients'], supplier:[state.suppliers,'suppliers'], stock:[state.stock,'stock'], user:[state.users,'users'], follow:[state.followups,'followups'] };
   qsa('[data-delete-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.deleteEntity.split(':'); if(!canDelete()) return toast('Sem permissão para apagar.'); if(type==='user' && !isAdminMaster()) return toast('Só o Admin Master pode alterar utilizadores.'); const target=map[type]; state[target[1]] = target[0].filter(x=>x.id!==id); saveState(); renderPage(currentPage); toast('Registo apagado.'); }));
   qsa('[data-edit-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.editEntity.split(':'); if(type==='user' && !isAdminMaster()) return toast('Só o Admin Master pode alterar utilizadores.'); openEntityModal(type,id); }));
@@ -4910,7 +5068,16 @@ function openEntityReadModal(type,id){
   openModal('Detalhe do registo', `<div class="detail-grid">${fields.map(([k,v])=>`<div><small>${esc(k)}</small><strong>${esc(v || '-')}</strong></div>`).join('')}</div>`);
 }
 function bindFollowForm(){
-  qs('#followForm').addEventListener('submit',e=>{ e.preventDefault(); state.followups.push({id:uid('AGE'),...Object.fromEntries(new FormData(e.target).entries())}); saveState(); renderPage('agenda'); toast('Follow-up guardado.'); });
+  qs('#openFollowCreateBtn')?.addEventListener('click', openFollowCreateModal);
+  const form = qs('#followForm');
+  if(!form || form.dataset.boundFollowForm) return;
+  form.dataset.boundFollowForm = '1';
+  form.addEventListener('submit',e=>{
+    e.preventDefault();
+    if(!canEditOperational()) return toast('Sem permissão para guardar.');
+    state.followups.push({id:uid('AGE'),...Object.fromEntries(new FormData(e.target).entries())});
+    saveState(); closeModal(); renderPage('agenda'); toast('Follow-up guardado.');
+  });
 }
 
 function refreshConfigPage(message){
