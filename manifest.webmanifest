@@ -1,0 +1,80 @@
+{
+  "id": "./html/login.html",
+  "name": "Bragalis Callcenter",
+  "short_name": "Bragalis",
+  "description": "App Bragalis Callcenter",
+  "start_url": "./html/login.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
+  "orientation": "any",
+  "background_color": "#070b16",
+  "theme_color": "#06447f",
+  "categories": [
+    "business",
+    "productivity",
+    "utilities"
+  ],
+  "lang": "pt-PT",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "assets/bragalis-callcenter-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/bragalis-callcenter-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/bragalis-callcenter-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "./html/dashboard.html",
+      "icons": [
+        {
+          "src": "assets/bragalis-callcenter-icon.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Orçamentos",
+      "short_name": "Orçamentos",
+      "url": "./html/orcamentos.html",
+      "icons": [
+        {
+          "src": "assets/bragalis-callcenter-icon.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Rotas",
+      "short_name": "Rotas",
+      "url": "./html/rotas.html",
+      "icons": [
+        {
+          "src": "assets/bragalis-callcenter-icon.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

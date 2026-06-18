@@ -1,0 +1,61 @@
+{
+  "name": "bragalis-callcenter",
+  "version": "2.8.8",
+  "description": "App Bragalis Callcenter",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win --x64",
+    "pack:win": "electron-builder --dir --win --x64",
+    "start:github": "set APP_URL=https://picafern-commits.github.io/App-Callcenter/html/login.html&& electron ."
+  },
+  "author": "",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest"
+  },
+  "build": {
+    "appId": "pt.bragalis.callcenter",
+    "productName": "Bragalis Callcenter",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "html/**/*",
+      "css/**/*",
+      "js/**/*",
+      "assets/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/bragalis-callcenter.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Bragalis Callcenter",
+      "artifactName": "Bragalis-CallCenter-Setup-${version}.${ext}",
+      "installerIcon": "assets/bragalis-callcenter.ico",
+      "uninstallerIcon": "assets/bragalis-callcenter.ico",
+      "installerHeaderIcon": "assets/bragalis-callcenter.ico"
+    },
+    "asar": true,
+    "compression": "maximum"
+  },
+  "productName": "Bragalis Callcenter"
+}

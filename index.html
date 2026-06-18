@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="refresh" content="0; url=html/index.html">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bragalis Callcenter</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#06447f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="Bragalis Callcenter">
+  <link rel="apple-touch-icon" href="assets/bragalis-callcenter-icon.png">
+  <link rel="icon" href="assets/bragalis-callcenter-icon.png">
+</head>
+<body style="margin:0;background:#070b16;color:white;font-family:Arial,sans-serif;display:grid;place-items:center;min-height:100vh">
+  <a href="html/index.html" style="color:white">Abrir Bragalis Callcenter</a>
+  <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('./sw.js').catch(function(err){
+        console.warn('Service Worker não registado:', err);
+      });
+    });
+  }
+</script>
+</body>
+</html>
