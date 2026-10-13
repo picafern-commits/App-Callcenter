@@ -1,4 +1,4 @@
-const APP_VERSION = '2.9.4';
+const APP_VERSION = '2.9.41';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -16,10 +16,14 @@ const FIREBASE_COLLECTIONS = {
   vehicles: 'viaturas',
   followups: 'agenda',
   stock: 'stock',
+  references: 'referenciasEmpresa',
   users: 'utilizadores',
   contactGroups: 'diretorioContactos',
   auditLogs: 'auditoria',
-  backups: 'backups'
+  backups: 'backups',
+  engineCatalog: 'catalogoMotor',
+  engineCatalogEngines: 'catalogoMotores',
+  engineCatalogTypes: 'catalogoTiposPeca'
 };
 const firebaseConfig = {
   apiKey: "AIzaSyDlSqa8bPMGmYMgla-vn7j73eJyp0_eVJI",
@@ -33,6 +37,7 @@ const firebaseConfig = {
 let firebaseReady = false;
 let firebaseAuth = null;
 let firebaseDb = null;
+let firebaseStorage = null;
 let cloudSaveTimer = null;
 let firebaseUnsubscribers = [];
 let pendingSignupUser = null;
@@ -53,6 +58,7 @@ function svgIcon(pathD, viewBox='0 0 24 24'){
 }
 const ICONS = {
   dashboard: svgIcon('M3 13.2h8V3H3zm10 7.8h8V11h-8zM3 21h8v-5.8H3zm10-10h8V3h-8z'),
+  search: svgIcon('M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm6-2 4 4'),
   clientes: svgIcon('M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M9.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8m9.5 10v-2a4 4 0 0 0-3-3.87M14.5 3.13a4 4 0 0 1 0 7.75'),
   contactos: svgIcon('M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.09 2h3a2 2 0 0 1 2 1.72c.13.98.37 1.94.72 2.86a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.22-1.27a2 2 0 0 1 2.1-.45c.92.35 1.88.59 2.86.72A2 2 0 0 1 22 16.9'),
   fornecedores: svgIcon('M3 21h18M5 21V7l7-4 7 4v14M9 9h6M9 13h6M9 17h6'),
@@ -67,7 +73,8 @@ const ICONS = {
   copy: svgIcon('M9 9h10v12H9zM5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'),
   edit: svgIcon('M12 20h9M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4Z'),
   view: svgIcon('M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6'),
-  arrow: svgIcon('M5 12h14M12 5l7 7-7 7')
+  arrow: svgIcon('M5 12h14M12 5l7 7-7 7'),
+  catalogo: svgIcon('M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z')
 };
 
 const pages = [
@@ -75,9 +82,7 @@ const pages = [
   { id: 'clientes', icon: ICONS.clientes, title: 'Clientes', short: 'Clientes', subtitle: 'Fichas, histórico e contactos' },
   { id: 'contactos', icon: ICONS.contactos, title: 'Diretório de contactos', short: 'Diretório', subtitle: 'Pesquisa rápida de clientes e fornecedores' },
   { id: 'fornecedores', icon: ICONS.fornecedores, title: 'Fornecedores', short: 'Fornecedores', subtitle: 'Lista de fornecedores e referências' },
-  { id: 'rotas', icon: ICONS.rotas, title: 'Rotas', short: 'Rotas', subtitle: 'Registo de viaturas, serviços, cargas e quilómetros' },
-  { id: 'pedidos', icon: ICONS.orcamentos, title: 'Pedidos', short: 'Pedidos', subtitle: 'Pedidos de peças e referências' },
-  { id: 'orcamentos', icon: ICONS.orcamentos, title: 'Orçamentos', short: 'Orçamentos', subtitle: 'Criar, enviar e acompanhar propostas' },
+  { id: 'referencias', icon: ICONS.catalogo, title: 'Referências', short: 'Referências', subtitle: 'Base geral de referências da empresa' },
   { id: 'users', icon: ICONS.users, title: 'Utilizadores', short: 'Users', subtitle: 'Equipa, cargos e permissões' },
   { id: 'configs-user', icon: ICONS.configsUser, title: 'Minhas Configs', short: 'Configs', subtitle: 'Tema e preferências do utilizador' },
   { id: 'config', icon: ICONS.config, title: 'Configurações', short: 'Admin', subtitle: 'GitHub, Electron, Firebase e backups' }
@@ -88,10 +93,8 @@ const pageFiles = {
   clientes: 'clientes.html',
   contactos: 'contactos.html',
   fornecedores: 'fornecedores.html',
-  rotas: 'rotas.html',
-  orcamentos: 'orcamentos.html',
+  referencias: 'referencias.html',
   'nova-chamada': 'nova-chamada.html',
-  pedidos: 'pedidos.html',
   agenda: 'agenda.html',
   stock: 'stock.html',
   relatorios: 'relatorios.html',
@@ -133,29 +136,23 @@ function seedData() {
     },
     currentUser: null,
     calls: [
-      { id: uid('PED'), createdAt: today(), cliente:'João Silva', telefone:'912345678', email:'', matricula:'12-AB-34', marca:'BMW', modelo:'320d', ano:'2016', motor:'2.0 Diesel', vin:'', peca:'Alternador', referencia:'ALT-320D', urgencia:'Urgente', estado:'Em pesquisa', operador:'Ricardo', observacoes:'Cliente quer resposta ainda hoje.', fornecedor:'Fornecedor Norte', precoCompra:120, precoVenda:185 },
-      { id: uid('PED'), createdAt: today(), cliente:'Auto Oficina Braga', telefone:'253000000', email:'geral@oficina.pt', matricula:'88-ZZ-10', marca:'Mercedes', modelo:'Classe A', ano:'2019', motor:'A180d', vin:'', peca:'Farol frente esquerdo', referencia:'FRL-A180', urgencia:'Normal', estado:'Orçamento enviado', operador:'Fátima', observacoes:'Enviar alternativa nova e usada.', fornecedor:'Stock Sul', precoCompra:210, precoVenda:310 }
     ],
     clients: [
-      { id: uid('CLI'), codigoCliente:'CLI-001', nome:'João Silva', telefone:'912345678', email:'', notas:'Prefere contacto por WhatsApp.' },
-      { id: uid('CLI'), codigoCliente:'CLI-002', nome:'Auto Oficina Braga', telefone:'253000000', email:'geral@oficina.pt', notas:'Cliente profissional.' }
     ],
     suppliers: [
-      { id: uid('FOR'), nomeMarca:'Fornecedor Norte', codigoFicha:'FOR-001' },
-      { id: uid('FOR'), nomeMarca:'Stock Sul', codigoFicha:'FOR-002' }
     ],
     quotes: [],
     vehicles: [],
     routes: [],
     followups: [
-      { id: uid('AGE'), date: today(), time:'15:00', title:'Ligar ao João Silva', related:'Alternador BMW', status:'Pendente', notes:'Confirmar se aceita orçamento.' }
     ],
     stock: [
-      { id: uid('STK'), referencia:'ALT-BMW-F30', nome:'Alternador BMW Série 3 F30', marca:'BMW', modelo:'320d', estado:'Recondicionada', local:'Prateleira A2', custo:110, venda:190, qtd:1 }
     ],
+    references: [],
+    engineCatalog: [],
+    engineCatalogEngines: [],
+    engineCatalogTypes: [],
     users: [
-      { id: uid('USR'), nome:'Ricardo', email:'pica.fern@gmail.com', role:'Admin Master', status:'Ativo', pageAccess:{}, actionAccess:{} },
-      { id: uid('USR'), nome:'Operador 1', email:'operador@empresa.pt', role:'Operador', status:'Ativo', pageAccess:{}, actionAccess:{} }
     ],
     auditLogs: [],
     backups: [],
@@ -167,8 +164,6 @@ function seedData() {
         nome:'Callcenter',
         aberto:true,
         contactos:[
-          { id: uid('CNT'), nome:'Ricardo', telemovel:'912345678', telefone:'213000000', email:'pica.fern@gmail.com' },
-          { id: uid('CNT'), nome:'Operador Lisboa', telemovel:'913000000', telefone:'213000001', email:'lisboa@empresa.pt' }
         ]
       },
       {
@@ -178,7 +173,6 @@ function seedData() {
         nome:'Apoio',
         aberto:false,
         contactos:[
-          { id: uid('CNT'), nome:'Apoio Porto', telemovel:'914000000', telefone:'223000000', email:'porto@empresa.pt' }
         ]
       }
     ]
@@ -203,9 +197,13 @@ function ensureStateShape(appState){
     return next;
   });
   appState.contactGroups = Array.isArray(appState.contactGroups) ? appState.contactGroups : [];
+  appState.engineCatalog = Array.isArray(appState.engineCatalog) ? appState.engineCatalog : [];
+  appState.engineCatalogEngines = Array.isArray(appState.engineCatalogEngines) ? appState.engineCatalogEngines : [];
+  appState.engineCatalogTypes = Array.isArray(appState.engineCatalogTypes) ? appState.engineCatalogTypes : [];
   appState.calls = Array.isArray(appState.calls) ? appState.calls : [];
   appState.settings.transportes = Array.isArray(appState.settings.transportes) ? appState.settings.transportes : [];
   appState.suppliers = Array.isArray(appState.suppliers) ? appState.suppliers : [];
+  appState.references = Array.isArray(appState.references) ? appState.references : [];
   appState.routes = Array.isArray(appState.routes) ? appState.routes : [];
   appState.vehicles = Array.isArray(appState.vehicles) ? appState.vehicles : deriveVehiclesFromRoutes(appState.routes || []);
   appState.quotes = (Array.isArray(appState.quotes) ? appState.quotes : []).map(q=>{ const items = quoteItemsFromLegacy(q); return { ...q, items, total: quoteItemsTotal(items) }; });
@@ -418,6 +416,7 @@ async function pushCloudState(options = {}){
   }
 }
 function canSyncCollectionKey(stateKey){
+  if(stateKey === 'references') return false;
   if(isAdminMaster()) return true;
   if(stateKey === 'users') return false;
   if(stateKey === 'auditLogs' || stateKey === 'backups') return false;
@@ -429,8 +428,12 @@ function canSyncCollectionKey(stateKey){
     vehicles:'rotas',
     followups:'agenda',
     stock:'stock',
+    references:'referencias',
     contactGroups:'contactos',
-    calls:'pedidos'
+    calls:'pedidos',
+    engineCatalog:'catalogo-motor',
+    engineCatalogEngines:'catalogo-motor',
+    engineCatalogTypes:'catalogo-motor'
   };
   const pageId = pageByKey[stateKey] || currentPage;
   return canAction('add', pageId) || canAction('edit', pageId) || canAction('delete', pageId);
@@ -442,6 +445,9 @@ const PAGE_COLLECTION_KEYS = {
   clientes:['clients'],
   contactos:['contactGroups'],
   fornecedores:['suppliers'],
+  // Referências são consultadas por pesquisa paginada; nunca descarregar a coleção inteira.
+  referencias:[],
+  'catalogo-motor':['engineCatalogEngines','engineCatalogTypes','engineCatalog'],
   rotas:['routes','vehicles'],
   orcamentos:['quotes','clients'],
   agenda:['followups'],
@@ -484,11 +490,16 @@ async function ensurePageCollections(pageId){
   return results.some(Boolean);
 }
 
-function canLoadCollectionKey(stateKey){
-  // Coleções administrativas podem estar bloqueadas nas rules.
-  // A app não deve falhar toda só porque auditoria/backups não estão acessíveis.
-  return true;
+async function canLoadCollectionKey(stateKey) {
+  // 1. Liberta o catálogo imediatamente
+  if (stateKey === 'catalogoMotores' || stateKey === 'catalogoMotors' || stateKey === 'catalogoTiposPeca') {
+    return true;
+  }
+  
+  // 2. Retorno padrão seguro
+  return false;
 }
+
 async function safeLoadCollection(stateKey, collectionName){
   try {
     const snap = await firebaseDb.collection(collectionName).get();
@@ -540,6 +551,7 @@ async function saveFirebaseCollections(){
     if(important.length) throw errors[0][1];
   }
 }
+
 async function syncCollection(collectionName, rows, allowDelete=false){
   const collectionRef = firebaseDb.collection(collectionName);
   const existing = await collectionRef.get();
@@ -575,11 +587,13 @@ async function syncCollection(collectionName, rows, allowDelete=false){
 
   await commitIfNeeded(true);
 }
+
 async function saveSingleRowToFirebase(stateKey, row){
   if(!hasWritableFirebaseSession()) return false;
   const collectionName = FIREBASE_COLLECTIONS[stateKey];
   if(!collectionName || !row?.id) return false;
   const payload = sanitizeRowForFirestore(row);
+  if(stateKey === 'references') Object.assign(payload, referenceSearchFields(row));
   payload.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
   payload.updatedBy = firebaseAuth.currentUser.email || '';
   await firebaseDb.collection(collectionName).doc(row.id).set(payload, { merge:true });
@@ -620,7 +634,7 @@ async function loadCloudState(options = {}){
     let loadedCollections = 0;
     firebaseLoadedKeys = new Set();
     const loadKeys = options.full === true
-      ? Object.keys(FIREBASE_COLLECTIONS).filter(k=>!['auditLogs','backups'].includes(k))
+      ? Object.keys(FIREBASE_COLLECTIONS).filter(k=>!['auditLogs','backups','references'].includes(k))
       : initialFirebaseKeys();
     const entries = Object.entries(FIREBASE_COLLECTIONS)
       .filter(([stateKey]) => loadKeys.includes(stateKey))
@@ -657,7 +671,11 @@ async function loadCloudState(options = {}){
   }
 }
 function cleanFirebaseDoc(doc){
-  const normalizeDate = value => value?.toDate ? value.toDate().toISOString() : value;
+  const normalizeDate = value => {
+    if (!value) return '';
+    if (value.toDate && typeof value.toDate === 'function') return value.toDate().toISOString();
+    return String(value);
+  };
   return {
     ...doc,
     createdAt: normalizeDate(doc.createdAt),
@@ -744,9 +762,11 @@ async function initFirebase(){
     await loadScript('https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js');
     await loadScript('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js');
     await loadScript('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js');
+    await loadScript('https://www.gstatic.com/firebasejs/10.12.5/firebase-storage-compat.js');
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     firebaseAuth = firebase.auth();
     firebaseDb = firebase.firestore();
+    firebaseStorage = firebase.storage();
     firebaseReady = true;
     return true;
   } catch (err) {
@@ -1304,7 +1324,7 @@ function renderPage(id){
   qs('#pageTitle').textContent = meta.title;
   qs('#pageSubtitle').textContent = meta.subtitle;
   qsa('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.page===id));
-  const renderers = { dashboard, 'nova-chamada': novaChamada, pedidos, clientes, contactos, fornecedores, rotas, orcamentos, agenda, stock, relatorios, users, 'configs-user': configsUser, config };
+  const renderers = { dashboard, 'nova-chamada': novaChamada, clientes, contactos, fornecedores, referencias, agenda, stock, relatorios, users, 'configs-user': configsUser, config };
   const paint = ()=>{
     const pageBody = renderers[id]();
     const content = qs('#pageContent');
@@ -1354,6 +1374,9 @@ function currentDisplayName(){
 }
 function normalizeText(v){
   return String(v || '').trim().toLowerCase();
+}
+function normalizeSearchText(v){
+  return normalizeText(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 function isMineByOperator(row){
   const appUser = currentAppUser();
@@ -1431,22 +1454,64 @@ function dashboard(){
     </div>`;
 }
 function metric(label,value,note){ return `<div class="card metric"><div class="label">${label}</div><div class="value">${value}</div><div class="note">${note}</div></div>`; }
+function globalSearchCollectionReady(key){
+  // Em modo local, os dados existentes no estado também são pesquisáveis.
+  return !firebaseReady || firebaseLoadedKeys.has(key);
+}
 function globalSearchRows(){
   const rows = [];
-  if(firebaseLoadedKeys.has('clients')) rows.push(...state.clients.map(c=>({ type:'Cliente', title:c.nome, detail:`${clientCode(c)} · ${c.telefone || ''} · ${c.email || ''}`, page:'clientes', id:c.id })));
-  if(firebaseLoadedKeys.has('calls')) rows.push(...state.calls.map(c=>({ type:'Pedido', title:c.cliente, detail:`${c.matricula || ''} · ${c.peca || ''} · ${c.estado || ''}`, page:'pedidos' })));
-  if(firebaseLoadedKeys.has('quotes')) rows.push(...state.quotes.map(q=>({ type:'Orçamento', title:q.cliente, detail:`${q.id} · ${q.peca || ''} · ${money(q.total)}`, page:'orcamentos' })));
-  if(firebaseLoadedKeys.has('contactGroups')) {
+  if(canOpenPage('clientes') && globalSearchCollectionReady('clients')) rows.push(...(state.clients || []).map(c=>({ type:'Cliente', title:c.nome, detail:`${clientCode(c)} · ${c.telefone || ''} · ${c.email || ''}`, page:'clientes' })));
+  if(canOpenPage('contactos') && globalSearchCollectionReady('contactGroups')) {
     (state.contactGroups || []).forEach(g => (g.contactos || []).forEach(c => rows.push({ type:'Contacto', title:c.nome, detail:`${g.nome} · ${c.telemovel || c.telefone || ''} · ${c.email || ''}`, page:'contactos' })));
+  }
+  if(canOpenPage('fornecedores') && globalSearchCollectionReady('suppliers')) {
+    rows.push(...(state.suppliers || []).map(s=>({ type:'Fornecedor', title:supplierName(s) || 'Fornecedor', detail:`${supplierRef(s)} · ${s.telefone || ''} · ${s.email || ''}`, page:'fornecedores' })));
   }
   return rows;
 }
 function globalSearchResults(query){
-  const q = (query || '').toLowerCase();
-  if(!q) return '<div class="empty compact">Pesquisa global pronta.</div>';
-  const rows = globalSearchRows().filter(r => `${r.type} ${r.title} ${r.detail}`.toLowerCase().includes(q)).slice(0,8);
-  if(!rows.length) return '<div class="empty compact">Sem resultados.</div>';
-  return `<div class="search-results">${rows.map(r=>`<button class="search-result" data-go="${r.page}" ${r.id?`data-client-detail="${r.id}"`:''}><strong>${esc(r.type)} · ${esc(r.title || '-')}</strong><span>${esc(r.detail || '')}</span></button>`).join('')}</div>`;
+  const q = (query || '').trim().toLocaleLowerCase('pt-PT');
+  if(!q) return '<div class="empty compact">Escreve para pesquisar nas áreas a que tens acesso.</div>';
+  const rows = globalSearchRows().filter(r => `${r.type} ${r.title} ${r.detail}`.toLocaleLowerCase('pt-PT').includes(q)).slice(0,8);
+  if(!rows.length) return '<div class="empty compact">Sem resultados nas áreas carregadas e autorizadas.</div>';
+  return `<div class="search-results">${rows.map(r=>`<button class="search-result" type="button" data-go="${r.page}"><strong>${esc(r.type)} · ${esc(r.title || '-')}</strong><span>${esc(r.detail || '')}</span></button>`).join('')}</div>`;
+}
+async function prepareGlobalSearchData(){
+  if(!firebaseReady || !firebaseDb) return { failed:[] };
+  const keyToPage = { clients:'clientes', contactGroups:'contactos', suppliers:'fornecedores' };
+  const keys = Object.entries(keyToPage).filter(([key,page])=>canOpenPage(page) && !firebaseLoadedKeys.has(key)).map(([key])=>key);
+  const results = await Promise.all(keys.map(async key=>({ key, ok:await loadCollectionKey(key) })));
+  return { failed:results.filter(r=>!r.ok).map(r=>r.key) };
+}
+function bindGlobalSearchInput(input, results){
+  if(!input || input.dataset.bound === '1') return;
+  input.dataset.bound = '1';
+  let request = 0;
+  input.addEventListener('input', async ()=>{
+    const query = input.value;
+    const target = qs(`#${results}`);
+    if(!target) return;
+    if(!query.trim()) {
+      target.innerHTML = globalSearchResults('');
+      return;
+    }
+    const currentRequest = ++request;
+    target.innerHTML = '<div class="empty compact">A pesquisar...</div>';
+    const status = await prepareGlobalSearchData();
+    if(currentRequest !== request || !qs(`#${results}`)) return;
+    const resultTarget = qs(`#${results}`);
+    resultTarget.innerHTML = globalSearchResults(query);
+    if(status.failed.length && !globalSearchRows().length) resultTarget.innerHTML = '<div class="empty compact">Não foi possível carregar os dados da pesquisa. Verifica a ligação e as permissões.</div>';
+    bindGlobalResults();
+  });
+  input.addEventListener('keydown', event=>{
+    if(event.key === 'Escape') {
+      input.value = '';
+      const target = qs(`#${results}`);
+      if(target) target.innerHTML = '';
+      input.blur();
+    }
+  });
 }
 
 function novaChamada(){
@@ -1810,7 +1875,7 @@ function clientes(){
         <div class="clean-stats"><span><b>${total}</b> total</span><span><b>${withEmail}</b> email</span><span><b>${withPhone}</b> telefone</span></div>
       </div>
       ${canEdit ? `<div class="quote-page-actions"><button class="btn primary quote-new-btn" type="button" data-create-entity="client">+ Adicionar registo</button></div>` : '<div class="readonly-note">Modo leitura: podes consultar dados e enviar emails, mas não podes adicionar nem editar clientes.</div>'}
-      <div class="clean-search-row"><input id="clientSearch" class="field" placeholder="Pesquisar cliente, código, telefone, email, morada ou código postal"></div>
+      <div class="clean-search-row clean-search-tools"><input id="clientSearch" class="field" type="search" autocomplete="off" placeholder="Pesquisar cliente, código, telefone, email, morada ou código postal" aria-label="Pesquisar clientes"><button id="clearClientSearch" class="btn ghost search-clear-btn" type="button" disabled aria-label="Limpar pesquisa de clientes">Limpar</button><span id="clientSearchCount" class="search-result-count" aria-live="polite">${total} clientes</span></div>
       <div id="clientsTable">${clientsTable(state.clients)}</div>
     </div>
   </div>`;
@@ -1832,6 +1897,207 @@ function fornecedores(){
   </div>`;
 }
 
+function referencias(){
+  const rows = [...(state.references || [])];
+  const canEdit = canEditOperational();
+  return `<div class="grid single-list clean-module-page references-page">
+    <div class="card clean-main-card">
+      <div class="clean-page-head">
+        <div><span class="clean-eyebrow">Base da empresa</span><h3>Referências</h3><p class="muted">Base central de referências, famílias, marcas e descrições. A pesquisa consulta apenas os resultados necessários.</p></div>
+        <div class="clean-stats"><span><b id="referencesTotal">—</b> resultados</span><span><b id="referencesFamilies">—</b> famílias nos resultados</span></div>
+      </div>
+      <div class="reference-toolbar">
+        <input id="referenceSearch" class="field" type="search" autocomplete="off" placeholder="Pesquisar por início da referência, família, marca ou descrição…" aria-label="Pesquisar referências">
+        <button class="btn primary" id="referenceSearchBtn" type="button">Pesquisar</button>
+        ${canEdit ? '<button class="btn" type="button" data-create-entity="reference">+ Adicionar referência</button>' : '<span class="readonly-note">Modo leitura</span>'}
+      </div>
+      <p class="muted reference-search-help">A lista é carregada em páginas de 100 registos. A pesquisa por referência, família, marca ou descrição continua disponível e só é executada quando carregas em Pesquisar.</p>
+      <div id="referencesTable"><div class="empty">A carregar a primeira página de referências…</div></div>
+      <div class="reference-pagination" id="referencesPagination" hidden><span id="referencesPageInfo">Página 1</span><nav class="reference-page-nav" id="referencesPageNav" aria-label="Páginas de referências"><button class="btn ghost reference-page-edge" id="referencesFirstBtn" type="button">Início</button><button class="btn ghost reference-page-arrow" id="referencesPrevBtn" type="button" aria-label="Página anterior" disabled>‹</button><div id="referencesPageNumbers" class="reference-page-numbers"></div><button class="btn ghost reference-page-arrow" id="referencesNextBtn" type="button" aria-label="Página seguinte">›</button><button class="btn ghost reference-page-edge" id="referencesLastBtn" type="button">Fim</button></nav></div>
+    </div>
+  </div>`;
+}
+function referencesTable(rows){
+  if(!rows.length) return '<div class="empty">Sem resultados para esta pesquisa.</div>';
+  return `<div class="table-wrap"><table class="references-table"><thead><tr><th>Referência</th><th>Família</th><th>Marca</th><th>Descrição</th><th>Ações</th></tr></thead><tbody>${rows.map(r=>{const familyReference=`${String(r.familia||'').trim()}-${String(r.referencia||'').trim()}`;return `<tr><td><strong>${esc(r.referencia||'-')}</strong></td><td>${esc(r.familia||'-')}</td><td>${esc(r.marca||'-')}</td><td>${esc(r.descricao||'-')}</td><td><div class="actions"><button class="btn small" type="button" data-copy-family-reference="${esc(familyReference)}" title="Copiar família-referência">${ICONS.copy||'⧉'} Copiar</button>${canEditOperational('referencias')?`<button class="btn small" data-edit-entity="reference:${esc(r.id)}">Editar</button>`:'<span class="muted">Consulta</span>'}${canDelete('referencias')?`<button class="btn danger small" data-delete-entity="reference:${esc(r.id)}">Apagar</button>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`;
+}
+function referenceSearchFields(row){
+  return {
+    referenciaNorm: normalizeSearchText(row.referencia || ''),
+    familiaNorm: normalizeSearchText(row.familia || ''),
+    marcaNorm: normalizeSearchText(row.marca || ''),
+    descricaoNorm: normalizeSearchText(row.descricao || '')
+  };
+}
+async function searchCompanyReferences(query){
+  const q = normalizeSearchText(query);
+  if(!firebaseReady || !firebaseDb) {
+    const rows=(state.references||[]).filter(r=>['referencia','familia','marca','descricao'].some(k=>normalizeSearchText(r[k]).includes(q))).slice(0,80);
+    return rows;
+  }
+  if(q.length < 2) throw new Error('Escreve pelo menos 2 caracteres para pesquisar.');
+  // Percorre todos os resultados de prefixo de cada campo em blocos de 100.
+  // A versão anterior usava limit(20) e slice(0,80), cortando silenciosamente resultados como LPR.
+  const fields=['referenciaNorm','familiaNorm','marcaNorm','descricaoNorm'];
+  const found = new Map();
+  const BATCH_SIZE = 100;
+  for(const field of fields){
+    let cursor = null;
+    while(true){
+      let query = firebaseDb.collection(FIREBASE_COLLECTIONS.references)
+        .orderBy(field).startAt(q).endAt(q+'\uf8ff').limit(BATCH_SIZE);
+      if(cursor) query = query.startAfter(cursor);
+      const snap = await query.get();
+      snap.docs.forEach(doc=>found.set(doc.id,cleanFirebaseDoc({id:doc.id,...doc.data()})));
+      if(snap.docs.length < BATCH_SIZE) break;
+      cursor = snap.docs[snap.docs.length-1];
+    }
+  }
+  const rows=[...found.values()];
+  rows.sort((a,b)=>String(a.referencia||'').localeCompare(String(b.referencia||''),'pt',{numeric:true,sensitivity:'base'}));
+  return rows;
+}
+async function bindReferencesPage(){
+  const input=qs('#referenceSearch');
+  const table=qs('#referencesTable');
+  const pagination=qs('#referencesPagination');
+  const pageInfo=qs('#referencesPageInfo');
+  const prevBtn=qs('#referencesPrevBtn');
+  const nextBtn=qs('#referencesNextBtn');
+  const firstBtn=qs('#referencesFirstBtn');
+  const lastBtn=qs('#referencesLastBtn');
+  const pageNumbers=qs('#referencesPageNumbers');
+  const PAGE_SIZE=100;
+  let cursorStack=[null];
+  let pageHasNext={};
+  let currentCursor=null;
+  let currentPageNumber=1;
+  let mode='list';
+
+  // Listener delegado: continua funcional depois de cada mudança de página/pesquisa.
+  table?.addEventListener('click',event=>{
+    const button=event.target.closest('[data-copy-family-reference]');
+    if(!button) return;
+    copyText(button.dataset.copyFamilyReference || '');
+  });
+
+  const updateStats=(rows,totalLabel)=>{
+    const total=qs('#referencesTotal'); if(total)total.textContent=totalLabel;
+    const fam=qs('#referencesFamilies'); if(fam)fam.textContent=new Set(rows.map(r=>String(r.familia||'').trim()).filter(Boolean)).size.toLocaleString('pt-PT');
+  };
+  const loadListPage=async(direction='current')=>{
+    if(!firebaseReady || !firebaseDb){ if(table)table.innerHTML='<div class="empty">Liga a Firebase para consultar a base completa de referências.</div>'; if(pagination)pagination.hidden=true; return; }
+    const btn=direction==='next'?nextBtn:prevBtn;
+    if(btn)btn.disabled=true;
+    if(table)table.innerHTML='<div class="empty">A carregar referências…</div>';
+    try{
+      if(direction==='next'){
+        if(!pageHasNext[currentPageNumber]) return;
+        cursorStack[currentPageNumber]=currentCursor;
+        currentPageNumber++;
+      }else if(direction==='prev'){
+        currentPageNumber=Math.max(1,currentPageNumber-1);
+      }else if(typeof direction==='number'){
+        currentPageNumber=direction;
+      }else{
+        currentPageNumber=1;
+        cursorStack=[null];
+        pageHasNext={};
+      }
+      const startCursor=cursorStack[currentPageNumber-1]||null;
+      if(currentPageNumber>1 && !startCursor){
+        // Só permite navegar para páginas cujo cursor já foi obtido, evitando leituras extra via offset.
+        currentPageNumber=Math.max(1,currentPageNumber-1);
+        return;
+      }
+      let query=firebaseDb.collection(FIREBASE_COLLECTIONS.references).orderBy('referenciaNorm').limit(PAGE_SIZE);
+      if(startCursor)query=query.startAfter(startCursor);
+      const snap=await query.get();
+      const rows=snap.docs.map(doc=>cleanFirebaseDoc({id:doc.id,...doc.data()}));
+      currentCursor=snap.docs.length?snap.docs[snap.docs.length-1]:startCursor;
+      pageHasNext[currentPageNumber]=rows.length===PAGE_SIZE;
+      state.references=rows;
+      if(table)table.innerHTML=referencesTable(rows);
+      updateStats(rows,rows.length.toLocaleString('pt-PT'));
+      if(pagination)pagination.hidden=false;
+      if(pageInfo)pageInfo.textContent=`Página ${currentPageNumber} · ${rows.length} registos nesta página`;
+      if(prevBtn)prevBtn.disabled=currentPageNumber<=1;
+      if(nextBtn)nextBtn.disabled=rows.length<PAGE_SIZE;
+      if(firstBtn)firstBtn.disabled=currentPageNumber<=1;
+      if(lastBtn)lastBtn.disabled=rows.length<PAGE_SIZE;
+      if(pageNumbers){
+        const first=Math.max(1,currentPageNumber-2);
+        const last=currentPageNumber+2;
+        let html='';
+        for(let n=first;n<=last;n++){
+          const known=n===1 || !!cursorStack[n-1];
+          if(!known && n>currentPageNumber+1) continue;
+          html+=`<button class="btn ${n===currentPageNumber?'primary':'ghost'} reference-page-number" type="button" data-reference-page="${n}" ${n===currentPageNumber?'aria-current="page"':''} ${known?'':'disabled'}>${n}</button>`;
+        }
+        pageNumbers.innerHTML=html;
+        pageNumbers.querySelectorAll('[data-reference-page]').forEach(b=>b.addEventListener('click',()=>loadListPage(Number(b.dataset.referencePage))));
+      }
+      bindEntities();
+    }catch(err){
+      console.error('References page load failed',err);
+      if(table)table.innerHTML=`<div class="empty">Não foi possível carregar a lista. ${esc(err.message||'Verifica as permissões do Firestore.')}</div>`;
+      if(pagination)pagination.hidden=true;
+    }finally{if(btn)btn.disabled=false;}
+  };
+  const loadLastPage=async()=>{
+    if(!firebaseReady || !firebaseDb) return;
+    if(lastBtn)lastBtn.disabled=true;
+    if(table)table.innerHTML='<div class="empty">A carregar o fim da lista…</div>';
+    try{
+      const snap=await firebaseDb.collection(FIREBASE_COLLECTIONS.references).orderBy('referenciaNorm','desc').limit(PAGE_SIZE).get();
+      const rows=snap.docs.map(doc=>cleanFirebaseDoc({id:doc.id,...doc.data()})).reverse();
+      state.references=rows;
+      if(table)table.innerHTML=referencesTable(rows);
+      updateStats(rows,rows.length.toLocaleString('pt-PT'));
+      currentPageNumber=null; cursorStack=[null]; pageHasNext={}; currentCursor=null;
+      if(pageInfo)pageInfo.textContent=`Fim da lista · ${rows.length} registos`;
+      if(prevBtn)prevBtn.disabled=true; if(nextBtn)nextBtn.disabled=true;
+      if(firstBtn)firstBtn.disabled=false; if(lastBtn)lastBtn.disabled=true;
+      if(pageNumbers)pageNumbers.innerHTML='';
+      bindEntities();
+    }catch(err){
+      console.error('Could not load last references page',err);
+      if(table)table.innerHTML=`<div class="empty">Não foi possível carregar o fim da lista. ${esc(err.message||'Verifica as permissões do Firestore.')}</div>`;
+    }finally{if(lastBtn)lastBtn.disabled=false;}
+  };
+  firstBtn?.addEventListener('click',()=>loadListPage('first'));
+  lastBtn?.addEventListener('click',loadLastPage);
+  const runSearch=async()=>{
+    const q=input?.value.trim()||'';
+    if(q.length<2){toast('Escreve pelo menos 2 caracteres para pesquisar.');return;}
+    mode='search'; if(pagination)pagination.hidden=true;
+    const btn=qs('#referenceSearchBtn');if(btn)btn.disabled=true;
+    if(table)table.innerHTML='<div class="empty">A pesquisar…</div>';
+    try{
+      const rows=await searchCompanyReferences(q);state.references=rows;
+      if(table)table.innerHTML=referencesTable(rows);
+      updateStats(rows,rows.length.toLocaleString('pt-PT'));
+      bindEntities();
+    }catch(err){if(table)table.innerHTML=`<div class="empty">${esc(err.message||'Erro na pesquisa.')}</div>`;}
+    finally{if(btn)btn.disabled=false;}
+  };
+  qs('#referenceSearchBtn')?.addEventListener('click',runSearch);
+  input?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();runSearch();}});
+  input?.addEventListener('input',()=>{if(!input.value.trim() && mode==='search'){mode='list';loadListPage('current');}});
+  prevBtn?.addEventListener('click',()=>loadListPage('prev'));
+  nextBtn?.addEventListener('click',()=>loadListPage('next'));
+  await loadListPage('current');
+}
+function referenceFormHtml(item={}){
+  return `<form id="entityCreateForm" data-create-type="reference" class="form-grid modal-grid-form">
+    <input class="field" name="referencia" placeholder="Referência" value="${esc(item.referencia||'')}" required>
+    <input class="field" name="familia" placeholder="Família" value="${esc(item.familia||'')}" required>
+    <input class="field" name="marca" placeholder="Marca" value="${esc(item.marca||'')}" required>
+    <textarea class="span3" name="descricao" placeholder="Descrição" required>${esc(item.descricao||'')}</textarea>
+    <div class="span3"><button class="btn primary" type="submit">Guardar referência</button></div>
+  </form>`;
+}
+
 function contactos(){
   const warehouses = uniqueWarehouses();
   const sections = uniqueSections();
@@ -1844,7 +2110,7 @@ function contactos(){
         <div class="clean-stats"><span><b>${warehouses.length}</b> armazéns</span><span><b>${sections.length}</b> secções</span><span><b>${totalContacts}</b> contactos</span></div>
       </div>
       ${canEdit ? `<div class="quote-page-actions"><button class="btn primary quote-new-btn" type="button" id="openQuickContactBtn">+ Adicionar registo</button></div>` : '<div class="readonly-note">Modo leitura: podes consultar contactos, ligar ou enviar email, mas não podes adicionar nem editar.</div>'}
-      <div class="clean-search-row"><input id="contactSearch" class="field" placeholder="Pesquisar armazém, secção, nome, telefone ou email"></div>
+      <div class="clean-search-row clean-search-tools"><input id="contactSearch" class="field" type="search" autocomplete="off" placeholder="Pesquisar armazém, secção, nome, telefone ou email" aria-label="Pesquisar diretório de contactos"><button id="clearContactSearch" class="btn ghost search-clear-btn" type="button" disabled aria-label="Limpar pesquisa de contactos">Limpar</button><span id="contactSearchCount" class="search-result-count" aria-live="polite">${totalContacts} contactos</span></div>
       <div id="contactsTable">${contactGroupsView(filterContactGroups())}</div>
     </div>
   </div>`;
@@ -1927,15 +2193,15 @@ function contactCount(){
 }
 function filterContactGroups(){
   normalizeContactDirectory();
-  const q = (qs('#contactSearch')?.value || '').trim().toLowerCase();
+  const q = normalizeSearchText(qs('#contactSearch')?.value || '');
   const groups = state.contactGroups || [];
   if(!q) return groups;
   return groups.map(group => {
-    const fullGroup = `${contactWarehouse(group)} ${contactSection(group)}`.toLowerCase();
+    const fullGroup = normalizeSearchText(`${contactWarehouse(group)} ${contactSection(group)}`);
     const groupMatch = fullGroup.includes(q);
-    const contactos = (group.contactos || []).filter(c => `${fullGroup} ${c.nome || ''} ${c.telemovel || ''} ${c.telefone || ''} ${c.email || ''}`.toLowerCase().includes(q));
+    const contactos = (group.contactos || []).filter(c => normalizeSearchText(`${fullGroup} ${c.nome || ''} ${c.telemovel || ''} ${c.telefone || ''} ${c.email || ''} ${c.extensao || ''} ${c.local || ''}`).includes(q));
     return groupMatch ? { ...group, aberto:true } : { ...group, aberto:true, contactos };
-  }).filter(group => (group.contactos || []).length || `${contactWarehouse(group)} ${contactSection(group)}`.toLowerCase().includes(q));
+  }).filter(group => (group.contactos || []).length || normalizeSearchText(`${contactWarehouse(group)} ${contactSection(group)}`).includes(q));
 }
 function groupedByWarehouse(groups){
   return groups.reduce((acc, group) => {
@@ -1946,7 +2212,10 @@ function groupedByWarehouse(groups){
   }, {});
 }
 function contactGroupsView(groups){
-  if(!groups.length) return '<div class="empty">Sem contactos encontrados.</div>';
+  if(!groups.length){
+    const q = (qs('#contactSearch')?.value || '').trim();
+    return q ? `<div class="empty search-empty-state">Não foram encontrados contactos para <strong>“${esc(q)}”</strong>. <button class="btn ghost small" type="button" data-clear-contact-search>Limpar pesquisa</button></div>` : '<div class="empty">Ainda não existem contactos neste diretório.</div>';
+  }
   const grouped = groupedByWarehouse(groups);
   const warehouses = orderedWarehouses(Object.keys(grouped));
   const q = (qs('#contactSearch')?.value || '').trim();
@@ -2024,11 +2293,14 @@ function contactsCards(group){
 }
 function clientCode(c){ return c.codigoCliente || c.codigo || c.tipo || ''; }
 function filterClients(){
-  const q = (qs('#clientSearch')?.value || '').toLowerCase();
-  return state.clients.filter(c => `${clientCode(c)} ${c.nome || ''} ${(normalizeClientContacts(c).telefones||[]).join(' ')} ${(normalizeClientContacts(c).emails||[]).join(' ')} ${c.morada || ''} ${c.codigoPostal || ''}`.toLowerCase().includes(q));
+  const q = normalizeSearchText(qs('#clientSearch')?.value || '');
+  return state.clients.filter(c => normalizeSearchText(`${clientCode(c)} ${c.nome || ''} ${(normalizeClientContacts(c).telefones||[]).join(' ')} ${(normalizeClientContacts(c).emails||[]).join(' ')} ${c.morada || ''} ${c.codigoPostal || ''}`).includes(q));
 }
 function clientsTable(rows){
-  if(!rows.length) return '<div class="empty">Sem clientes registados.</div>';
+  if(!rows.length){
+    const q = (qs('#clientSearch')?.value || '').trim();
+    return q ? `<div class="empty search-empty-state">Não foram encontrados clientes para <strong>“${esc(q)}”</strong>. <button class="btn ghost small" type="button" data-clear-client-search>Limpar pesquisa</button></div>` : '<div class="empty">Ainda não existem clientes registados.</div>';
+  }
   return `<div class="clean-card-list client-card-list">${rows.map(c=>`
     <article class="clean-data-card client-data-card code-centered-card">
       <div class="data-card-main client-name-box">
@@ -2135,6 +2407,2649 @@ function suppliersTable(rows){
       </div>
     </article>`).join('')}</div></div>`;
 }
+
+/* ==========================================================================
+   Catálogo Motor v2 · Motor → Tipo de peça → Peças
+   Coleções Firebase: catalogoMotores (motores), catalogoTiposPeca (tipos),
+   catalogoMotor (peças, com motorId + tipoId).
+   As gravações são feitas só para os documentos alterados (não reescrevem
+   o catálogo inteiro a cada edição).
+   ========================================================================== */
+const CATALOG_PAGE = 'catalogo-motor';
+const CATALOG_STATE_KEYS = ['engineCatalogEngines', 'engineCatalogTypes', 'engineCatalog'];
+const catalogUI = { motorId:'', tipoId:'', q:'', motorQ:'', motorView:'parts', motorBookPage:0, motorBookZoom:100, motorBookSearch:'', motorOpen:false, motorFocus:false, motorPickerOpen:false, motorPickerQ:'', catalogPanelOpen:false, limit:60, searchTimer:null, motorSearchTimer:null, motorPickerTimer:null, pendingPlan:null, loading:false, failed:false, errors:[] };
+const catalogSearchCache = new WeakMap();
+const CATALOG_TYPE_ICON_RULES = [
+  [/distrib/, '⛓️'], [/filtro/, '🧴'], [/trav|pastilh|disco/, '🛑'], [/vela|igni/, '🔥'],
+  [/junta|vedante|retentor/, '🧱'], [/oleo|lubrific/, '🛢️'], [/embraiag/, '⚙️'], [/turbo/, '🌀'],
+  [/injec|injet|bomba/, '💧'], [/refriger|agua|radiad|termost/, '❄️'], [/correia|corrente|tensor|rolo/, '🔗'],
+  [/cabeca|cilindro|piston|pistao|biela|segment|casquilh|cambota|arvore/, '🔩'],
+  [/sensor|sonda|eletr|electr|bobin|alternad|arranque/, '⚡']
+];
+const CATALOG_ICON_CHOICES = ['⛓️','🧴','🛑','🔥','🧱','🛢️','⚙️','🌀','💧','❄️','🔗','🔩','⚡','🔧'];
+
+/* ---------- Normalização ---------- */
+function catNorm(v){ return String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); }
+function catKey(v){ return catNorm(v).replace(/\s/g,''); }
+function catCompact(v){ return catNorm(v).replace(/[^a-z0-9]/g,''); }
+function catSlug(v){ return catNorm(v).replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60) || 'x'; }
+function catHash(s){ let h = 5381; for(const c of String(s)) h = ((h << 5) + h + c.charCodeAt(0)) | 0; return (h >>> 0).toString(36); }
+function catCollate(a,b){ return String(a ?? '').localeCompare(String(b ?? ''), 'pt', { numeric:true, sensitivity:'base' }); }
+function catNewId(prefix, name, used){
+  const cleanSlug = catSlug(name);
+  const nameHash = catHash(name);
+  let id = `${prefix}-${cleanSlug}-${nameHash}`;
+  while(used.has(id)) {
+    id += Math.random().toString(36).slice(2, 4).toUpperCase();
+  }
+  used.add(id);
+  return id;
+}
+function catTypeIcon(t){
+  if(t?.icone) {
+    // Se for um Memoji em Base64, renderiza a imagem com um tamanho maior (42px)
+    if(String(t.icone).startsWith('data:image')) {
+      return `<img src="${t.icone}" style="width: 42px; height: 42px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 8px; display: inline-block; background: #f1f5f9; border: 1px solid #cbd5e1;">`;
+    }
+    return t.icone;
+  }
+  const n = catNorm(t?.nome);
+  const hit = CATALOG_TYPE_ICON_RULES.find(([rx]) => rx.test(n));
+  return hit ? hit[1] : '🔧';
+}
+
+
+/* ---------- Estado e permissões ---------- */
+function catalogReady(){ return CATALOG_STATE_KEYS.every(k => firebaseLoadedKeys.has(k)); }
+function catalogCan(action){
+  if(action === 'import') return canImportExcel() && canCreateOperational(CATALOG_PAGE);
+  if(action === 'export') return canExportExcel();
+  return canAction(action, CATALOG_PAGE);
+}
+function catalogIndex(){
+  // CORREÇÃO: Força a ordenação alfabética natural estável pelo nome do motor (A-Z)
+  const engines = [...(state.engineCatalogEngines || [])].sort((a, b) => {
+    return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt', { numeric: true, sensitivity: 'base' });
+  });
+
+  // Força a ordenação estável das categorias/tipos de peça (A-Z)
+  const types = [...(state.engineCatalogTypes || [])].sort((a, b) => {
+    return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt', { numeric: true, sensitivity: 'base' });
+  });
+
+  const engineById = new Map(engines.map(e => [e.id, e]));
+  const typeById = new Map(types.map(t => [t.id, t]));
+  const byEngine = new Map();
+  const engineCount = new Map();
+  const typeCount = new Map();
+  const all = [];
+
+  (state.engineCatalog || []).forEach(p => {
+    const e = engineById.get(p.motorId), t = typeById.get(p.tipoId);
+    if(!e || !t) return;
+    if(!byEngine.has(e.id)) byEngine.set(e.id, new Map());
+    const m = byEngine.get(e.id);
+    if(!m.has(t.id)) m.set(t.id, []);
+    m.get(t.id).push(p);
+    engineCount.set(e.id, (engineCount.get(e.id) || 0) + 1);
+    typeCount.set(t.id, (typeCount.get(t.id) || 0) + 1);
+    all.push({ p, e, t });
+  });
+
+  byEngine.forEach(m => m.forEach(list => list.sort((a,b) => catCollate(a.referencia, b.referencia))));
+  return { engines, types, engineById, typeById, byEngine, engineCount, typeCount, all };
+}
+
+function catalogFixSelection(idx){
+  if(!idx.engineById.has(catalogUI.motorId)) catalogUI.motorId = idx.engines[0]?.id || '';
+  if(catalogUI.tipoId && !idx.byEngine.get(catalogUI.motorId)?.has(catalogUI.tipoId)) catalogUI.tipoId = '';
+}
+
+function catalogMigrateLegacy(){
+  const legacy = (state.engineCatalog || []).filter(p => !p.motorId || !p.tipoId);
+  if(!legacy.length) return;
+  const engByKey = new Map(state.engineCatalogEngines.map(e => [catKey(e.nome), e]));
+  const typeByKey = new Map(state.engineCatalogTypes.map(t => [catKey(t.nome), t]));
+  const usedE = new Set(state.engineCatalogEngines.map(e => e.id));
+  const usedT = new Set(state.engineCatalogTypes.map(t => t.id));
+  const newE = [], newT = [], now = new Date().toISOString();
+  legacy.forEach(p => {
+    const mName = String(p.motor || '').trim() || 'Sem motor';
+    const tName = String(p.tipoPeca || '').trim() || 'Sem tipo';
+    let e = engByKey.get(catKey(mName));
+    if(!e){ e = { id:catNewId('EMO', mName, usedE), nome:mName, observacoes:'', createdAt:now }; engByKey.set(catKey(mName), e); newE.push(e); }
+    let t = typeByKey.get(catKey(tName));
+    if(!t){ t = { id:catNewId('TPC', tName, usedT), nome:tName, icone:'', createdAt:now }; typeByKey.set(catKey(tName), t); newT.push(t); }
+    p.motorId = e.id; p.tipoId = t.id;
+  });
+  state.engineCatalogEngines.push(...newE);
+  state.engineCatalogTypes.push(...newT);
+  // Só grava se o utilizador puder escrever; caso contrário fica apenas em memória.
+  if(hasWritableFirebaseSession() && catalogCan('add') && catalogCan('edit') && !catalogUI.migrating){
+    catalogUI.migrating = true;
+    const ops = [
+      ...newE.map(row => ({ key:'engineCatalogEngines', row })),
+      ...newT.map(row => ({ key:'engineCatalogTypes', row })),
+      ...legacy.map(p => {
+        const dropFields = ['motor','tipoPeca'].filter(f => f in p);
+        dropFields.forEach(f => delete p[f]);
+        return { key:'engineCatalog', row:p, dropFields };
+      })
+    ];
+    catalogCommit(ops, `Catálogo Motor: migração (${legacy.length} peça(s))`, { silent:true }).finally(() => { catalogUI.migrating = false; });
+  }
+}
+
+async function catalogCommit(ops, action, opts = {}){
+  if(!hasWritableFirebaseSession()){
+    toast('Sem Firebase ativo. Nada foi gravado.');
+    updateFirebaseStatusBadge();
+    return false;
+  }
+  try{
+    let batch = firebaseDb.batch(), n = 0;
+    for(const op of ops){
+      const ref = firebaseDb.collection(FIREBASE_COLLECTIONS[op.key]).doc(op.id || op.row.id);
+      if(op.del){
+        batch.delete(ref);
+      } else {
+        const payload = sanitizeRowForFirestore(op.row);
+        payload.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+        payload.updatedBy = firebaseAuth.currentUser.email || '';
+        (op.dropFields || []).forEach(f => { payload[f] = firebase.firestore.FieldValue.delete(); });
+        batch.set(ref, payload, { merge:true });
+      }
+      if(++n >= 400){ await batch.commit(); batch = firebaseDb.batch(); n = 0; }
+    }
+    if(n) await batch.commit();
+    addAuditLog(action, CATALOG_PAGE);
+    return true;
+  } catch(err){
+    console.warn('Catálogo Motor: erro Firebase', err);
+    if(!opts.silent) toast(`Erro Firebase: Catálogo Motor não foi guardado${err?.code ? ` (${err.code})` : ''}.`);
+    if(!opts.silent) await catalogReload();
+    return false;
+  }
+}
+async function catalogReload(){
+  CATALOG_STATE_KEYS.forEach(k => firebaseLoadedKeys.delete(k));
+  await Promise.all(CATALOG_STATE_KEYS.map(k => loadCollectionKey(k)));
+  if(currentPage === CATALOG_PAGE) renderPage(CATALOG_PAGE);
+}
+
+async function catalogLoadAll(){
+  if(catalogUI.loading) return;
+  catalogUI.loading = true; catalogUI.failed = false; catalogUI.errors = [];
+  try{
+    if(!firebaseReady || !firebaseDb || !firebaseAuth?.currentUser){
+      catalogUI.errors.push('sem sessão Firebase ativa');
+    } else {
+      for(const key of CATALOG_STATE_KEYS){
+        if(firebaseLoadedKeys.has(key)) continue;
+        const r = await safeLoadCollection(key, FIREBASE_COLLECTIONS[key]);
+        if(r.ok && Array.isArray(r.rows)){
+          state[key] = r.rows; firebaseLoadedKeys.add(key); state = ensureStateShape(state);
+        } else {
+          catalogUI.errors.push(`${FIREBASE_COLLECTIONS[key]}: ${r.error?.code || r.error?.message || 'erro desconhecido'}`);
+        }
+      }
+    }
+  } catch(err){
+    console.warn('Catálogo Motor: falha a carregar', err);
+    catalogUI.errors.push(err?.message || 'erro inesperado');
+  }
+  catalogUI.loading = false;
+  catalogUI.failed = !catalogReady();
+  if(currentPage === CATALOG_PAGE) renderPage(CATALOG_PAGE);
+}
+function catalogLoadingCard(){
+  catalogLoadAll();
+  return '<div class="card cm-loading" id="cmLoading">⏳ A carregar catálogo…</div>';
+}
+function catalogErrorBanner(){
+  if(catalogReady()) return '';
+  const detail = catalogUI.errors.length ? `<small>${esc(catalogUI.errors.join(' · '))}</small>` : '';
+  return `<div class="cm-banner">⚠️ <div><strong>Não foi possível carregar o catálogo do Firebase.</strong><span>Confirma que estás com sessão Firebase e que publicaste o <code>firestore.rules</code> novo (coleções catalogoMotor, catalogoMotores e catalogoTiposPeca).</span>${detail}</div><button type="button" class="cm-btn cm-btn-main small" data-cm="retry">🔄 Tentar de novo</button></div>`;
+}
+
+/* ==========================================================================
+   LIVRO DO MOTOR
+   Cada motor pode ter um DOCX original guardado no Firebase Storage.
+   A aplicação renderiza o DOCX no browser com docx-preview, mantendo
+   imagens, tabelas, cores e estrutura do documento o mais fiel possível.
+   ========================================================================== */
+let motorBookRenderToken = 0;
+
+async function ensureDocxViewer(){
+  // docx-preview 0.3.x usa JSZip para abrir o .docx.
+  // O bundle do docx-preview não disponibiliza necessariamente JSZip
+  // como global, por isso carregamos a dependência explicitamente antes.
+  try{
+    if(!window.JSZip?.loadAsync){
+      await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+    }
+    if(!window.JSZip?.loadAsync){
+      console.warn('JSZip carregado mas window.JSZip.loadAsync não está disponível.');
+      return false;
+    }
+    if(!window.docx?.renderAsync){
+      await loadScript('https://cdn.jsdelivr.net/npm/docx-preview@0.3.6/dist/docx-preview.min.js');
+    }
+    return !!window.docx?.renderAsync;
+  }catch(err){
+    console.warn('Dependências do visualizador Word indisponíveis', err);
+    return false;
+  }
+}
+
+async function openMotorBookPicker(engine){
+  if(!engine) return;
+
+  // Edge/Chrome: usar o seletor nativo moderno diretamente a partir do clique.
+  // Fallback para <input type=file> para Electron/ambientes sem showOpenFilePicker.
+  try {
+    if(typeof window.showOpenFilePicker === 'function'){
+      const handles = await window.showOpenFilePicker({
+        multiple: false,
+        types: [{
+          description: 'Documento Microsoft Word',
+          accept: { 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'] }
+        }]
+      });
+      if(!handles?.length) return;
+      const file = await handles[0].getFile();
+      await uploadMotorBook(file, engine);
+      return;
+    }
+  } catch(err){
+    // Cancelar o seletor não é erro. Para outros erros, tentamos o fallback.
+    if(err?.name === 'AbortError') return;
+    console.warn('showOpenFilePicker indisponível/falhou, a usar fallback:', err);
+  }
+
+  const old = document.querySelector('#cmMotorBookPickerDynamic');
+  if(old) old.remove();
+
+  const input = document.createElement('input');
+  input.id = 'cmMotorBookPickerDynamic';
+  input.type = 'file';
+  input.accept = '.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  input.style.cssText = 'position:fixed;left:-10000px;top:-10000px;width:1px;height:1px;opacity:0;';
+  document.body.appendChild(input);
+
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    input.remove();
+    if(file) await uploadMotorBook(file, engine);
+  };
+
+  input.click();
+}
+
+async function uploadMotorBook(file, engine){
+  if(!file || !engine) return;
+  if(!catalogGuard('edit')) return;
+  if(!firebaseStorage) return toast('Firebase Storage não está disponível.');
+  const ext = String(file.name || '').toLowerCase().endsWith('.docx') ? '.docx' : '';
+  if(ext !== '.docx') return toast('Escolhe um ficheiro Word .docx.');
+  if(file.size > 25 * 1024 * 1024) return toast('O Word não pode ultrapassar 25 MB.');
+
+  const btn = qs('#cmUploadMotorBookBtn');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ A carregar…'; }
+  const uploadButtons = qsa('[data-cm="motor-book-upload"]');
+  uploadButtons.forEach(b => { b.disabled = true; b.dataset.originalText = b.textContent; b.textContent = '⏳ A carregar Word…'; });
+  toast(`A carregar o Word de ${engine.nome}…`);
+
+  try{
+    const safeName = String(file.name).replace(/[^\w.\-À-ÿ ]+/g,'_').trim() || `motor-${engine.nome}.docx`;
+    const path = `catalogo-motores/${engine.id}/${Date.now()}-${safeName}`;
+    const ref = firebaseStorage.ref().child(path);
+    const uploadTask = ref.put(file, {
+      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      customMetadata: {
+        motorId: String(engine.id),
+        motorNome: String(engine.nome || ''),
+        uploadedBy: String(firebaseAuth?.currentUser?.email || '')
+      }
+    });
+    const task = await new Promise((resolve, reject) => {
+      uploadTask.on(firebase.storage.TaskEvent.STATE_CHANGED,
+        snapshot => {
+          const pct = snapshot.totalBytes ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100) : 0;
+          const statusBtns = qsa('[data-cm="motor-book-upload"]');
+          statusBtns.forEach(b => b.textContent = `⏳ Word ${pct}%`);
+        },
+        reject,
+        () => resolve(uploadTask.snapshot)
+      );
+    });
+    const url = await task.ref.getDownloadURL();
+
+    engine.livroMotorUrl = url;
+    engine.livroMotorNome = safeName;
+    engine.livroMotorPath = path;
+    engine.livroMotorUpdatedAt = new Date().toISOString();
+    engine.livroMotorUpdatedBy = firebaseAuth?.currentUser?.email || '';
+
+    const ok = await saveSingleRowToFirebase('engineCatalogEngines', engine);
+    if(!ok) throw new Error('Não foi possível guardar o motor no Firebase.');
+
+    // Mantém a referência em memória e abre imediatamente o livro.
+    state.engineCatalogEngines = (state.engineCatalogEngines || []).map(e => e.id === engine.id ? engine : e);
+    catalogUI.motorBook = true;
+    catalogUI.motorView = 'book';
+    catalogUI.motorBookPage = 0;
+    catalogUI.motorBookAutoImportPending = true;
+    catalogRefreshBody();
+    toast(`Livro do motor ${engine.nome} carregado com sucesso. A preparar as peças automaticamente…`);
+  }catch(err){
+    console.error('Erro no upload do Livro do Motor:', err);
+    const code = String(err?.code || '');
+    let detail = err?.message || err;
+    if(code === 'storage/unauthorized') detail = 'Firebase Storage recusou o upload. Publica as regras storage.rules da versão 2.9.17.';
+    else if(code === 'storage/bucket-not-found') detail = 'O bucket do Firebase Storage não foi encontrado/ativado neste projeto.';
+    else if(code === 'storage/quota-exceeded') detail = 'A quota do Firebase Storage foi excedida.';
+    else if(code === 'storage/canceled') detail = 'O upload foi cancelado.';
+    toast(`Erro ao carregar o Word: ${detail}`);
+  }finally{
+    const b = qs('#cmUploadMotorBookBtn');
+    if(b){ b.disabled=false; b.textContent='📤 Trocar Word'; }
+    qsa('[data-cm="motor-book-upload"]').forEach(x => {
+      x.disabled = false;
+      if(x.dataset.originalText) x.textContent = x.dataset.originalText;
+    });
+  }
+}
+
+async function removeMotorBook(engine){
+  if(!engine || !catalogGuard('edit')) return;
+  if(!confirm(`Remover o Word do motor ${engine.nome}?`)) return;
+  try{
+    // Apaga o ficheiro do Storage quando o caminho é conhecido.
+    if(firebaseStorage && engine.livroMotorPath){
+      await firebaseStorage.ref().child(engine.livroMotorPath).delete().catch(()=>{});
+    }
+    delete engine.livroMotorUrl;
+    delete engine.livroMotorNome;
+    delete engine.livroMotorPath;
+    delete engine.livroMotorUpdatedAt;
+    delete engine.livroMotorUpdatedBy;
+    await saveSingleRowToFirebase('engineCatalogEngines', engine);
+    state.engineCatalogEngines = (state.engineCatalogEngines || []).map(e => e.id === engine.id ? engine : e);
+    catalogUI.motorBook = false;
+    catalogUI.motorView = 'parts';
+    catalogRefreshBody();
+    toast('Livro do motor removido.');
+  }catch(err){
+    console.error(err);
+    toast('Não foi possível remover o livro do motor.');
+  }
+}
+
+async function renderMotorBook(engine){
+  const box = qs('#cmMotorBookViewer');
+  if(!box || !engine?.livroMotorUrl) return;
+  const token = ++motorBookRenderToken;
+  box.innerHTML = '<div class="cm-book-loading">📖 A preparar o livro do motor…</div>';
+  const ready = await ensureDocxViewer();
+  if(token !== motorBookRenderToken) return;
+  if(!ready){
+    box.innerHTML = '<div class="cm-empty small"><div class="cm-empty-ico">📄</div><h4>Não foi possível carregar o visualizador Word</h4><p>Verifica a ligação à Internet e tenta novamente.</p></div>';
+    return;
+  }
+  try{
+    const res = await fetch(engine.livroMotorUrl, { cache:'no-store' });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    if(token !== motorBookRenderToken) return;
+    box.innerHTML = '';
+    await window.docx.renderAsync(blob, box, null, {
+      className: 'cm-docx',
+      inWrapper: true,
+      ignoreWidth: false,
+      ignoreHeight: false,
+      breakPages: true,
+      useBase64URL: true,
+      renderHeaders: true,
+      renderFooters: true,
+      renderFootnotes: true,
+      renderEndnotes: true
+    });
+    if(token !== motorBookRenderToken) return;
+    window.__cmCurrentMotorBookEngine = engine;
+    catalogUI.motorBookZoom = 100;
+    setupMotorBookViewer(engine);
+    // Garantia para browsers/PWA onde estilos e filhos do renderer assentam
+    // no DOM depois do renderAsync resolver.
+    [50, 150, 400, 900].forEach(ms => setTimeout(() => setupMotorBookViewer(engine), ms));
+    if(catalogUI.motorBookAutoImportPending){
+      catalogUI.motorBookAutoImportPending=false;
+      setTimeout(() => motorBookAutoCreatePieces(engine), 1100);
+    }
+  }catch(err){
+    console.error(err);
+    box.innerHTML = `<div class="cm-empty small"><div class="cm-empty-ico">⚠️</div><h4>Não foi possível abrir o Word</h4><p>${esc(err?.message || 'Erro ao ler o documento.')}</p><a class="cm-btn cm-btn-main" href="${esc(engine.livroMotorUrl)}" target="_blank" rel="noopener">Abrir ficheiro original</a></div>`;
+  }
+}
+
+function getMotorBookPages(){
+  const viewer = qs('#cmMotorBookViewer');
+  if(!viewer) return [];
+
+  // O docx-preview pode gerar as páginas como <section class="docx">,
+  // mas algumas versões/ambientes usam outro elemento com a mesma classe.
+  // Não dependemos do nome da tag.
+  // O renderizador foi chamado com className: 'cm-docx'.
+  // Isso faz o docx-preview criar 'cm-docx-wrapper' (e não 'docx-wrapper').
+  // Aceitamos ambos para não ficarmos dependentes do prefixo configurado.
+  const wrapper = viewer.querySelector('.cm-docx-wrapper, .docx-wrapper, [class*="docx-wrapper"]');
+  if(!wrapper) return [];
+
+  const direct = [...wrapper.children].filter(el => {
+    if(!(el instanceof HTMLElement)) return false;
+    if(el === wrapper) return false;
+    const cls = String(el.className || '').toLowerCase();
+    return el.classList.contains('docx') || el.tagName === 'SECTION' || cls.includes('docx');
+  });
+  if(direct.length) return direct;
+
+  // Fallback para documentos em que o renderer introduz um nível intermédio.
+  const nested = [...wrapper.querySelectorAll('.docx, section, article')].filter(el => {
+    if(!(el instanceof HTMLElement)) return false;
+    if(el.closest('.cm-docx-wrapper, .docx-wrapper, [class*=\"docx-wrapper\"]') !== wrapper) return false;
+    // Keep only the highest-level page nodes. If a page contains nested
+    // sections/articles, those are document content, not extra pages.
+    return !el.parentElement?.closest('.docx-wrapper') || el.parentElement === wrapper;
+  });
+  if(nested.length) return nested;
+
+  // Last fallback: docx-preview always gives its rendered page a class with
+  // the configured className ("docx"). If a future build changes the wrapper
+  // nesting, use the outermost elements carrying that class.
+  const allDocx = [...viewer.querySelectorAll('[class*="docx"]')].filter(el => {
+    if(!(el instanceof HTMLElement)) return false;
+    if(el === wrapper) return false;
+    return el.closest('.cm-docx-wrapper, .docx-wrapper, [class*=\"docx-wrapper\"]') === wrapper && !el.parentElement?.className?.toString().includes('docx-wrapper');
+  });
+  if(allDocx.length) return allDocx;
+
+  // Último fallback: alguns browsers/PWA podem entregar o DOM renderizado
+  // sem as classes esperadas pelo docx-preview. Nessa situação identificamos
+  // as páginas pelo tamanho real e pelo facto de conterem imagens.
+  const visualCandidates = [...viewer.querySelectorAll('section, article, div')].filter(el => {
+    if(!(el instanceof HTMLElement)) return false;
+    if(el.closest('[data-book], .cm-book-toolbar, .cm-book-tools, .cm-book-thumbs')) return false;
+    if(!el.querySelector('img')) return false;
+    const r = el.getBoundingClientRect();
+    return r.width >= 400 && r.height >= 500;
+  });
+  if(visualCandidates.length){
+    const outer = visualCandidates.filter(el => !visualCandidates.some(other => other !== el && other.contains(el)));
+    if(outer.length) return outer;
+  }
+
+  return [];
+}
+
+function motorBookUpdateZoom(){
+  const viewer = qs('#cmMotorBookViewer');
+  if(!viewer) return;
+  const zoom = Math.max(60, Math.min(280, Number(catalogUI.motorBookZoom || 100)));
+  catalogUI.motorBookZoom = zoom;
+  const factor = zoom / 100;
+  const pages = getMotorBookPages();
+  pages.forEach(page => {
+    page.classList.add('cm-book-page');
+    page.style.zoom = String(factor);
+    page.style.transform = 'none';
+    page.style.transformOrigin = 'top center';
+  });
+  const label = qs('#cmBookZoomLabel');
+  if(label) label.textContent = `${zoom}%`;
+}
+
+function motorBookFitWidth(){
+  const viewer = qs('#cmMotorBookViewer');
+  const pages = getMotorBookPages();
+  if(!viewer || !pages.length) return;
+  const page = pages[catalogUI.motorBookPage] || pages[0];
+  const available = Math.max(280, viewer.clientWidth - 28);
+  const currentZoom = Math.max(0.01, Number(catalogUI.motorBookZoom || 100) / 100);
+  const pageWidth = Math.max(1, page.getBoundingClientRect().width / currentZoom);
+  catalogUI.motorBookZoom = Math.max(60, Math.min(280, Math.round((available / pageWidth) * 100)));
+  motorBookUpdateZoom();
+}
+
+function motorBookClearPageZoom(){
+  getMotorBookPages().forEach(page => {
+    page.style.zoom = '';
+    page.style.transform = '';
+    page.style.transformOrigin = '';
+  });
+}
+
+function motorBookShowPage(page, scroll=true){
+  const pages = getMotorBookPages();
+  if(!pages.length) return;
+  catalogUI.motorBookPage = Math.max(0, Math.min(Number(page) || 0, pages.length - 1));
+  pages.forEach((p,i) => {
+    p.classList.add('cm-book-page');
+    p.classList.toggle('cm-book-page-active', i === catalogUI.motorBookPage);
+  });
+  qsa('.cm-book-thumb').forEach((t,i) => t.classList.toggle('active', i === catalogUI.motorBookPage));
+  const current = qs('#cmBookPageCurrent');
+  const total = qs('#cmBookPageTotal');
+  if(current) current.textContent = String(catalogUI.motorBookPage + 1);
+  if(total) total.textContent = String(pages.length);
+  const prev = qs('[data-book="prev"]');
+  const next = qs('[data-book="next"]');
+  if(prev) prev.disabled = catalogUI.motorBookPage <= 0;
+  if(next) next.disabled = catalogUI.motorBookPage >= pages.length - 1;
+  motorBookUpdateZoom();
+  if(scroll) pages[catalogUI.motorBookPage]?.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function motorBookBuildThumbs(){
+  const pages = getMotorBookPages();
+  const rail = qs('#cmBookThumbs');
+  if(!rail) return;
+  rail.innerHTML = pages.map((page,i) => `
+    <button type="button" class="cm-book-thumb ${i===catalogUI.motorBookPage?'active':''}" data-book-page="${i}" title="Página ${i+1}">
+      <span class="cm-book-thumb-page"></span><span>Página ${i+1}</span>
+    </button>`).join('');
+  pages.forEach((page,i) => {
+    const target = rail.querySelector(`[data-book-page="${i}"] .cm-book-thumb-page`);
+    if(!target) return;
+    const clone = page.cloneNode(true);
+    clone.removeAttribute('class');
+    clone.style.zoom = '';
+    clone.style.transform = 'none';
+    target.appendChild(clone);
+  });
+  const total = qs('#cmBookPageTotal');
+  if(total) total.textContent = String(pages.length);
+}
+
+function clearMotorBookHighlights(){
+  const viewer = qs('#cmMotorBookViewer');
+  if(!viewer) return;
+  viewer.querySelectorAll('mark.cm-book-search-hit').forEach(mark => {
+    const parent = mark.parentNode;
+    if(!parent) return;
+    parent.replaceChild(document.createTextNode(mark.textContent || ''), mark);
+    parent.normalize();
+  });
+  viewer.querySelectorAll('.cm-book-ocr-overlay').forEach(el => el.remove());
+  viewer.querySelectorAll('.cm-book-ocr-active').forEach(el => el.classList.remove('cm-book-ocr-active'));
+}
+
+function motorBookNormalizeSearch(value){
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('pt-PT')
+    .replace(/[‐‑‒–—−]/g, '-')
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function motorBookTextHighlight(query){
+  const q = String(query || '').trim();
+  if(!q) return [];
+  const pages = getMotorBookPages();
+  if(!pages.length) return [];
+  const needle = q.toLocaleLowerCase('pt-PT');
+  const hits = [];
+  pages.forEach((page, pageIndex) => {
+    const walker = document.createTreeWalker(page, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    let node;
+    while((node = walker.nextNode())){
+      const parent = node.parentElement;
+      if(!parent || parent.closest('mark.cm-book-search-hit,script,style,.cm-book-ocr-overlay')) continue;
+      if(String(node.nodeValue || '').toLocaleLowerCase('pt-PT').includes(needle)) nodes.push(node);
+    }
+    nodes.forEach(textNode => {
+      const text = textNode.nodeValue || '';
+      const lower = text.toLocaleLowerCase('pt-PT');
+      const frag = document.createDocumentFragment();
+      let from = 0;
+      while(true){
+        const at = lower.indexOf(needle, from);
+        if(at < 0){
+          if(from < text.length) frag.appendChild(document.createTextNode(text.slice(from)));
+          break;
+        }
+        if(at > from) frag.appendChild(document.createTextNode(text.slice(from, at)));
+        const mark = document.createElement('mark');
+        mark.className = 'cm-book-search-hit';
+        mark.textContent = text.slice(at, at + q.length);
+        frag.appendChild(mark);
+        hits.push({mark, pageIndex});
+        from = at + q.length;
+      }
+      textNode.parentNode?.replaceChild(frag, textNode);
+    });
+  });
+  return hits;
+}
+
+let motorBookTesseractPromise = null;
+const motorBookOCRCache = new Map();
+
+async function ensureMotorBookOCR(){
+  if(window.Tesseract?.recognize) return window.Tesseract;
+  if(motorBookTesseractPromise) return motorBookTesseractPromise;
+  motorBookTesseractPromise = loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js')
+    .then(() => window.Tesseract?.recognize ? window.Tesseract : null)
+    .catch(err => { console.warn('OCR indisponível', err); return null; });
+  return motorBookTesseractPromise;
+}
+
+function motorBookOCRSources(img){
+  // Criamos várias versões da mesma fotografia. O OCR pode falhar numa
+  // imagem inclinada/escura mesmo quando o texto é perfeitamente legível.
+  try{
+    const w = img.naturalWidth || img.width || 0;
+    const h = img.naturalHeight || img.height || 0;
+    if(!w || !h) return [img.currentSrc || img.src].filter(Boolean);
+    const scale = Math.min(2.8, Math.max(1.5, 2400 / Math.max(w, h)));
+    const outW = Math.round(w * scale), outH = Math.round(h * scale);
+    const base = document.createElement('canvas');
+    base.width = outW; base.height = outH;
+    const ctx = base.getContext('2d', {willReadFrequently:true});
+    if(!ctx) return [img.currentSrc || img.src].filter(Boolean);
+    ctx.drawImage(img, 0, 0, outW, outH);
+    const src = ctx.getImageData(0, 0, outW, outH);
+    const d = src.data;
+    const gray = new Uint8Array(outW * outH);
+    for(let i=0,pix=0;i<d.length;i+=4,pix++){
+      const y = (d[i]*0.299)+(d[i+1]*0.587)+(d[i+2]*0.114);
+      gray[pix] = Math.max(0, Math.min(255, Math.round(y)));
+    }
+
+    // Passo 1: grayscale + contraste suave — preserva melhor letras pequenas.
+    const soft = new ImageData(new Uint8ClampedArray(d), outW, outH);
+    for(let i=0,pix=0;i<soft.data.length;i+=4,pix++){
+      const y = gray[pix];
+      const v = Math.max(0, Math.min(255, ((y-128)*1.65)+128));
+      soft.data[i]=soft.data[i+1]=soft.data[i+2]=v; soft.data[i+3]=255;
+    }
+    const c1=document.createElement('canvas'); c1.width=outW; c1.height=outH;
+    c1.getContext('2d').putImageData(soft,0,0);
+
+    // Passo 2: binarização adaptada. Ajuda bastante em páginas fotografadas
+    // com reflexos, sombras e texto cinzento/colorido.
+    const bin = new ImageData(new Uint8ClampedArray(d), outW, outH);
+    const radius = Math.max(8, Math.round(Math.min(outW,outH)/120));
+    const integral = new Float64Array((outW+1)*(outH+1));
+    for(let y=0;y<outH;y++){
+      let row=0;
+      for(let x=0;x<outW;x++){
+        row += gray[y*outW+x];
+        integral[(y+1)*(outW+1)+(x+1)] = integral[y*(outW+1)+(x+1)] + row;
+      }
+    }
+    for(let y=0;y<outH;y++) for(let x=0;x<outW;x++){
+      const x0=Math.max(0,x-radius), x1=Math.min(outW-1,x+radius);
+      const y0=Math.max(0,y-radius), y1=Math.min(outH-1,y+radius);
+      const A=integral[y0*(outW+1)+x0], B=integral[y0*(outW+1)+x1+1];
+      const C=integral[(y1+1)*(outW+1)+x0], D=integral[(y1+1)*(outW+1)+x1+1];
+      const mean=(D-B-C+A)/((x1-x0+1)*(y1-y0+1));
+      const v=gray[y*outW+x] < mean-7 ? 0 : 255;
+      const i=(y*outW+x)*4;
+      bin.data[i]=bin.data[i+1]=bin.data[i+2]=v; bin.data[i+3]=255;
+    }
+    const c2=document.createElement('canvas'); c2.width=outW; c2.height=outH;
+    c2.getContext('2d').putImageData(bin,0,0);
+
+    return [c1.toDataURL('image/jpeg',0.92), c2.toDataURL('image/png')];
+  }catch(err){
+    console.warn('Pré-processamento OCR ignorado', err);
+    return [img.currentSrc || img.src].filter(Boolean);
+  }
+}
+
+function motorBookWordBox(words){
+  const valid = (words || []).filter(w => String(w?.text || '').trim() && w?.bbox);
+  if(!valid.length) return null;
+  const xs = valid.map(w => w.bbox.x0), ys = valid.map(w => w.bbox.y0);
+  const xe = valid.map(w => w.bbox.x1), ye = valid.map(w => w.bbox.y1);
+  return {x0:Math.min(...xs), y0:Math.min(...ys), x1:Math.max(...xe), y1:Math.max(...ye)};
+}
+
+function motorBookOverlayForMatches(img, matches){
+  if(!img || !matches?.length) return [];
+  const host = img.parentElement;
+  if(!host) return [];
+  if(getComputedStyle(host).position === 'static') host.style.position = 'relative';
+  host.querySelectorAll('.cm-book-ocr-overlay').forEach(el => el.remove());
+  const overlay = document.createElement('div');
+  overlay.className = 'cm-book-ocr-overlay';
+  host.appendChild(overlay);
+  const naturalW = img.naturalWidth || img.width || 1;
+  const naturalH = img.naturalHeight || img.height || 1;
+  const displayW = img.clientWidth || naturalW;
+  const displayH = img.clientHeight || naturalH;
+  const sx = displayW / naturalW;
+  const sy = displayH / naturalH;
+  return matches.map((match, index) => {
+    const b = match.bbox || {};
+    const mark = document.createElement('span');
+    mark.className = 'cm-book-ocr-hit';
+    mark.dataset.ocrHit = String(index);
+    mark.style.left = `${Math.max(0, (b.x0 || 0) * sx - 2)}px`;
+    mark.style.top = `${Math.max(0, (b.y0 || 0) * sy - 2)}px`;
+    mark.style.width = `${Math.max(6, ((b.x1 || 0) - (b.x0 || 0)) * sx + 4)}px`;
+    mark.style.height = `${Math.max(6, ((b.y1 || 0) - (b.y0 || 0)) * sy + 4)}px`;
+    mark.title = match.text || '';
+    overlay.appendChild(mark);
+    return mark;
+  });
+}
+
+function motorBookOCRSimilarity(a,b){
+  a=motorBookNormalizeSearch(a); b=motorBookNormalizeSearch(b);
+  if(!a||!b) return 0;
+  if(a===b) return 1;
+  if(a.includes(b)||b.includes(a)) return Math.min(a.length,b.length)/Math.max(a.length,b.length);
+  const m=a.length,n=b.length;
+  if(Math.abs(m-n)>Math.max(3,Math.floor(Math.max(m,n)*0.45))) return 0;
+  const prev=new Array(n+1); const cur=new Array(n+1);
+  for(let j=0;j<=n;j++) prev[j]=j;
+  for(let i=1;i<=m;i++){
+    cur[0]=i;
+    for(let j=1;j<=n;j++){
+      const cost=a[i-1]===b[j-1]?0:1;
+      cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+cost);
+    }
+    for(let j=0;j<=n;j++) prev[j]=cur[j];
+  }
+  return 1-(prev[n]/Math.max(m,n));
+}
+
+function motorBookSearchVariants(query){
+  const base=motorBookNormalizeSearch(query);
+  if(!base) return [];
+  const variants=new Set([base]);
+  // Erros frequentes de OCR em referências de peças.
+  const swaps=[['0','o'],['1','i'],['1','l'],['5','s'],['8','b'],['2','z'],['6','g']];
+  swaps.forEach(([a,b])=>{
+    if(base.includes(a)) variants.add(base.replaceAll(a,b));
+    if(base.includes(b)) variants.add(base.replaceAll(b,a));
+  });
+  return [...variants];
+}
+
+function motorBookBuildOCRMatches(words, query){
+  const variants=motorBookSearchVariants(query);
+  if(!variants.length) return [];
+  const cleanWords=(words||[]).filter(w=>String(w?.text||'').trim()&&w?.bbox);
+  const groups=new Map();
+  cleanWords.forEach((word,index)=>{
+    const key=`${word.block_num??0}:${word.par_num??0}:${word.line_num??index}`;
+    if(!groups.has(key)) groups.set(key,[]);
+    groups.get(key).push({...word,__index:index});
+  });
+  const matches=[];
+  const threshold=variants.some(v=>/\d/.test(v)) ? 0.72 : 0.78;
+  groups.forEach(lineWords=>{
+    lineWords.sort((a,b)=>(a.bbox.y0-b.bbox.y0)||(a.bbox.x0-b.bbox.x0));
+    for(let start=0;start<lineWords.length;start++){
+      let combined='';
+      const used=[];
+      for(let end=start;end<lineWords.length && end<start+8;end++){
+        const w=lineWords[end];
+        const clean=motorBookNormalizeSearch(w.text);
+        if(!clean) continue;
+        combined+=clean; used.push(w);
+        for(const needle of variants){
+          if(combined.includes(needle)){
+            const at=combined.indexOf(needle);
+            const endPos=at+needle.length;
+            let chars=0, selected=[];
+            for(const uw of used){
+              const u=motorBookNormalizeSearch(uw.text); const next=chars+u.length;
+              if(next>at && chars<endPos) selected.push(uw);
+              chars=next;
+            }
+            const bbox=motorBookWordBox(selected);
+            if(bbox) matches.push({text:selected.map(x=>x.text).join(' '),bbox,score:1});
+            break;
+          }
+        }
+      }
+    }
+    // Fuzzy fallback: cada palavra/pequeno grupo pode ter 1-2 erros de OCR.
+    for(let start=0;start<lineWords.length;start++){
+      let combined=''; const used=[];
+      for(let end=start;end<lineWords.length && end<start+5;end++){
+        const w=lineWords[end]; const clean=motorBookNormalizeSearch(w.text);
+        if(!clean) continue;
+        combined+=clean; used.push(w);
+        const score=Math.max(...variants.map(v=>motorBookOCRSimilarity(combined,v)));
+        if(score>=threshold){
+          const bbox=motorBookWordBox(used);
+          if(bbox) matches.push({text:used.map(x=>x.text).join(' '),bbox,score});
+        }
+        // Não alongar demasiado uma referência já muito maior que a pesquisa.
+        if(combined.length>Math.max(...variants.map(v=>v.length))+6) break;
+      }
+    }
+  });
+  const seen=new Set();
+  return matches.filter(m=>{
+    const b=m.bbox; const key=`${Math.round(b.x0/5)}:${Math.round(b.y0/5)}:${Math.round(b.x1/5)}:${Math.round(b.y1/5)}`;
+    if(seen.has(key)) return false; seen.add(key); return true;
+  }).sort((a,b)=>(b.score||0)-(a.score||0));
+}
+
+async function motorBookOCRPage(page, pageIndex, query){
+  const images=[...page.querySelectorAll('img')];
+  if(!images.length) return [];
+  const Tesseract=await ensureMotorBookOCR();
+  if(!Tesseract) return [];
+  const hits=[];
+  for(let i=0;i<images.length;i++){
+    const img=images[i]; const src=img.currentSrc||img.src;
+    if(!src) continue;
+    const key=`${pageIndex}:${i}:${src.length}:${img.naturalWidth}x${img.naturalHeight}`;
+    try{
+      let words=motorBookOCRCache.get(key);
+      if(!words){
+        const sources=motorBookOCRSources(img);
+        let best=[];
+        for(let pass=0;pass<sources.length;pass++){
+          const result=await Tesseract.recognize(sources[pass],'por+eng',{
+            logger:m=>{
+              if(m?.status==='recognizing text'&&typeof m.progress==='number'){
+                const pct=Math.round(m.progress*100);
+                if(pct%25===0) toast(`🔎 A analisar página ${pageIndex+1}: ${pct}%`);
+              }
+            },
+            tessedit_pageseg_mode: 6
+          });
+          const got=result?.data?.words||[];
+          if(got.length>best.length) best=got;
+          if(motorBookBuildOCRMatches(got,query).length) { best=got; break; }
+        }
+        words=best; motorBookOCRCache.set(key,words);
+      }
+      const matches=motorBookBuildOCRMatches(words,query);
+      const marks=motorBookOverlayForMatches(img,matches);
+      marks.forEach((mark,matchIndex)=>hits.push({mark,pageIndex,text:matches[matchIndex]?.text||'',score:matches[matchIndex]?.score||0}));
+    }catch(err){ console.warn('OCR da página falhou',pageIndex+1,err); }
+  }
+  return hits;
+}
+
+async function motorBookSearch(query){
+  const q = String(query || '').trim();
+  catalogUI.motorBookSearch = q;
+  clearMotorBookHighlights();
+  if(!q) return;
+  let pages = getMotorBookPages();
+  if(!pages.length){
+    // O renderer pode terminar de criar as páginas alguns instantes depois
+    // de renderAsync resolver, sobretudo em PWA/Android. Esperamos brevemente
+    // em vez de abortar a pesquisa.
+    for(let attempt=0; attempt<10 && !pages.length; attempt++){
+      await new Promise(resolve => setTimeout(resolve, 180));
+      pages = getMotorBookPages();
+    }
+  }
+  if(!pages.length) return toast('O livro ainda não terminou de carregar.');
+
+  // Garante que a navegação/paginação fica inicializada mesmo quando o DOM
+  // só ficou completo depois do primeiro setup.
+  setupMotorBookViewer(window.__cmCurrentMotorBookEngine || null);
+
+  const textHits = motorBookTextHighlight(q);
+  if(textHits.length){
+    const first = textHits[0];
+    motorBookShowPage(first.pageIndex, false);
+    requestAnimationFrame(() => first.mark.scrollIntoView({behavior:'smooth', block:'center', inline:'nearest'}));
+    return toast(`🔎 ${textHits.length} resultado${textHits.length === 1 ? '' : 's'} encontrado${textHits.length === 1 ? '' : 's'}.`);
+  }
+
+  toast('🔎 A procurar nas imagens do livro…');
+  const ocrHits = [];
+  for(let i=0;i<pages.length;i++){
+    const pageHits = await motorBookOCRPage(pages[i], i, q);
+    ocrHits.push(...pageHits);
+  }
+  if(!ocrHits.length) return toast(`Não encontrei “${q}” no livro.`);
+
+  // Cada resultado leva à página correta. Não dependemos da tag <section>,
+  // porque o docx-preview pode usar div/article conforme a versão.
+  const first = ocrHits[0];
+  motorBookShowPage(first.pageIndex, false);
+  requestAnimationFrame(() => first.mark.scrollIntoView({behavior:'smooth', block:'center', inline:'nearest'}));
+  toast(`🟨 ${ocrHits.length} resultado${ocrHits.length === 1 ? '' : 's'} encontrado${ocrHits.length === 1 ? '' : 's'}.`);
+}
+
+
+/* ========================================================================== 
+   IMPORTAÇÃO AUTOMÁTICA DO LIVRO → PEÇAS
+   Ao carregar um novo Word, o catálogo é analisado automaticamente.
+   Não pede confirmação: cria/atualiza apenas as peças que consegue identificar
+   e deixa-as editáveis na lista normal de Peças.
+   ========================================================================== */
+const MOTOR_BOOK_BRANDS = [
+  'VICTOR REINZ','REINZ','TOYONISA','REDLINE','GLYCO','KING','AJUSA','FRECCIA','KS',
+  'CORTECO','ELRING','PAYEN','AE','INA','MAHLE','GOETZE','GOETZ','FEDERAL MOGUL','NURAL',
+  'PIERBURG','BOSCH','DAYCO','GATES','SKF','SNR','FEBI','FAI','TRW','LUK','SACHS','VALEO',
+  'MANN','PURFLUX','HENGST','CONTINENTAL','CAVILHA','CORTeco'.toUpperCase()
+];
+const MOTOR_BOOK_TYPE_HINTS = [
+  ['CHUMACEIRA|CASQUILHA|BRONZES', 'Chumaceiras'],
+  ['PISTAO|PISTÕES|EMBOLO|EMBÔLO', 'Pistões'],
+  ['SEGMENTO', 'Segmentos'],
+  ['JUNTA', 'Juntas'],
+  ['RETENTOR', 'Retentores'],
+  ['VALVULA|VÁLVULA', 'Válvulas'],
+  ['BIELA', 'Bielas'],
+  ['CAMBOTA', 'Cambota'],
+  ['ARVORE DE CAMES|ÁRVORE DE CAMES|CAMES', 'Árvore de cames'],
+  ['CORREIA|CORRENTE|TENSOR|ROLO', 'Distribuição'],
+  ['FILTRO', 'Filtros'],
+  ['VELA', 'Velas'],
+  ['BOMBA', 'Bombas'],
+  ['TERMOST|RADIADOR|REFRIGERA', 'Refrigeração'],
+  ['EMBRAIAGEM', 'Embraiagem'],
+  ['TURBO', 'Turbo'],
+  ['INJETOR|INJECAO|INJEÇÃO', 'Injeção'],
+  ['SENSOR|SONDA', 'Sensores'],
+  ['ROLAMENTO', 'Rolamentos']
+];
+
+function motorBookCleanOCRLine(value){
+  return String(value || '').replace(/[|¦]+/g,' ').replace(/\s+/g,' ').replace(/\s+([,.;:])/g,'$1').trim();
+}
+function motorBookReferenceCandidates(line){
+  const source = motorBookCleanOCRLine(line).replace(/[“”"']/g,'');
+  const tokens = source.match(/[A-Za-z0-9][A-Za-z0-9./_-]{2,39}/g) || [];
+  const out=[];
+  const seen=new Set();
+  tokens.forEach(raw=>{
+    let v=raw.replace(/^[.,;:()[\]{}]+|[.,;:()[\]{}]+$/g,'');
+    if(!v || v.length<4 || v.length>40 || !/\d/.test(v)) return;
+    const compact=catCompact(v);
+    if(!compact || compact.length<4) return;
+    // Evita dimensões isoladas, anos, páginas e palavras demasiado genéricas.
+    if(/^\d{1,3}(?:[.,]\d{1,3})?(?:mm|cm)?$/i.test(v)) return;
+    if(/^\d{1,4}$/.test(v)) return;
+    if(/^(?:motor|pagina|página|page|std|jogo|x\d+)$/i.test(v)) return;
+    if(/^(?:0?25|0?50|025|050|075|100)mm$/i.test(v)) return;
+    if(seen.has(compact)) return;
+    seen.add(compact); out.push(v);
+  });
+  return out;
+}
+function motorBookFindBrand(line){
+  const n=catNorm(line).toUpperCase();
+  const found=MOTOR_BOOK_BRANDS.find(b=>n.includes(catNorm(b).toUpperCase()));
+  return found ? found.replace(/^REINZ$/,'VICTOR REINZ') : '';
+}
+function motorBookInferType(line, fallback='Outros'){
+  const n=catNorm(line).toUpperCase();
+  for(const [rx,name] of MOTOR_BOOK_TYPE_HINTS){ if(new RegExp(rx,'i').test(n)) return name; }
+  return fallback || 'Outros';
+}
+function motorBookDescription(line, refs, brand, typeName){
+  let d=motorBookCleanOCRLine(line);
+  refs.forEach(ref=>{ d=d.replace(new RegExp(ref.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'ig'),' '); });
+  if(brand) d=d.replace(new RegExp(brand.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'ig'),' ');
+  d=d.replace(/[-–—:;,|]+/g,' ').replace(/\s+/g,' ').trim();
+  if(!d || d.length<3) d=typeName || '';
+  // Não guardar títulos inteiros como descrição se forem apenas o nome do tipo.
+  if(catNorm(d)===catNorm(typeName)) return typeName;
+  return d.slice(0,180);
+}
+function motorBookLineFromOCR(words){
+  const groups=new Map();
+  (words||[]).filter(w=>String(w?.text||'').trim()&&w?.bbox).forEach((w,i)=>{
+    const key=`${w.block_num??0}:${w.par_num??0}:${w.line_num??i}`;
+    if(!groups.has(key)) groups.set(key,[]); groups.get(key).push(w);
+  });
+  return [...groups.values()].map(line=>line.sort((a,b)=>(a.bbox.y0-b.bbox.y0)||(a.bbox.x0-b.bbox.x0)).map(w=>String(w.text||'').trim()).filter(Boolean).join(' ')).filter(Boolean);
+}
+async function motorBookOCRFullImage(img){
+  const Tesseract=await ensureMotorBookOCR();
+  if(!Tesseract || !img) return [];
+  const key=`full:${img.currentSrc||img.src}:${img.naturalWidth}x${img.naturalHeight}`;
+  let cached=motorBookOCRCache.get(key);
+  if(cached?.__fullLines) return cached.__fullLines;
+  const sources=motorBookOCRSources(img); let bestWords=[];
+  for(let pass=0;pass<sources.length;pass++){
+    try{
+      const result=await Tesseract.recognize(sources[pass],'por+eng',{logger:m=>{
+        if(m?.status==='recognizing text'&&typeof m.progress==='number'){
+          const pct=Math.round(m.progress*100); if(pct%25===0) toast(`🔎 A analisar o livro: ${pct}%`);
+        }
+      },tessedit_pageseg_mode:6});
+      const words=result?.data?.words||[];
+      if(words.length>bestWords.length) bestWords=words;
+    }catch(err){ console.warn('OCR automático falhou',err); }
+  }
+  const lines=motorBookLineFromOCR(bestWords);
+  motorBookOCRCache.set(key,{__fullLines:true,words:bestWords,lines});
+  return lines;
+}
+function motorBookTextLines(page){
+  const text=String(page?.innerText||page?.textContent||'');
+  return text.split(/\n+/).map(motorBookCleanOCRLine).filter(Boolean);
+}
+function motorBookLooksLikeHeading(line){
+  const clean=motorBookCleanOCRLine(line); if(!clean || clean.length>90) return false;
+  if(motorBookReferenceCandidates(clean).length) return false;
+  const letters=clean.replace(/[^A-Za-zÀ-ÿ]/g,'');
+  if(letters.length<4) return false;
+  const upper=letters===letters.toUpperCase();
+  return upper || /^(jogo|pist|chum|junta|retentor|válvula|valvula|segment|árvore|arvore|biela|cambota|correia|filtro|vela|sensor)/i.test(clean);
+}
+function motorBookParseLines(lines,pageNumber,engine){
+  const found=[]; let currentType='Outros';
+  for(const raw of lines){
+    const line=motorBookCleanOCRLine(raw); if(line.length<3) continue;
+    const hinted=motorBookInferType(line,'');
+    if(hinted) currentType=hinted;
+    if(motorBookLooksLikeHeading(line) && !hinted) currentType=line.replace(/[.:]+$/,'').slice(0,80);
+    const refs=motorBookReferenceCandidates(line); if(!refs.length) continue;
+    const brand=motorBookFindBrand(line);
+    const typeName=motorBookInferType(line,currentType||'Outros');
+    const desc=motorBookDescription(line,refs,brand,typeName);
+    refs.forEach(ref=>found.push({motorId:engine.id,tipoNome:typeName||'Outros',referencia:ref,marca:brand,descricao:desc,observacoes:`Importado automaticamente do Livro · página ${pageNumber}`,sourceBook:engine.livroMotorNome||'',sourceBookPage:pageNumber}));
+  }
+  return found;
+}
+async function motorBookExtractPieces(engine,pages){
+  const all=[];
+  for(let i=0;i<pages.length;i++){
+    const page=pages[i];
+    let lines=motorBookTextLines(page);
+    const images=[...page.querySelectorAll('img')];
+    if(images.length){
+      const ocrLines=[];
+      for(const img of images){ const got=await motorBookOCRFullImage(img); ocrLines.push(...got); }
+      // Se o Word já tem texto mas o OCR encontrou mais informação, juntamos as duas fontes.
+      if(ocrLines.length) lines=[...lines,...ocrLines];
+    }
+    all.push(...motorBookParseLines(lines,i+1,engine));
+  }
+  return all;
+}
+async function motorBookAutoCreatePieces(engine){
+  if(!engine || !catalogGuard('add') || !engine.livroMotorUrl) return;
+  let pages=getMotorBookPages();
+  for(let i=0;i<15 && !pages.length;i++){ await new Promise(r=>setTimeout(r,250)); pages=getMotorBookPages(); }
+  if(!pages.length) return toast('O Livro carregou, mas não foi possível preparar a leitura automática.');
+  try{
+    toast(`🧠 A analisar o Livro do ${engine.nome} e a criar as peças…`);
+    const extracted=await motorBookExtractPieces(engine,pages);
+    if(!extracted.length) return toast('Não foram encontradas referências suficientes para criar peças.');
+
+    const idx=catalogIndex();
+    const typeByKey=new Map(idx.types.map(t=>[catKey(t.nome),t]));
+    const usedTypes=new Set(idx.types.map(t=>t.id));
+    const ops=[]; const newTypes=[];
+    const now=new Date().toISOString();
+    const seen=new Set();
+    for(const item of extracted){
+      let type=typeByKey.get(catKey(item.tipoNome));
+      if(!type){
+        const typeName=item.tipoNome||'Outros';
+        type={id:catNewId('TPC',typeName,usedTypes),nome:typeName,icone:'',createdAt:now};
+        typeByKey.set(catKey(typeName),type); newTypes.push(type);
+      }
+      const key=`${item.motorId}|${type.id}|${catCompact(item.referencia)}|${catKey(item.marca)}`;
+      if(seen.has(key)) continue; seen.add(key);
+      const dup=state.engineCatalog.find(p=>p.motorId===item.motorId&&p.tipoId===type.id&&catCompact(p.referencia)===catCompact(item.referencia)&&catKey(p.marca)===catKey(item.marca));
+      if(dup) continue;
+      const row={id:uid('PEC'),motorId:item.motorId,tipoId:type.id,referencia:item.referencia,descricao:item.descricao||'',marca:item.marca||'',observacoes:item.observacoes||'',createdAt:now,sourceBook:item.sourceBook||'',sourceBookPage:item.sourceBookPage||0,autoImported:true};
+      state.engineCatalog.push(row); ops.push({key:'engineCatalog',row});
+    }
+    newTypes.forEach(t=>{state.engineCatalogTypes.push(t);ops.unshift({key:'engineCatalogTypes',row:t});});
+    if(!ops.length) return toast('O Livro foi analisado. Não havia peças novas para adicionar.');
+    const ok=await catalogCommit(ops,`Catálogo Motor: importação automática do Livro ${engine.livroMotorNome||''}`);
+    if(ok){
+      catalogUI.motorView='parts'; catalogUI.motorBookAutoImportPending=false; catalogRefreshBody();
+      toast(`✅ ${ops.filter(o=>o.key==='engineCatalog').length} peça(s) criada(s) automaticamente. Podes editá-las na lista.`);
+    }
+  }catch(err){ console.error('Importação automática do Livro:',err); toast('O Livro foi carregado, mas a criação automática das peças falhou.'); }
+}
+
+function motorBookPrint(){
+  const pages = getMotorBookPages();
+  if(!pages.length) return toast('O livro ainda não está carregado.');
+  const html = pages.map(p => p.outerHTML).join('');
+  const win = window.open('', '_blank', 'noopener,noreferrer');
+  if(!win) return toast('O navegador bloqueou a janela de impressão.');
+  win.document.write(`<!doctype html><html><head><title>Livro do Motor</title><style>@page{size:A4;margin:0}body{margin:0;background:#fff}section{page-break-after:always!important;margin:0!important;box-shadow:none!important}</style></head><body>${html}</body></html>`);
+  win.document.close();
+  setTimeout(() => { try{win.focus(); win.print();}catch{} }, 350);
+}
+
+function setupMotorBookViewer(engine){
+  const pages = getMotorBookPages();
+  if(pages.length){
+    motorBookBuildThumbs();
+    motorBookShowPage(Math.min(catalogUI.motorBookPage, pages.length - 1), false);
+    // v2.9.34: mantém o zoom escolhido depois da abertura inicial.
+    motorBookUpdateZoom();
+  }
+
+  qsa('[data-book]').forEach(btn => {
+    btn.onclick = async e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const act = btn.dataset.book;
+      if(act === 'prev') motorBookShowPage(catalogUI.motorBookPage - 1);
+      if(act === 'next') motorBookShowPage(catalogUI.motorBookPage + 1);
+      if(act === 'zoom-in') {
+        catalogUI.motorBookZoom = Math.min(280, Number(catalogUI.motorBookZoom || 100) + 10);
+        motorBookUpdateZoom();
+      }
+      if(act === 'fit-width') motorBookFitWidth();
+      if(act === 'zoom-out') {
+        catalogUI.motorBookZoom = Math.max(60, Number(catalogUI.motorBookZoom || 100) - 10);
+        motorBookUpdateZoom();
+      }
+      if(act === 'zoom-reset') {
+        catalogUI.motorBookZoom = 100;
+        motorBookUpdateZoom();
+      }
+      if(act === 'fullscreen') {
+        const target = qs('#cmBookShell');
+        if(!target) return;
+        const fallback = target.classList.contains('cm-book-fullscreen-fallback');
+        if(document.fullscreenElement || fallback){
+          try{ if(document.fullscreenElement) await document.exitFullscreen?.(); }catch{}
+          target.classList.remove('cm-book-fullscreen-fallback','cm-book-is-fullscreen');
+          document.body.classList.remove('cm-book-body-fullscreen');
+          return;
+        }
+        // O modo CSS é o fallback garantido para Edge/PWA/Electron e não depende
+        // das permissões do Fullscreen API.
+        target.classList.add('cm-book-fullscreen-fallback');
+        document.body.classList.add('cm-book-body-fullscreen');
+        try{
+          if(target.requestFullscreen && !document.fullscreenElement) await target.requestFullscreen();
+        }catch(err){
+          console.warn('Fullscreen API indisponível; mantendo modo CSS.', err);
+        }
+        target.classList.add('cm-book-is-fullscreen');
+        setTimeout(motorBookUpdateZoom, 80);
+      }
+      if(act === 'print') motorBookPrint();
+    };
+  });
+  qsa('[data-book-page]').forEach(btn => btn.onclick = () => motorBookShowPage(Number(btn.dataset.bookPage)));
+
+  const search = qs('#cmBookSearch');
+  if(search){
+    let timer = null;
+    search.oninput = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => motorBookSearch(search.value), 180);
+    };
+    search.onkeydown = e => {
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        clearTimeout(timer);
+        motorBookSearch(search.value);
+      }
+      if(e.key === 'Escape'){
+        search.value = '';
+        clearTimeout(timer);
+        motorBookSearch('');
+      }
+    };
+  }
+
+  if(!document.__cmBookFullscreenBound){
+    document.__cmBookFullscreenBound = true;
+    document.addEventListener('fullscreenchange', () => {
+      const shell = qs('#cmBookShell');
+      if(shell){
+        const active = document.fullscreenElement === shell;
+        shell.classList.toggle('cm-book-is-fullscreen', active || shell.classList.contains('cm-book-fullscreen-fallback'));
+        document.body.classList.toggle('cm-book-body-fullscreen', active || shell.classList.contains('cm-book-fullscreen-fallback'));
+      }
+      setTimeout(motorBookUpdateZoom, 80);
+    });
+  }
+}
+
+function motorBookHTML(engine, canEdit){
+  if(!engine?.livroMotorUrl) return '';
+  return `<section class="cm-book" id="cmBookShell">
+    <div class="cm-book-toolbar cm-book-reading-toolbar">
+      <div class="cm-book-reading-left">
+        <button type="button" class="cm-book-back" data-cm="motor-book-close" title="Voltar ao motor">← <span>${esc(engine.nome)}</span></button>
+        <div class="cm-book-file">
+          <span class="cm-eyebrow">📖 LIVRO DO MOTOR</span>
+          <strong>${esc(engine.livroMotorNome || `Motor ${engine.nome}.docx`)}</strong>
+          <span class="cm-book-status">● ${esc(engine.livroMotorUpdatedAt ? new Date(engine.livroMotorUpdatedAt).toLocaleDateString('pt-PT') : 'Word carregado')}</span>
+        </div>
+      </div>
+      <div class="cm-book-actions">
+        <button type="button" class="cm-btn small" data-book="print">🖨️ Imprimir</button>
+        <a class="cm-btn small" href="${esc(engine.livroMotorUrl)}" target="_blank" rel="noopener" download>📥 Word original</a>
+        ${canEdit ? '<button type="button" class="cm-btn small" id="cmUploadMotorBookBtn">📤 Trocar Word</button>' : ''}
+        ${canEdit ? '<button type="button" class="cm-btn small cm-danger" data-cm="remove-motor-book">🗑️ Remover</button>' : ''}
+      </div>
+    </div>
+    <div class="cm-book-tools">
+      <div class="cm-book-page-tools">
+        <button type="button" class="cm-book-icon" data-book="prev" title="Página anterior">←</button>
+        <span>Página <b id="cmBookPageCurrent">1</b> / <b id="cmBookPageTotal">—</b></span>
+        <button type="button" class="cm-book-icon" data-book="next" title="Página seguinte">→</button>
+      </div>
+      <div class="cm-book-search"><span>🔎</span><input id="cmBookSearch" type="search" placeholder="Pesquisar no livro…" autocomplete="off"></div>
+      <div class="cm-book-page-tools">
+        <button type="button" class="cm-book-icon" data-book="zoom-out" title="Diminuir">−</button>
+        <button type="button" class="cm-book-zoom" id="cmBookZoomLabel" data-book="zoom-reset">100%</button>
+        <button type="button" class="cm-book-icon" data-book="zoom-in" title="Aumentar">+</button>
+        <button type="button" class="cm-book-icon cm-book-fit" data-book="fit-width" title="Ajustar à largura">↔</button>
+        <button type="button" class="cm-book-icon" data-book="fullscreen" title="Ecrã inteiro">⛶</button>
+      </div>
+    </div>
+    <div class="cm-book-workspace">
+      <aside class="cm-book-thumbs"><div class="cm-book-thumbs-title">Páginas</div><div id="cmBookThumbs"></div></aside>
+      <div id="cmMotorBookViewer" class="cm-book-viewer"></div>
+    </div>
+  </section>`;
+}
+
+function catalogoMotor(){
+  if(!catalogReady() && !catalogUI.failed) return catalogLoadingCard();
+  if(catalogReady()) catalogMigrateLegacy();
+  const idx = catalogIndex();
+  catalogFixSelection(idx);
+  syncMotorBookReadingMode();
+  const canAdd = catalogCan('add');
+  const canImport = catalogCan('import');
+  const canExport = catalogCan('export');
+  const motorMode = Boolean(catalogUI.motorOpen && catalogUI.motorId && idx.engineById.has(catalogUI.motorId) && !String(catalogUI.q || '').trim());
+  if(!motorMode && catalogUI.motorFocus){ catalogUI.motorFocus=false; document.body.classList.remove('cm-motor-focus'); }
+  const shell = motorMode ? `<div id="cmMotorModeHead">${catalogMotorWorkspaceHTML(idx, canAdd, canImport, canExport)}</div>` : `<section class="cm-hero">
+      <div class="cm-hero-top">
+        <div class="cm-hero-copy">
+          <span class="cm-eyebrow">📚 CATÁLOGO MOTOR</span>
+          <h3>Material de motor</h3>
+          <p>Motor → Tipo de peça → Peças. Pesquisa tudo de uma vez por referência, descrição, marca ou motor.</p>
+        </div>
+        <div class="cm-stats">
+          <div><b>${idx.engines.length}</b><span>Motores</span></div>
+          <div><b>${idx.types.length}</b><span>Tipos</span></div>
+          <div><b>${idx.all.length}</b><span>Peças</span></div>
+        </div>
+      </div>
+      <div class="cm-search">
+        <span class="cm-search-ico">🔎</span>
+        <input id="cmSearch" class="cm-search-input" type="search" autocomplete="off" spellcheck="false" placeholder="Pesquisar referência, descrição, marca ou motor…" value="${esc(catalogUI.q)}">
+        <button type="button" class="cm-clear ${catalogUI.q ? '' : 'cm-hide'}" data-cm="clear-search" aria-label="Limpar pesquisa">✕</button>
+      </div>
+      <div class="cm-actions">
+        ${canAdd ? '<button class="cm-btn cm-btn-main" type="button" data-cm="piece-new">➕ Nova peça</button>' : ''}
+        ${canAdd ? '<button class="cm-btn" type="button" data-cm="engine-new">🚗 Novo motor</button>' : ''}
+        <button class="cm-btn" type="button" data-cm="type-manage">🏷️ Tipos de peça</button>
+        ${canImport ? '<button class="cm-btn" type="button" data-cm="import-motor-spec" style="background:#0284c7; color:white; border:0;">📥 Importar para este Motor</button>' : ''}
+        ${canExport ? '<button class="cm-btn" type="button" data-cm="export-motor-spec" style="background:#0f766e; color:white; border:0;">📤 Exportar este Motor</button>' : ''}
+        ${isAdminMaster() ? '<button class="cm-btn cm-btn-danger" type="button" id="cmDeleteAllEnginesBtn" style="background:#ef4444; color:white; border:0;">🗑️ Apagar tudo</button>' : ''}
+      </div>
+    </section>`;
+  return `<div class="cm-page" id="cmPage">
+    <style>
+      .cm-page .table-wrap,.cm-page table,.cm-page .card tbody,.cm-page .catalogo-type-card table{display:none!important}
+      .cm-page .cm-aberto + .table-wrap,.cm-page .cm-aberto table{display:table!important}
+    </style>
+    ${catalogErrorBanner()}
+    ${shell}
+    <div id="motorMainWrapper"><div id="cmBody">${catalogBodyHTML(idx)}</div></div>
+    <input class="hidden" id="cmExcelInput" type="file" accept=".xlsx,.xls,.csv,.tsv">
+    <input class="hidden" id="cmMotorSpecExcelInput" type="file" accept=".xlsx,.xls,.csv,.tsv">
+    <input id="cmMotorBookInput" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" aria-hidden="true" tabindex="-1" style="position:fixed;left:-10000px;top:-10000px;width:1px;height:1px;opacity:0;pointer-events:none;">
+  </div>`;
+}
+
+function catalogMotorWorkspaceHTML(idx, canAdd, canImport, canExport){
+  const engine = idx.engineById.get(catalogUI.motorId);
+  if(!engine) return '';
+  const pos = Math.max(0, idx.engines.findIndex(e => e.id === engine.id));
+  const prev = idx.engines[pos - 1], next = idx.engines[pos + 1];
+  const picker = catalogUI.motorPickerOpen ? `<div class="cm-motor-picker-panel">
+      <div class="cm-motor-picker-search"><span>🔎</span><input id="cmMotorPickerSearch" type="search" placeholder="Procurar motor…" value="${esc(catalogUI.motorPickerQ || '')}" autocomplete="off"></div>
+      <div class="cm-motor-picker-list">${idx.engines.filter(e => !catalogUI.motorPickerQ || catNorm(e.nome).includes(catNorm(catalogUI.motorPickerQ))).slice(0,120).map(e => `<button type="button" class="cm-motor-picker-item ${e.id===engine.id?'active':''}" data-cm="motor-pick" data-id="${esc(e.id)}"><span>🚗 ${esc(e.nome)}</span><small>${idx.engineCount.get(e.id)||0} peças</small></button>`).join('') || '<div class="cm-motor-picker-empty">Nenhum motor encontrado.</div>'}</div>
+    </div>` : '';
+  const catalogPanel = catalogUI.catalogPanelOpen ? `<div class="cm-catalog-popover" data-catalog-popover>
+      <div class="cm-catalog-popover-head"><div><strong>📚 Catálogo Motor</strong><small>Ferramentas do catálogo</small></div><button type="button" class="cm-catalog-close" data-cm="catalog-panel-toggle" aria-label="Fechar catálogo">✕</button></div>
+      <div class="cm-catalog-popover-search"><span>🔎</span><input id="cmSearch" class="cm-search-input" type="search" autocomplete="off" spellcheck="false" placeholder="Pesquisar referência, descrição, marca ou motor…" value="${esc(catalogUI.q)}"><button type="button" class="cm-clear ${catalogUI.q ? '' : 'cm-hide'}" data-cm="clear-search" aria-label="Limpar pesquisa">✕</button></div>
+      <div class="cm-catalog-popover-actions">
+        ${canAdd ? '<button class="cm-btn cm-btn-main" type="button" data-cm="piece-new">➕ Nova peça</button>' : ''}
+        ${canAdd ? '<button class="cm-btn" type="button" data-cm="engine-new">🚗 Novo motor</button>' : ''}
+        <button class="cm-btn" type="button" data-cm="type-manage">🏷️ Tipos de peça</button>
+        ${canImport ? '<button class="cm-btn" type="button" data-cm="import-motor-spec" style="background:#0284c7; color:white; border:0;">📥 Importar</button>' : ''}
+        ${canExport ? '<button class="cm-btn" type="button" data-cm="export-motor-spec" style="background:#0f766e; color:white; border:0;">📤 Exportar</button>' : ''}
+        ${isAdminMaster() ? '<button class="cm-btn cm-btn-danger" type="button" id="cmDeleteAllEnginesBtn" data-cm="delete-all-engines" style="background:#ef4444; color:white; border:0;">🗑️ Apagar tudo</button>' : ''}
+      </div>
+    </div>` : '';
+  return `<div class="cm-motor-mode-head">
+    <div class="cm-motor-mode-left">
+      <button type="button" class="cm-btn small" data-cm="motor-back">← Catálogo</button>
+      <button type="button" class="cm-motor-nav" data-cm="motor-prev" ${prev?'':'disabled'} title="Motor anterior">‹</button>
+      <button type="button" class="cm-motor-current" data-cm="motor-picker-toggle"><span>🚗</span><strong>${esc(engine.nome)}</strong><small>${pos+1} / ${idx.engines.length}</small></button>
+      <button type="button" class="cm-motor-nav" data-cm="motor-next" ${next?'':'disabled'} title="Motor seguinte">›</button>
+      ${picker}
+    </div>
+    <div class="cm-motor-mode-actions">
+      <button type="button" class="cm-btn small cm-catalog-trigger" data-cm="catalog-panel-toggle">📚 Catálogo</button>
+      ${canAdd ? `<button type="button" class="cm-btn small cm-btn-main" data-cm="piece-new" data-motor="${esc(engine.id)}">➕ Peça</button>` : ''}
+      ${canImport ? '<button type="button" class="cm-btn small" data-cm="import-motor-spec">📥 Importar</button>' : ''}
+      ${canExport ? '<button type="button" class="cm-btn small" data-cm="export-motor-spec">📤 Exportar</button>' : ''}
+      <button type="button" class="cm-btn small" data-cm="motor-focus">⛶ ${catalogUI.motorFocus?'Sair do foco':'Modo foco'}</button>
+    </div>
+    ${catalogPanel}
+  </div>`;
+}
+
+function catalogBodyHTML(idx){
+  let html;
+  if(String(catalogUI.q || '').trim()) html = catalogSearchHTML(idx, catalogUI.q);
+  else if(catalogUI.motorOpen && catalogUI.motorId) {
+    const engine = idx.engineById.get(catalogUI.motorId);
+    html = engine ? catalogEnginePanel(idx, engine) : catalogBrowseHTML(idx);
+  } else html = catalogBrowseHTML(idx);
+  if (html) {
+    html = html.replace(/class="table-wrap"/g, 'class="table-wrap" style="display: none;" hidden');
+    html = html.replace(/<table/g, '<table style="display: none;" hidden');
+  }
+  return html;
+}
+
+function syncMotorBookReadingMode(){
+  const idx = catalogIndex();
+  const engine = idx.engineById.get(catalogUI.motorId);
+  const active = Boolean(catalogUI.motorOpen && catalogUI.motorView === 'book' && engine?.livroMotorUrl);
+  document.body.classList.toggle('cm-book-reading-mode', active);
+  if(!active) document.body.classList.remove('cm-book-reader-fullscreen');
+  return active;
+}
+
+function setMotorViewForEngine(engine, resetBook=true){
+  if(engine?.livroMotorUrl){
+    catalogUI.motorView = 'book';
+    if(resetBook){
+      catalogUI.motorBookPage = 0;
+      catalogUI.motorBookZoom = 100;
+      catalogUI.motorBookSearch = '';
+    }
+  }else{
+    catalogUI.motorView = 'parts';
+    catalogUI.motorBookPage = 0;
+    catalogUI.motorBookSearch = '';
+  }
+}
+
+function catalogRefreshBody(){
+  syncMotorBookReadingMode();
+  const box = qs('#cmBody'); if(!box) return;
+  const page = qs('#cmPage');
+  document.body.classList.toggle('cm-motor-focus', Boolean(catalogUI.motorFocus && catalogUI.motorOpen));
+  const idx = catalogIndex();
+  catalogFixSelection(idx);
+  const motorMode = Boolean(catalogUI.motorOpen && catalogUI.motorId && idx.engineById.has(catalogUI.motorId) && !String(catalogUI.q || '').trim());
+
+  // v2.9.28: quando se abre um motor depois de a página do catálogo já estar
+  // renderizada, o "hero" do catálogo antigo não era removido. Isso fazia
+  // parecer que a gaveta não funcionava e roubava espaço ao Livro.
+  if(page){
+    page.classList.toggle('cm-motor-mode', motorMode);
+    const hero = page.querySelector('.cm-hero');
+    if(hero) hero.style.display = motorMode ? 'none' : '';
+  }
+
+  const head = qs('#cmMotorModeHead');
+  if(motorMode){
+    const canAdd=catalogCan('add'), canImport=catalogCan('import'), canExport=catalogCan('export');
+    if(head) head.innerHTML = catalogMotorWorkspaceHTML(idx, canAdd, canImport, canExport);
+    else { const wrap=qs('#motorMainWrapper'); if(wrap) wrap.insertAdjacentHTML('beforebegin', `<div id="cmMotorModeHead">${catalogMotorWorkspaceHTML(idx,canAdd,canImport,canExport)}</div>`); }
+  } else if(head) head.remove();
+  box.innerHTML = catalogBodyHTML(idx);
+  const engine = idx.engineById.get(catalogUI.motorId);
+  const input = qs('#cmMotorBookInput');
+  if(input) input.value = '';
+  const uploadBtn = qs('#cmUploadMotorBookBtn');
+  if(uploadBtn && engine) uploadBtn.onclick = (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    openMotorBookPicker(engine);
+  };
+  if(engine?.livroMotorUrl) {
+    setTimeout(() => renderMotorBook(engine), 0);
+  }
+}
+
+function catalogBrowseHTML(idx){
+  if(!idx.engines.length){
+    return `<div class="cm-empty"><div class="cm-empty-ico">🚗</div><h4>Ainda não há motores no catálogo</h4><p>Cria o primeiro motor ou importa o teu catálogo a partir de Excel.</p><div class="cm-actions center">${catalogCan('add') ? '<button class="cm-btn cm-btn-main" type="button" data-cm="engine-new">🚗 Criar motor</button>' : ''}${catalogCan('import') ? '<button class="cm-btn" type="button" data-cm="import">📥 Importar Excel</button>' : ''}</div></div>`;
+  }
+  const engineButtonsHTML = idx.engines.map(e => {
+    const engineCount = idx.engineCount.get(e.id) || 0;
+    return `<button type="button" class="cm-engine" data-cm="engine-select" data-id="${esc(e.id)}" data-key="${esc(catNorm(e.nome))}"><span class="cm-engine-name">${esc(e.nome)}</span><span class="cm-engine-meta">${engineCount}</span></button>`;
+  }).join('');
+  return `<div class="cm-layout cm-engine-browser">
+    <aside class="cm-side"><div class="cm-side-head"><strong>🚗 Motores</strong><span class="cm-count">${idx.engines.length}</span></div>${idx.engines.length > 8 ? '<input class="cm-side-filter" data-cm-input="engine-filter" placeholder="Filtrar motores…" autocomplete="off">' : ''}<div class="cm-engine-list">${engineButtonsHTML}</div></aside>
+    <section class="cm-main cm-engine-empty-state"><div class="cm-empty"><div class="cm-empty-ico">🚗</div><h4>Escolhe um motor</h4><p>Ao abrir um motor, a lista lateral desaparece para dar o máximo de espaço ao conteúdo.</p></div></section>
+  </div>`;
+}
+
+function catalogEnginePanel(idx, engine){
+  if(!engine) return '';
+  const typeMap = idx.byEngine.get(engine.id) || new Map();
+  const typeIds = [...typeMap.keys()].sort((a,b) => catCollate(idx.typeById.get(a)?.nome, idx.typeById.get(b)?.nome));
+  const total = idx.engineCount.get(engine.id) || 0;
+  const canAdd = catalogCan('add'), canEdit = catalogCan('edit'), canDel = catalogCan('delete');
+  if(!catalogUI.motorView) catalogUI.motorView = engine.livroMotorUrl ? 'book' : 'parts';
+  if(catalogUI.motorView === 'book' && !engine.livroMotorUrl) catalogUI.motorView = 'parts';
+  const view = catalogUI.motorView;
+  const tab = (name,label,icon) => `<button type="button" class="cm-motor-tab ${view===name?'active':''}" data-cm="motor-view" data-view="${name}">${icon} ${label}</button>`;
+  const info = `<div class="cm-motor-info-panel">
+    <div class="cm-info-grid">
+      <div><span>Motor</span><strong>${esc(engine.nome)}</strong></div>
+      <div><span>Tipos de peça</span><strong>${typeIds.length}</strong></div>
+      <div><span>Peças registadas</span><strong>${total}</strong></div>
+      <div><span>Livro</span><strong>${engine.livroMotorNome ? esc(engine.livroMotorNome) : 'Ainda não carregado'}</strong></div>
+    </div>
+    ${engine.observacoes ? `<div class="cm-info-note">${esc(engine.observacoes)}</div>` : '<div class="cm-info-note muted">Sem observações registadas para este motor.</div>'}
+  </div>`;
+  const book = engine.livroMotorUrl ? motorBookHTML(engine, canEdit) : `<div class="cm-empty cm-book-empty"><div class="cm-empty-ico">📖</div><h4>Este motor ainda não tem Livro</h4><p>Carrega o Word deste motor para o abrir aqui como um dossier técnico.</p>${canEdit ? `<button type="button" class="cm-btn cm-btn-main" data-cm="motor-book-upload" data-id="${esc(engine.id)}">📤 Carregar Word</button>` : ''}</div>`;
+  const parts = catalogMotorPartsHTML(idx, engine, typeMap, typeIds, total, canAdd, canEdit, canDel);
+  return `<div class="cm-engine-card">
+      <div class="cm-engine-title">
+        <div><span class="cm-eyebrow">MOTOR</span><h3>🚗 ${esc(engine.nome)}</h3>${engine.observacoes ? `<p class="cm-notes">${esc(engine.observacoes)}</p>` : ''}<span class="cm-engine-sub">${typeIds.length} tipo(s) de peça · ${total} peça(s)</span></div>
+        <div class="cm-engine-actions">
+          ${canEdit ? `<button type="button" class="cm-btn small" data-cm="motor-book-upload" data-id="${esc(engine.id)}">📤 ${engine.livroMotorUrl ? 'Trocar Word' : 'Carregar Word'}</button>` : ''}
+          ${canAdd ? `<button class="cm-btn small" type="button" data-cm="piece-new" data-motor="${esc(engine.id)}">➕ Peça</button>` : ''}
+          ${canEdit ? `<button class="cm-btn small" type="button" data-cm="engine-edit" data-id="${esc(engine.id)}">✏️ Editar</button>` : ''}
+          ${canDel ? `<button class="cm-btn small cm-danger" type="button" data-cm="engine-del" data-id="${esc(engine.id)}">🗑️</button>` : ''}
+        </div>
+      </div>
+      <div class="cm-motor-tabs">${engine.livroMotorUrl ? tab('book','Livro do Motor','📖') : ''}${tab('parts','Peças (lista)','🧩')}${tab('info','Informações','ⓘ')}</div>
+      ${view==='book' ? book : view==='info' ? info : parts}
+    </div>`;
+}
+
+function catalogMotorPartsHTML(idx, engine, typeMap, typeIds, total, canAdd, canEdit, canDel){
+  const shown = catalogUI.tipoId ? typeIds.filter(id => id === catalogUI.tipoId) : typeIds;
+  return `<div class="cm-motor-parts">
+    <div class="cm-motor-search">
+      <span class="cm-motor-search-ico">🔎</span><input id="cmMotorSearch" class="cm-motor-search-input" type="search" autocomplete="off" spellcheck="false" placeholder="Pesquisar neste motor por referência, peça, marca ou tipo…" value="${esc(catalogUI.motorQ || '')}">
+      ${catalogUI.motorQ ? '<button type="button" class="cm-motor-search-clear" data-cm="clear-motor-search" title="Limpar pesquisa">✕</button>' : ''}
+    </div>
+    <div class="cm-collapse-actions"><button type="button" class="cm-collapse-btn" data-cm="motor-open-all">↕ Abrir todos</button><button type="button" class="cm-collapse-btn" data-cm="motor-close-all">↕ Fechar todos</button></div>
+    ${catalogUI.motorQ ? `<div class="cm-motor-search-info">🔎 ${motorSearchCount(idx, engine, typeMap)} resultado(s) neste motor</div>` : ''}
+    ${!typeIds.length ? `<div class="cm-empty small"><div class="cm-empty-ico">🧩</div><h4>Este motor ainda não tem peças</h4>${canAdd ? `<button type="button" class="cm-btn cm-btn-main" data-cm="piece-new" data-motor="${esc(engine.id)}">➕ Adicionar a primeira peça</button>` : ''}</div>` : (() => {
+      const motorQuery = String(catalogUI.motorQ || '').trim();
+      const tokens = catNorm(motorQuery).split(' ').filter(Boolean);
+      const filteredIds = motorQuery ? typeIds.filter(id => { const t=idx.typeById.get(id), pieces=typeMap.get(id)||[]; const typeMatch=tokens.length && tokens.every(tok=>catNorm(t?.nome).includes(tok)); if(typeMatch)return true; return pieces.some(p=>catalogPieceMatchesQuery(p,t,tokens)); }) : shown;
+      if(motorQuery && !filteredIds.length) return `<div class="cm-empty small"><div class="cm-empty-ico">🔎</div><h4>Nenhum resultado neste motor</h4><p>Tenta outra referência, descrição, marca ou tipo de peça.</p></div>`;
+      return filteredIds.map(id => { const t=idx.typeById.get(id), pieces=typeMap.get(id)||[]; let visiblePieces=pieces; if(motorQuery && !tokens.every(tok=>catNorm(t?.nome).includes(tok))) visiblePieces=pieces.filter(p=>catalogPieceMatchesQuery(p,t,tokens)); return catalogTypeSection(t,visiblePieces,engine,canAdd,canEdit,canDel,motorQuery,Boolean(motorQuery)); }).join('');
+    })()}
+  </div>`;
+}
+
+function catalogTypeSection(type, pieces, engine, canAdd, canEdit, canDel, searchQuery = '', openOnSearch = false){
+  openOnSearch = Boolean(String(searchQuery || '').trim()) && openOnSearch;
+  const motorIdEsc = esc(engine.id);
+  const tipoIdEsc = esc(type.id);
+  const rx = searchQuery ? catTokenRegex(catNorm(searchQuery).split(' ').filter(Boolean)) : null;
+
+  return `<details class="cm-type" ${openOnSearch ? 'open' : ''}>
+    <summary aria-label="Abrir ou fechar ${esc(type.nome)}">
+      <span class="cm-type-ico">${catTypeIcon(type)}</span>
+      <span class="cm-type-name">${searchQuery ? catHilite(type.nome, rx) : esc(type.nome)}</span>
+      <span class="cm-pill">${pieces.length}</span>
+      <span class="cm-type-actions">
+        ${canAdd ? `<button type="button" class="cm-mini" data-cm="piece-new" data-motor="${motorIdEsc}" data-tipo="${tipoIdEsc}" title="Adicionar peça a este tipo">➕ Peça</button>` : ''}
+      </span>
+    </summary>
+    <div class="cm-parts">
+      <div class="cm-row cm-row-head"><div>Referência</div><div>Descrição</div><div>Marca</div><div>Observações</div><div></div></div>
+      ${pieces.map(p => catalogPartRow(p, rx, canEdit, canDel)).join('')}
+    </div>
+  </details>`;
+}
+
+function catalogPieceMatchesQuery(p, type, tokens){
+  const hay = catNorm([
+    type?.nome || '',
+    p?.referencia || '',
+    p?.descricao || '',
+    p?.marca || '',
+    p?.observacoes || ''
+  ].join(' '));
+  const ref = catCompact(p?.referencia || '');
+  return tokens.every(tok => {
+    if(hay.includes(tok)) return true;
+    const compact = catCompact(tok);
+    return compact.length >= 2 && ref.includes(compact);
+  });
+}
+
+function motorSearchCount(idx, engine, typeMap){
+  const q = String(catalogUI.motorQ || '').trim();
+  if(!q) return idx.engineCount.get(engine.id) || 0;
+  const tokens = catNorm(q).split(' ').filter(Boolean);
+  let count = 0;
+  typeMap.forEach((pieces, typeId) => {
+    const type = idx.typeById.get(typeId);
+    const typeMatch = tokens.length && tokens.every(tok => catNorm(type?.nome).includes(tok));
+    count += typeMatch ? pieces.length : pieces.filter(p => catalogPieceMatchesQuery(p, type, tokens)).length;
+  });
+  return count;
+}
+
+function catalogPartRow(p, rx, canEdit, canDel){
+  const dash = '<span class="cm-dash">—</span>';
+  return `<div class="cm-row">
+    <div class="cm-cell cm-ref" data-label="Referência"><code>${catHilite(p.referencia, rx)}</code><button type="button" class="cm-copy" data-cm="copy" data-text="${esc(p.referencia)}" title="Copiar referência">⧉</button></div>
+    <div class="cm-cell" data-label="Descrição">${p.descricao ? catHilite(p.descricao, rx) : dash}</div>
+    <div class="cm-cell" data-label="Marca">${p.marca ? `<span class="cm-brand">${catHilite(p.marca, rx)}</span>` : dash}</div>
+    <div class="cm-cell cm-obs" data-label="Observações">${p.observacoes ? catHilite(p.observacoes, rx) : dash}</div>
+    <div class="cm-cell cm-row-actions">
+      ${canEdit ? `<button type="button" class="cm-icon" data-cm="piece-edit" data-id="${esc(p.id)}" title="Editar">✏️</button>` : ''}
+      ${canDel ? `<button type="button" class="cm-icon" data-cm="piece-del" data-id="${esc(p.id)}" title="Apagar">🗑️</button>` : ''}
+    </div>
+  </div>`;
+}
+
+/* ---------- Pesquisa global ---------- */
+function catTokenRegex(tokens){
+  const map = { a:'aàáâãäå', e:'eèéêë', i:'iìíîï', o:'oòóôõö', u:'uùúûü', c:'cç', n:'nñ' };
+  const parts = tokens.map(t => [...t].map(ch => map[ch] ? `[${map[ch]}]` : ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join(''));
+  return parts.length ? new RegExp(parts.join('|'), 'gi') : null;
+}
+function catHilite(text, rx){
+  const s = String(text ?? '');
+  if(!rx || !s) return esc(s);
+  rx.lastIndex = 0;
+  let out = '', last = 0, m;
+  while((m = rx.exec(s))){
+    if(m[0] === ''){ rx.lastIndex++; continue; }
+    out += esc(s.slice(last, m.index)) + '<mark>' + esc(m[0]) + '</mark>';
+    last = m.index + m[0].length;
+  }
+  return out + esc(s.slice(last));
+}
+function catalogHay(item){
+  const { p, e, t } = item;
+  const sig = [e.nome, e.observacoes, t.nome, p.referencia, p.descricao, p.marca, p.observacoes].join('\u0001');
+  const cached = catalogSearchCache.get(p);
+  if(cached && cached.sig === sig) return cached;
+  const entry = { sig, hay:catNorm(sig.replace(/\u0001/g, ' ')), ref:catCompact(p.referencia) };
+  catalogSearchCache.set(p, entry);
+  return entry;
+}
+function catalogSearchRows(idx, q){
+  const tokens = catNorm(q).split(' ').filter(Boolean);
+  if(!tokens.length) return { tokens, rows:[] };
+  const qc = catCompact(q);
+  const rows = [];
+  idx.all.forEach(item => {
+    const h = catalogHay(item);
+    const ok = tokens.every(tok => {
+      if(h.hay.includes(tok)) return true;
+      const tc = catCompact(tok);
+      return tc.length >= 3 && h.ref.includes(tc);
+    });
+    if(!ok) return;
+    let rank = 3;
+    if(qc && h.ref === qc) rank = 0; else if(qc && h.ref.startsWith(qc)) rank = 1; else if(qc && h.ref.includes(qc)) rank = 2;
+    rows.push({ ...item, rank });
+  });
+  rows.sort((a,b) => a.rank - b.rank || catCollate(a.e.nome, b.e.nome) || catCollate(a.t.nome, b.t.nome) || catCollate(a.p.referencia, b.p.referencia));
+  return { tokens, rows };
+}
+
+function catalogSearchHTML(idx, q){
+  const { tokens, rows } = catalogSearchRows(idx, q);
+  const rx = catTokenRegex(tokens);
+  const canEdit = catalogCan('edit'), canDel = catalogCan('delete');
+  const engineHits = idx.engines.filter(e => { const h = catNorm(`${e.nome} ${e.observacoes || ''}`); return tokens.every(t => h.includes(t)); }).slice(0, 12);
+  const shown = rows.slice(0, catalogUI.limit);
+  
+  const engineHitsHTML = engineHits.map(e => {
+    const eId = esc(e.id);
+    const eNomeHilite = catHilite(e.nome, rx);
+    const eCount = idx.engineCount.get(e.id) || 0;
+    return `<button type="button" class="cm-chip" data-cm="open" data-motor="${eId}">${eNomeHilite} <b>${eCount}</b></button>`;
+  }).join('');
+
+  const resultsHTML = shown.map(({ p, e, t }) => {
+    const pRefHilite = catHilite(p.referencia, rx);
+    const pRefEsc = esc(p.referencia);
+    const pIdEsc = esc(p.id);
+    const eIdEsc = esc(e.id);
+    const tIdEsc = esc(t.id);
+    const eNomeHilite = catHilite(e.nome, rx);
+    const tNomeHilite = catHilite(t.nome, rx);
+    const tIcon = catTypeIcon(t);
+    const descHTML = p.descricao ? `<div class="cm-result-desc">${catHilite(p.descricao, rx)}</div>` : '';
+    const brandHTML = p.marca ? `<span class="cm-brand">${catHilite(p.marca, rx)}</span>` : '';
+    const obsHTML = p.observacoes ? `<span class="cm-obs">${catHilite(p.observacoes, rx)}</span>` : '';
+
+    const editButton = canEdit ? `<button type="button" class="cm-icon" data-cm="piece-edit" data-id="${pIdEsc}" title="Editar">✏️</button>` : '';
+    const delButton = canDel ? `<button type="button" class="cm-icon" data-cm="piece-del" data-id="${pIdEsc}" title="Apagar">🗑️</button>` : '';
+
+    return `<article class="cm-result">
+      <div class="cm-result-top">
+        <div class="cm-ref"><code>${pRefHilite}</code><button type="button" class="cm-copy" data-cm="copy" data-text="${pRefEsc}" title="Copiar referência">⧉</button></div>
+        <div class="cm-crumbs">
+          <button type="button" class="cm-crumb" data-cm="open" data-motor="${eIdEsc}">🚗 ${eNomeHilite}</button>
+          <span>›</span>
+          <button type="button" class="cm-crumb" data-cm="open" data-motor="${eIdEsc}" data-tipo="${tIdEsc}">${tIcon} ${tNomeHilite}</button>
+        </div>
+        <div class="cm-row-actions">
+          ${editButton}
+          ${delButton}
+        </div>
+      </div>
+      ${descHTML}
+      <div class="cm-result-meta">${brandHTML}${obsHTML}</div>
+    </article>`;
+  }).join('');
+
+  return `<div class="cm-results">
+    <div class="cm-results-head"><strong>${rows.length} resultado(s)</strong><span class="muted">para «${esc(q.trim())}»</span></div>
+    ${engineHits.length ? `<div class="cm-engine-hits"><span>🚗 Motores:</span>${engineHitsHTML}</div>` : ''}
+    ${!rows.length ? '<div class="cm-empty small"><div class="cm-empty-ico">🔍</div><h4>Sem resultados</h4><p>Tenta com menos palavras ou só parte da referência.</p></div>' : ''}
+    ${resultsHTML}
+    ${rows.length > shown.length ? `<div class="cm-more"><button type="button" class="cm-btn" data-cm="more">Mostrar mais (${rows.length - shown.length})</button></div>` : ''}
+  </div>`;
+}
+
+function openDeleteAllEnginesModal() {
+  if(!isAdminMaster()) return toast('Só o Admin Master pode apagar todos os motores.');
+  const total = (state.engineCatalogEngines || []).length;
+  if(!total) return toast('Não existem motores no catálogo para apagar.');
+  
+  openModal('⚠️ Limpar Catálogo Completo', `<div class="danger-confirm-box" style="padding:15px; background:#fef2f2; border-left:4px solid #ef4444; margin-bottom:15px; border-radius:4px;">
+    <div style="font-size:1.1rem; color:#991b1b; font-weight:bold; margin-bottom:6px;">Esta ação vai apagar os ${total} motores e TODAS as suas peças associadas!</div>
+    <p class="muted" style="margin:0;">Os tipos de peças (categorias) vão continuar guardados. Para confirmar o wipe total do catálogo, escreve exatamente o código de segurança abaixo:</p>
+    <code style="display:block; margin:10px 0; padding:8px; background:#fee2e2; color:#b91c1c; font-weight:bold; font-size:1.2rem; text-align:center; border-radius:4px; border:1px solid #fca5a5;">APAGAR CATALOGO</code>
+  </div>
+  <form id="deleteAllEnginesForm" class="form-grid">
+    <input class="field span3" name="confirmText" placeholder="Escreve APAGAR CATALOGO" autocomplete="off" required>
+    <label class="checkline span3"><input type="checkbox" name="confirmCheck" required> Confirmo que quero limpar todas as referências de motores de forma irreversível.</label>
+    <div class="span3 actions" style="display:flex; gap:10px; justify-content:flex-end; margin-top:10px;">
+      <button class="btn ghost" type="button" data-close-del-modal>Cancelar</button>
+      <button class="btn danger" type="submit">Wipe Definitivo</button>
+    </div>
+  </form>`);
+
+  qs('#deleteAllEnginesForm [data-close-del-modal]')?.addEventListener('click', closeModal);
+  qs('#deleteAllEnginesForm')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    if(String(data.confirmText || '').trim() !== 'APAGAR CATALOGO') return toast('Código de confirmação incorreto.');
+    
+    const ops = [];
+    // Prepara remoção em lote de todos os motores
+    state.engineCatalogEngines.forEach(eng => ops.push({ key:'engineCatalogEngines', id: eng.id, del: true }));
+    // Prepara remoção em lote de todas as peças associadas a esses motores
+    state.engineCatalog.forEach(pc => ops.push({ key:'engineCatalog', id: pc.id, del: true }));
+
+    // Limpa os estados locais
+    state.engineCatalogEngines = [];
+    state.engineCatalog = [];
+    catalogUI.motorId = '';
+    catalogUI.tipoId = '';
+
+    closeModal();
+    renderPage(CATALOG_PAGE);
+
+    const ok = await catalogCommit(ops, 'Wipe Total do Catálogo de Motores executado por Admin');
+    if(ok) toast('O catálogo de motores foi totalmente limpo.');
+  });
+}
+
+
+/* ---------- Eventos ---------- */
+function bindCatalogoMotor(){
+  const root = qs('#cmPage'); if(!root) return;
+  root.addEventListener('click', catalogOnClick);
+  root.addEventListener('input', catalogOnInput);
+  
+  qs('#cmExcelInput')?.addEventListener('change', e => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if(file) catalogImportFile(file);
+  });
+
+  // ESCUTA O INPUT DO EXCEL DO MOTOR SELECIONADO
+  qs('#cmMotorSpecExcelInput')?.addEventListener('change', e => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if(file) catalogImportSpecificEngineFile(file);
+  });
+
+  document.querySelector('.nav-btn[data-page="catalogo-motor"]')?.addEventListener('click', (e) => {
+    if (currentPage === 'catalogo-motor') {
+      e.preventDefault();
+      const wrapper = document.getElementById('motorMainWrapper');
+      if (wrapper) {
+        wrapper.style.display = wrapper.style.display === 'none' ? 'block' : 'none';
+      }
+    }
+  });
+
+  qs('#cmDeleteAllEnginesBtn')?.addEventListener('click', openDeleteAllEnginesModal);
+}
+
+function catalogOnInput(ev){
+  const t = ev.target;
+  if(t.id === 'cmSearch'){
+    clearTimeout(catalogUI.searchTimer);
+    catalogUI.searchTimer = setTimeout(() => {
+      catalogUI.q = t.value; catalogUI.limit = 60;
+      qs('.cm-clear')?.classList.toggle('cm-hide', !t.value);
+      catalogRefreshBody();
+    }, 140);
+  } else if(t.dataset?.cmInput === 'engine-filter'){
+    const k = catNorm(t.value);
+    qsa('.cm-engine').forEach(b => b.classList.toggle('cm-hide', Boolean(k) && !b.dataset.key.includes(k)));
+  } else if(t.id === 'cmMotorPickerSearch'){
+    clearTimeout(catalogUI.motorPickerTimer);
+    catalogUI.motorPickerTimer = setTimeout(() => { catalogUI.motorPickerQ = t.value; catalogRefreshBody(); const input=qs('#cmMotorPickerSearch'); if(input){input.focus();input.setSelectionRange(input.value.length,input.value.length);} }, 80);
+  } else if(t.id === 'cmMotorSearch'){
+    clearTimeout(catalogUI.motorSearchTimer);
+    catalogUI.motorSearchTimer = setTimeout(() => {
+      catalogUI.motorQ = t.value;
+      catalogUI.tipoId = '';
+      catalogRefreshBody();
+      const input = qs('#cmMotorSearch');
+      if(input){ input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+    }, 120);
+  }
+}
+
+function catalogOnClick(e) {
+  const anyEngineBtn = e.target.closest('.cm-engine');
+  if(anyEngineBtn){
+    e.preventDefault();
+    catalogUI.motorId = anyEngineBtn.dataset.id || '';
+    catalogUI.motorOpen = true;
+    catalogUI.motorFocus = false;
+    catalogUI.motorPickerOpen = false;
+    catalogUI.catalogPanelOpen = false;
+    catalogUI.tipoId = '';
+    catalogUI.motorQ = '';
+    catalogUI.q = '';
+    setMotorViewForEngine(catalogIndex().engineById.get(catalogUI.motorId));
+    catalogRefreshBody();
+    return;
+  }
+
+  // COMPORTAMENTO VERDE: Cliques reativos nativos da tag <details>.
+  // O botão "➕ Peça" dentro do cabeçalho deve executar a ação sem fechar/abrir o sistema.
+  const typeAction = e.target.closest('.cm-type summary [data-cm]');
+  if (typeAction) {
+    return;
+  }
+  const typeSummary = e.target.closest('.cm-type summary');
+  if (typeSummary) {
+    return;
+  }
+
+  // AÇÕES NATIVAS DO DATA-CM
+  const btn = e.target.closest('[data-cm]');
+  if(!btn) return;
+  const act = btn.dataset.cm;
+  
+  if(act === 'open' && btn.dataset.motor){
+    e.preventDefault();
+    catalogUI.motorId = btn.dataset.motor; catalogUI.motorOpen = true; catalogUI.motorFocus = false; catalogUI.motorPickerOpen = false; catalogUI.motorQ = ''; catalogUI.q = '';
+    if(btn.dataset.tipo) catalogUI.tipoId = btn.dataset.tipo; else catalogUI.tipoId = '';
+    setMotorViewForEngine(catalogIndex().engineById.get(catalogUI.motorId));
+    catalogRefreshBody();
+    return;
+  }
+  if(act === 'catalog-panel-toggle'){
+    e.preventDefault();
+    catalogUI.catalogPanelOpen = !catalogUI.catalogPanelOpen;
+    catalogRefreshBody();
+    return;
+  }
+  if(catalogUI.catalogPanelOpen && !e.target.closest('[data-catalog-popover]') && !e.target.closest('[data-cm="catalog-panel-toggle"]')){
+    catalogUI.catalogPanelOpen = false;
+    catalogRefreshBody();
+    return;
+  }
+  if(act === 'delete-all-engines'){
+    e.preventDefault();
+    openDeleteAllEnginesModal();
+    return;
+  }
+  if(act === 'motor-back'){
+    e.preventDefault();
+    catalogUI.motorOpen = false; catalogUI.motorFocus = false; catalogUI.motorPickerOpen = false; catalogUI.catalogPanelOpen = false; catalogUI.motorQ = ''; catalogUI.tipoId = '';
+    document.body.classList.remove('cm-motor-focus');
+    catalogRefreshBody();
+    return;
+  }
+  if(act === 'motor-picker-toggle'){
+    e.preventDefault();
+    catalogUI.motorPickerOpen = !catalogUI.motorPickerOpen;
+    catalogRefreshBody();
+    return;
+  }
+  if(act === 'motor-pick' && btn.dataset.id){
+    e.preventDefault();
+    catalogUI.motorId = btn.dataset.id; catalogUI.motorOpen = true; catalogUI.motorPickerOpen = false; catalogUI.catalogPanelOpen = false; catalogUI.motorFocus = false; catalogUI.motorQ = ''; catalogUI.tipoId = '';
+    setMotorViewForEngine(catalogIndex().engineById.get(catalogUI.motorId));
+    catalogRefreshBody();
+    return;
+  }
+  if(act === 'motor-prev' || act === 'motor-next'){
+    e.preventDefault();
+    const idx = catalogIndex(); const at = idx.engines.findIndex(x => x.id === catalogUI.motorId); const delta = act === 'motor-prev' ? -1 : 1; const next = idx.engines[at + delta];
+    if(next){ catalogUI.motorId = next.id; catalogUI.motorOpen = true; catalogUI.catalogPanelOpen = false; catalogUI.motorQ = ''; catalogUI.tipoId = ''; setMotorViewForEngine(next); catalogRefreshBody(); }
+    return;
+  }
+  if(act === 'motor-focus'){
+    e.preventDefault();
+    catalogUI.motorFocus = !catalogUI.motorFocus;
+    document.body.classList.toggle('cm-motor-focus', catalogUI.motorFocus && catalogUI.motorOpen);
+    const focusBtn = qs('[data-cm="motor-focus"]');
+    if(focusBtn) focusBtn.innerHTML = `⛶ ${catalogUI.motorFocus ? 'Sair do foco' : 'Modo foco'}`;
+    return;
+  }
+  // CORREÇÃO: Ativar a escuta dos botões de importação e exportação segmentada por motor
+  if(act === 'motor-view'){
+    e.preventDefault();
+    catalogUI.motorView = btn.dataset.view || 'parts';
+    if(catalogUI.motorView === 'book'){
+      catalogUI.motorBookPage = 0;
+      catalogUI.motorBookZoom = 100;
+      catalogUI.motorBookSearch = '';
+    }
+    catalogRefreshBody();
+    return;
+  }
+  if(act === 'motor-book'){
+    e.preventDefault();
+    catalogUI.motorView = 'book';
+    catalogUI.motorBookPage = 0;
+    catalogUI.motorBookZoom = 100;
+    catalogUI.motorBookSearch = '';
+    catalogRefreshBody();
+    return;
+  }
+  if(act === 'motor-book-upload'){
+    e.preventDefault();
+    e.stopPropagation();
+    const engine = catalogIndex().engineById.get(catalogUI.motorId);
+    if(!engine) return toast('Não foi possível identificar o motor selecionado.');
+    openMotorBookPicker(engine);
+    return;
+  }
+  if(act === 'motor-book-close'){
+    e.preventDefault();
+    catalogUI.motorView = 'parts';
+    catalogUI.motorBookPage = 0;
+    catalogUI.motorBookSearch = '';
+    syncMotorBookReadingMode();
+    catalogRefreshBody();
+    return;
+  }
+  if(act === 'remove-motor-book'){
+    e.preventDefault();
+    const engine = catalogIndex().engineById.get(catalogUI.motorId);
+    if(engine) removeMotorBook(engine);
+    return;
+  }
+  if(act === 'export-motor-spec') { 
+    e.preventDefault(); 
+    catalogExportSpecificEngineExcel(); 
+    return;
+  }
+  if(act === 'import-motor-spec') { 
+    e.preventDefault(); 
+    qs('#cmMotorSpecExcelInput')?.click(); 
+    return;
+  }
+
+  if(act === 'copy' && btn.dataset.text){
+    e.preventDefault(); catalogCopy(btn.dataset.text);
+  }
+  if(act === 'type-filter'){
+    e.preventDefault(); catalogUI.tipoId = btn.dataset.id || ''; catalogRefreshBody();
+  }
+  if(act === 'piece-new'){
+    e.preventDefault(); openCatalogPieceModal('', { motorId: btn.dataset.motor, tipoId: btn.dataset.tipo });
+  }
+  if(act === 'piece-edit' && btn.dataset.id){
+    e.preventDefault(); openCatalogPieceModal(btn.dataset.id);
+  }
+  if(act === 'piece-del' && btn.dataset.id){
+    e.preventDefault(); catalogDeletePiece(btn.dataset.id);
+  }
+  if(act === 'engine-new'){
+    e.preventDefault(); openCatalogEngineModal();
+  }
+  if(act === 'engine-edit' && btn.dataset.id){
+    e.preventDefault(); openCatalogEngineModal(btn.dataset.id);
+  }
+  if(act === 'engine-del' && btn.dataset.id){
+    e.preventDefault(); catalogDeleteEngine(btn.dataset.id);
+  }
+  if(act === 'type-manage'){
+    e.preventDefault(); openCatalogTypeManager();
+  }
+  if(act === 'import'){
+    e.preventDefault(); qs('#cmExcelInput')?.click();
+  }
+  if(act === 'export'){
+    e.preventDefault(); catalogExportExcel(false);
+  }
+  if(act === 'template'){
+    e.preventDefault(); catalogExportExcel(true);
+  }
+  if(act === 'retry'){
+    e.preventDefault(); catalogLoadAll();
+  }
+  if(act === 'clear-search'){
+    const input = qs('#cmSearch'); if(input) input.value = '';
+    catalogUI.q = ''; catalogRefreshBody();
+  }
+  if(act === 'clear-motor-search'){
+    catalogUI.motorQ = '';
+    catalogUI.tipoId = '';
+    catalogRefreshBody();
+  }
+  if(act === 'motor-open-all'){
+    e.preventDefault();
+    qs('#cmBody')?.querySelectorAll('details.cm-type').forEach(d => d.open = true);
+    return;
+  }
+  if(act === 'motor-close-all'){
+    e.preventDefault();
+    qs('#cmBody')?.querySelectorAll('details.cm-type').forEach(d => d.open = false);
+    return;
+  }
+}
+async function catalogCopy(text){
+  try{ await navigator.clipboard.writeText(text); }
+  catch{
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); }catch{}
+    ta.remove();
+  }
+  toast(`Referência copiada: ${text}`);
+}
+function catalogGuard(action){
+  if(!catalogReady()){ toast('O catálogo não está carregado do Firebase. Grava bloqueada.'); return false; }
+  if(!catalogCan(action)){ toast('Sem permissão para esta ação.'); return false; }
+  if(!hasWritableFirebaseSession()){ toast('Sem Firebase ativo. Nada foi gravado.'); return false; }
+  return true;
+}
+
+function openCatalogPieceModal(id = '', pre = {}) {
+  const editing = id ? state.engineCatalog.find(p => p.id === id) : null;
+  if(!catalogGuard(editing ? 'edit' : 'add')) return;
+  const idx = catalogIndex();
+  if(!idx.engines.length) return toast('Cria primeiro um motor.');
+  if(!idx.types.length) return toast('Cria primeiro um tipo de peça (botão «Tipos de peça»).');
+  
+  const motorId = editing?.motorId || pre.motorId || catalogUI.motorId || (idx.engines[0] ? idx.engines[0].id : '');
+  const tipoId = editing?.tipoId || pre.tipoId || catalogUI.tipoId || (idx.types[0] ? idx.types[0].id : '');
+  const brands = [...new Set(state.engineCatalog.map(p => String(p.marca || '').trim()).filter(Boolean))].sort(catCollate);
+  
+  let currentMemojiBase64 = editing?.avatarUrl || '';
+
+  let motorOptionsHTML = '';
+  for (const e of idx.engines) {
+    const isSelected = e.id === motorId ? 'selected' : '';
+    motorOptionsHTML += '<option value="' + esc(e.id) + '" ' + isSelected + '>' + esc(e.nome) + '</option>';
+  }
+
+  let tipoOptionsHTML = '';
+  for (const t of idx.types) {
+    const isSelected = t.id === tipoId ? 'selected' : '';
+    tipoOptionsHTML += '<option value="' + esc(t.id) + '" ' + isSelected + '>' + esc(t.nome) + '</option>';
+  }
+
+  openModal(editing ? '✏️ Editar peça' : '➕ Nova peça', `<form id="cmPieceForm" class="cm-form">
+    <label>Motor<select class="select" name="motorId" required>${motorOptionsHTML}</select></label>
+    <label>Tipo de peça<select class="select" name="tipoId" required>${tipoOptionsHTML}</select></label>
+    <label>Referência *<input class="field" name="referencia" required autocomplete="off" placeholder="Ex.: 038109119P" value="${esc(editing?.referencia || '')}"></label>
+    <label>Marca<input class="field" name="marca" list="cmBrands" autocomplete="off" placeholder="Ex.: Gates" value="${esc(editing?.marca || '')}"><datalist id="cmBrands">${brands.map(b => `<option value="\${esc(b)}">`).join('')}</datalist></label>
+    <label class="span2">Descrição<input class="field" name="descricao" autocomplete="off" placeholder="Ex.: Correia de distribuição" value="${esc(editing?.descricao || '')}"></label>
+    
+    <label class="span2" style="display: flex; flex-direction: column; gap: 8px;">
+      <span>Memoji da Peça (Imagem)</span>
+      <div style="display: flex; align-items: center; gap: 15px;">
+        <div id="cmMemojiPreview" style="width: 64px; height: 64px; border-radius: 50%; border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center; background: #f8fafc; overflow: hidden;">
+          ${currentMemojiBase64 ? `<img src="\${currentMemojiBase64}" style="width: 100%; height: 100%; object-fit: cover;">` : '<span style="font-size: 1.5rem;">👤</span>'}
+        </div>
+        <button class="cm-btn" type="button" id="cmSelectMemojiBtn" style="margin: 0;">📸 Escolher Memoji</button>
+        <input type="file" id="cmMemojiFileInput" accept="image/*" class="hidden">
+      </div>
+    </label>
+
+    <label class="span2">Observações<textarea name="observacoes" placeholder="Notas internas, compatibilidades, medidas…">${esc(editing?.observacoes || '')}</textarea></label>
+    <div class="span2 cm-form-actions"><button class="btn cm-btn cm-btn-main" type="submit">💾 Guardar peça</button><button class="cm-btn cm-btn-ghost" type="button" data-close>Cancelar</button></div>
+  </form>`);
+
+  const fileInput = qs('#cmMemojiFileInput');
+  qs('#cmSelectMemojiBtn')?.addEventListener('click', () => fileInput?.click());
+  
+  fileInput?.addEventListener('change', e => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        currentMemojiBase64 = ev.target.result;
+        const previewBox = qs('#cmMemojiPreview');
+        if (previewBox) previewBox.innerHTML = `<img src="${currentMemojiBase64}" style="width: 100%; height: 100%; object-fit: cover;">`;
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  qs('#cmPieceForm [data-close]')?.addEventListener('click', closeModal);
+  qs('#cmPieceForm')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target).entries());
+    const data = { 
+      motorId: f.motorId, 
+      tipoId: f.tipoId, 
+      referencia: String(f.referencia || '').trim(), 
+      descricao: String(f.descricao || '').trim(), 
+      marca: String(f.marca || '').trim(), 
+      observacoes: String(f.observacoes || '').trim(),
+      avatarUrl: currentMemojiBase64
+    };
+    if(!data.referencia) return toast('Indica a referência.');
+    const dup = state.engineCatalog.find(p => p.id !== editing?.id && p.motorId === data.motorId && p.tipoId === data.tipoId && catCompact(p.referencia) === catCompact(data.referencia) && catKey(p.marca) === catKey(data.marca));
+    if(dup) return toast('Já existe esta referência (mesma marca) neste motor e tipo.');
+    let row;
+    if(editing){ Object.assign(editing, data); row = editing; }
+    else { row = { id:uid('PEC'), ...data, createdAt:new Date().toISOString() }; state.engineCatalog.push(row); }
+    closeModal();
+    catalogUI.motorId = data.motorId;
+    if(catalogUI.tipoId && catalogUI.tipoId !== data.tipoId) catalogUI.tipoId = '';
+    renderPage(CATALOG_PAGE);
+    const ok = await catalogCommit([{ key:'engineCatalog', row }], editing ? 'Catálogo Motor: peça editada' : 'Catálogo Motor: peça criada');
+    if(ok) toast(editing ? 'Peça atualizada.' : 'Peça adicionada.');
+  });
+  setTimeout(() => qs('#cmPieceForm [name="referencia"]')?.focus(), 30);
+}
+
+async function catalogDeletePiece(id){
+  if(!catalogGuard('delete')) return;
+  const p = state.engineCatalog.find(x => x.id === id); if(!p) return;
+  if(!confirm(`Apagar a peça ${p.referencia}?`)) return;
+  state.engineCatalog = state.engineCatalog.filter(x => x.id !== id);
+  renderPage(CATALOG_PAGE);
+  const ok = await catalogCommit([{ key:'engineCatalog', id, del:true }], 'Catálogo Motor: peça apagada');
+  if(ok) toast('Peça apagada.');
+}
+
+/* ---------- Motores ---------- */
+function catalogFindByName(list, name, exceptId){
+  const k = catKey(name);
+  return list.find(x => x.id !== exceptId && catKey(x.nome) === k);
+}
+function openCatalogEngineModal(id = ''){
+  const editing = id ? state.engineCatalogEngines.find(e => e.id === id) : null;
+  if(!catalogGuard(editing ? 'edit' : 'add')) return;
+  
+  const placeholderText = editing ? "Ex.: 1.9 TDI" : "Ex.: 1.9 TDI, 2.0 TDI, 1.6 TDI (Separa por vírgulas para criar vários)";
+
+  openModal(editing ? '✏️ Editar motor' : '🚗 Novo(s) motor(es)', '<form id="cmEngineForm" class="cm-form">' +
+    '<label class="span2">Nome do(s) motor(es) *<input class="field" name="nome" required autocomplete="off" placeholder="' + placeholderText + '" value="' + esc(editing?.nome || '') + '"></label>' +
+    '<label class="span2">Observações<textarea name="observacoes" placeholder="Aplicação, códigos de motor, viaturas…">' + esc(editing?.observacoes || '') + '</textarea></label>' +
+    '<div class="span2 cm-form-actions"><button class="cm-btn cm-btn-main" type="submit">💾 Guardar</button><button class="cm-btn cm-btn-ghost" type="button" data-close>Cancelar</button></div>' +
+  '</form>');
+  
+  qs('#cmEngineForm [data-close]')?.addEventListener('click', closeModal);
+  qs('#cmEngineForm')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target).entries());
+    const nomeRaw = String(f.nome || '').trim(); 
+    const observacoes = String(f.observacoes || '').trim();
+    if(!nomeRaw) return toast('Indica o nome do motor.');
+    
+    const now = new Date().toISOString();
+    const ops = [];
+    let ultimoMotorId = '';
+
+    if(editing){
+      if(catalogFindByName(state.engineCatalogEngines, nomeRaw, editing.id)) return toast('Já existe um motor com esse nome.');
+      Object.assign(editing, { nome: nomeRaw, observacoes }); 
+      ops.push({ key:'engineCatalogEngines', row: editing });
+      ultimoMotorId = editing.id;
+    } else {
+      const nomes = nomeRaw.split(',').map(n => n.trim()).filter(Boolean);
+      if(!nomes.length) return toast('Indica os nomes válidos.');
+
+      // CORRIGIDO: Utilização correta de 'of' em vez de 'de'
+      for (const nome of nomes) {
+        if(catalogFindByName(state.engineCatalogEngines, nome)) {
+          return toast('O motor "' + nome + '" já existe no catálogo.');
+        }
+      }
+
+      // CORRIGIDO: Utilização correta de 'of' em vez de 'de'
+      for (const nome of nomes) {
+        const novoMotor = { id: uid('EMO'), nome: nome, observacoes: observacoes, createdAt: now };
+        state.engineCatalogEngines.push(novoMotor);
+        ops.push({ key:'engineCatalogEngines', row: novoMotor });
+        ultimoMotorId = novoMotor.id;
+      }
+    }
+
+    closeModal();
+    catalogUI.motorId = ultimoMotorId; 
+    catalogUI.tipoId = '';
+    renderPage(CATALOG_PAGE);
+
+    const textoAudit = editing ? 'Catálogo Motor: motor editado' : 'Catálogo Motor: ' + ops.length + ' motor(es) criado(s)';
+    const ok = await catalogCommit(ops, textoAudit);
+    if(ok) toast(editing ? 'Motor atualizado.' : ops.length + ' motor(es) adicionado(s) com sucesso.');
+  });
+  setTimeout(() => qs('#cmEngineForm [name="nome"]')?.focus(), 30);
+}
+
+async function catalogDeleteEngine(id){
+  if(!catalogGuard('delete')) return;
+  const e = state.engineCatalogEngines.find(x => x.id === id); if(!e) return;
+  const pieces = state.engineCatalog.filter(p => p.motorId === id);
+  if(!confirm(`Apagar o motor «${e.nome}»${pieces.length ? ` e as suas ${pieces.length} peça(s)` : ''}? Esta ação não pode ser desfeita.`)) return;
+  state.engineCatalogEngines = state.engineCatalogEngines.filter(x => x.id !== id);
+  state.engineCatalog = state.engineCatalog.filter(p => p.motorId !== id);
+  catalogUI.motorId = ''; catalogUI.tipoId = ''; catalogUI.motorQ = '';
+  renderPage(CATALOG_PAGE);
+  const ok = await catalogCommit([{ key:'engineCatalogEngines', id, del:true }, ...pieces.map(p => ({ key:'engineCatalog', id:p.id, del:true }))], `Catálogo Motor: motor apagado (${e.nome})`);
+  if(ok) toast('Motor apagado.');
+}
+
+/* ---------- Tipos de peça ---------- */
+function openCatalogTypeManager(){
+  if(!catalogReady()) return toast('O catálogo ainda está a carregar.');
+  const idx = catalogIndex();
+  const canAdd = catalogCan('add'), canEdit = catalogCan('edit'), canDel = catalogCan('delete');
+  
+  // 1. Gerar a lista de tipos usando aspas normais e concatenação limpa
+  let typesHTML = '';
+  for (const t of idx.types) {
+    const tIcon = catTypeIcon(t);
+    const tNome = esc(t.nome);
+    const tCount = idx.typeCount.get(t.id) || 0;
+    const tIdEsc = esc(t.id);
+    
+    typesHTML += '<div class="cm-type-item">' +
+      '<span class="cm-type-ico">' + tIcon + '</span>' +
+      '<div class="cm-type-item-name"><strong>' + tNome + '</strong><small>' + tCount + ' peça(s)</small></div>' +
+      (canEdit ? '<button type="button" class="cm-icon" data-type-edit="' + tIdEsc + '" title="Editar">✏️</button>' : '') +
+      (canDel ? '<button type="button" class="cm-icon" data-type-del="' + tIdEsc + '" title="Apagar">🗑️</button>' : '') +
+    '</div>';
+  }
+
+  // 2. Montagem final da modal injetando a string gerada de forma direta
+  let modalHTML = '<div class="cm-types-manager">' +
+    '<p class="muted">Os tipos são partilhados por todos os motores (ex.: Distribuição, Filtros, Juntas).</p>';
+    
+  if (idx.types.length) {
+    modalHTML += '<div class="cm-type-list">' + typesHTML + '</div>';
+  } else {
+    modalHTML += '<div class="cm-empty small"><div class="cm-empty-ico">🏷️</div><h4>Ainda não há tipos de peça</h4></div>';
+  }
+  
+  if (canAdd) {
+    modalHTML += '<div class="cm-form-actions"><button type="button" class="cm-btn cm-btn-main" id="cmTypeNewBtn">➕ Novo tipo de peça</button></div>';
+  }
+  
+  modalHTML += '</div>';
+
+  // Abre a modal com o HTML perfeitamente limpo
+  openModal('🏷️ Tipos de peça', modalHTML);
+  
+  qs('#cmTypeNewBtn')?.addEventListener('click', () => openCatalogTypeModal(''));
+  qsa('[data-type-edit]').forEach(b => b.addEventListener('click', () => openCatalogTypeModal(b.dataset.typeEdit)));
+  qsa('[data-type-del]').forEach(b => b.addEventListener('click', () => catalogDeleteType(b.dataset.typeDel)));
+}
+
+
+function openCatalogTypeModal(id = ''){
+  const editing = id ? state.engineCatalogTypes.find(t => t.id === id) : null;
+  if(!catalogGuard(editing ? 'edit' : 'add')) return;
+  
+  // Define a instrução com base no modo (Edição vs Nova Criação em Lote)
+  const placeholderText = editing ? "Ex.: Distribuição" : "Ex.: Distribuição, Filtros, Juntas (Separa por vírgulas para criar vários)";
+
+  openModal(editing ? '✏️ Editar tipo de peça' : '🏷️ Novo(s) tipo(s) de peça', `<form id="cmTypeForm" class="cm-form">
+    <label class="span2">Nome do(s) tipo(s) *<input class="field" name="nome" required autocomplete="off" placeholder="${placeholderText}" value="${esc(editing?.nome || '')}"></label>
+    
+    <label class="span2" style="display: flex; flex-direction: column; gap: 8px;">
+      <span>Imagem do Tipo (Memoji Personalizado)</span>
+      <div style="display: flex; align-items: center; gap: 15px;">
+        <div id="cmTypeIconPreview" style="width: 54px; height: 50px; border-radius: 50%; border: 2px dashed #06447f; display: flex; align-items: center; justify-content: center; background: #f8fafc; overflow: hidden;">
+          ${editing?.icone && editing.icone.startsWith('data:image') 
+            ? `<img src="\${editing.icone}" style="width: 100%; height: 100%; object-fit: cover;">` 
+            : `<span style="font-size: 1.5rem;">🔧</span>`}
+        </div>
+        <button class="cm-btn" type="button" id="cmSelectTypeIconBtn" style="margin: 0; padding: 8px 14px; background: #06447f; color: white; border: 0; border-radius: 6px; cursor: pointer;">📸 Carregar Memoji</button>
+        <input type="file" id="cmTypeIconFileInput" accept="image/*" class="hidden">
+      </div>
+    </label>
+
+    <div class="span2 cm-form-actions"><button class="cm-btn cm-btn-main" type="submit">💾 Guardar tipo</button><button class="cm-btn cm-btn-ghost" type="button" id="cmTypeBack">Voltar</button></div>
+  </form>`);
+
+  let currentIconBase64 = editing?.icone || '';
+  const fileInput = qs('#cmTypeIconFileInput');
+  qs('#cmSelectTypeIconBtn')?.addEventListener('click', () => fileInput?.click());
+  
+  fileInput?.addEventListener('change', e => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        currentIconBase64 = ev.target.result;
+        const previewBox = qs('#cmTypeIconPreview');
+        if (previewBox) previewBox.innerHTML = `<img src="${currentIconBase64}" style="width: 100%; height: 100%; object-fit: cover;">`;
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  qs('#cmTypeBack')?.addEventListener('click', openCatalogTypeManager);
+  qs('#cmTypeForm')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target).entries());
+    const nomeRaw = String(f.nome || '').trim();
+    if(!nomeRaw) return toast('Indica o nome do tipo.');
+    
+    const now = new Date().toISOString();
+    const ops = [];
+
+    if(editing){
+      if(catalogFindByName(state.engineCatalogTypes, nomeRaw, editing.id)) return toast('Já existe um tipo com esse nome.');
+      Object.assign(editing, { nome: nomeRaw, icone: currentIconBase64 }); 
+      ops.push({ key:'engineCatalogTypes', row: editing });
+    } else {
+      // Parte o texto por vírgulas para inserção múltipla
+      const nomes = nomeRaw.split(',').map(n => n.trim()).filter(Boolean);
+      if(!nomes.length) return toast('Indica pelo menos um nome válido.');
+
+      // Validação de duplicados antes de avançar para a gravação
+      for (const nome of nomes) {
+        if(catalogFindByName(state.engineCatalogTypes, nome)) {
+          return toast('O tipo "' + nome + '" já existe no catálogo.');
+        }
+      }
+
+      // Loop de criação individual
+      for (const nome of nomes) {
+        const novoTipo = { id: uid('TPC'), nome, icone: currentIconBase64, createdAt: now };
+        state.engineCatalogTypes.push(novoTipo);
+        ops.push({ key:'engineCatalogTypes', row: novoTipo });
+      }
+    }
+    
+    renderPage(CATALOG_PAGE);
+    openCatalogTypeManager();
+    
+    const textoAudit = editing ? 'Catálogo Motor: tipo editado' : 'Catálogo Motor: ' + ops.length + ' tipo(s) criado(s)';
+    const ok = await catalogCommit(ops, textoAudit);
+    if(ok) toast(editing ? 'Tipo atualizado.' : ops.length + ' tipo(s) criado(s) com sucesso.');
+  });
+  setTimeout(() => qs('#cmTypeForm [name="nome"]')?.focus(), 30);
+}
+
+
+async function catalogDeleteType(id){
+  if(!catalogGuard('delete')) return;
+  const t = state.engineCatalogTypes.find(x => x.id === id); if(!t) return;
+  const pieces = state.engineCatalog.filter(p => p.tipoId === id);
+  if(!confirm(`Apagar o tipo «${t.nome}»${pieces.length ? ` e as ${pieces.length} peça(s) deste tipo em todos os motores` : ''}? Esta ação não pode ser desfeita.`)) return;
+  state.engineCatalogTypes = state.engineCatalogTypes.filter(x => x.id !== id);
+  state.engineCatalog = state.engineCatalog.filter(p => p.tipoId !== id);
+  if(catalogUI.tipoId === id) catalogUI.tipoId = '';
+  renderPage(CATALOG_PAGE);
+  openCatalogTypeManager();
+  const ok = await catalogCommit([{ key:'engineCatalogTypes', id, del:true }, ...pieces.map(p => ({ key:'engineCatalog', id:p.id, del:true }))], `Catálogo Motor: tipo apagado (${t.nome})`);
+  if(ok) toast('Tipo apagado.');
+}
+
+/* ---------- Excel: exportar ---------- */
+const CATALOG_XLS = { pieces:'Peças', engines:'Motores', types:'Tipos de Peça' };
+async function catalogExportExcel(template = false){
+  if(!catalogReady()) return toast('O catálogo ainda está a carregar.');
+  if(!catalogCan('export') && !(template && catalogCan('import'))) return toast('Sem permissão para exportar.');
+  const idx = catalogIndex();
+  const pieceRows = template
+    ? [{ 'Motor':'1.9 TDI', 'Tipo de Peça':'Distribuição', 'Referência':'038109119P', 'Descrição':'Correia de distribuição', 'Marca':'Gates', 'Observações':'' }]
+    : idx.all.slice().sort((a,b) => catCollate(a.e.nome, b.e.nome) || catCollate(a.t.nome, b.t.nome) || catCollate(a.p.referencia, b.p.referencia))
+        .map(({ p, e, t }) => ({ 'Motor':e.nome, 'Tipo de Peça':t.nome, 'Referência':p.referencia || '', 'Descrição':p.descricao || '', 'Marca':p.marca || '', 'Observações':p.observacoes || '' }));
+  const engineRows = template ? [{ 'Motor':'1.9 TDI', 'Observações':'' }] : idx.engines.map(e => ({ 'Motor':e.nome, 'Observações':e.observacoes || '' }));
+  const typeRows = template ? [{ 'Tipo de Peça':'Distribuição', 'Ícone':'⛓️' }] : idx.types.map(t => ({ 'Tipo de Peça':t.nome, 'Ícone':t.icone || '' }));
+  const filename = `catalogo-motor-${template ? 'modelo' : 'export'}-${today()}`;
+  try{
+    await loadExcelLibrary();
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(pieceRows, { header:['Motor','Tipo de Peça','Referência','Descrição','Marca','Observações'] });
+    ws['!cols'] = [{ wch:18 }, { wch:20 }, { wch:20 }, { wch:38 }, { wch:16 }, { wch:38 }];
+    XLSX.utils.book_append_sheet(wb, ws, CATALOG_XLS.pieces);
+    const we = XLSX.utils.json_to_sheet(engineRows, { header:['Motor','Observações'] });
+    we['!cols'] = [{ wch:22 }, { wch:50 }];
+    XLSX.utils.book_append_sheet(wb, we, CATALOG_XLS.engines);
+    const wt = XLSX.utils.json_to_sheet(typeRows, { header:['Tipo de Peça','Ícone'] });
+    wt['!cols'] = [{ wch:26 }, { wch:8 }];
+    XLSX.utils.book_append_sheet(wb, wt, CATALOG_XLS.types);
+    XLSX.writeFile(wb, `${filename}.xlsx`);
+    toast(template ? 'Modelo Excel exportado.' : `Catálogo exportado (${pieceRows.length} peça(s)).`);
+  } catch(err){
+    console.error(err);
+    const headers = ['Motor','Tipo de Peça','Referência','Descrição','Marca','Observações'];
+    const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const csv = '\ufeff' + [headers.map(q).join(';'), ...pieceRows.map(r => headers.map(h => q(r[h])).join(';'))].join('\r\n');
+    downloadBlob(new Blob([csv], { type:'text/csv;charset=utf-8' }), `${filename}.csv`);
+    toast('Sem biblioteca Excel: exportado em CSV (abre no Excel).');
+  }
+}
+
+/* ---------- Excel: importar ---------- */
+const CATALOG_HEADERS = {
+  motor:['motor','motores','engine'],
+  tipo:['tipopeca','tipodepeca','tipo','categoria','familia','grupo'],
+  referencia:['referencia','ref','referencias','codigo','cod','partnumber','pn'],
+  descricao:['descricao','descricaopeca','designacao','description','nome'],
+  marca:['marca','fabricante','brand'],
+  observacoes:['observacoes','observacao','obs','notas','nota','notes'],
+  icone:['icone','icon','emoji']
+};
+async function catalogExportSpecificEngineExcel() {
+  if(!catalogReady()) return toast('O catálogo ainda está a carregar.');
+  if(!catalogUI.motorId) return toast('Seleciona primeiro um motor na barra lateral esquerda.');
+  
+  const idx = catalogIndex();
+  const engine = idx.engineById.get(catalogUI.motorId);
+  if(!engine) return toast('Motor não encontrado.');
+
+  // Filtra apenas as peças que pertencem a este motor ativo
+  const motorPieces = idx.all.filter(item => item.e.id === engine.id);
+
+  const excelRows = motorPieces.map(({ p, t }) => ({
+    'Tipo de Peça': t.nome,
+    'Referência': p.referencia || '',
+    'Descrição': p.descricao || '',
+    'Marca': p.marca || '',
+    'Observações': p.observacoes || ''
+  }));
+
+  // Se o motor estiver vazio, mete uma linha de exemplo para o utilizador saber preencher
+  if(!excelRows.length) {
+    excelRows.push({ 'Tipo de Peça': 'Distribuição', 'Referência': 'EXEMPLO-123', 'Descrição': 'Correia', 'Marca': 'Gates', 'Observações': '' });
+  }
+
+  const filename = `catalogo-${catSlug(engine.nome)}-${today()}.xlsx`;
+
+  try {
+    await loadExcelLibrary();
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(excelRows, { header: ['Tipo de Peça', 'Referência', 'Descrição', 'Marca', 'Observações'] });
+    ws['!cols'] = [{ wch: 22 }, { wch: 20 }, { wch: 38 }, { wch: 16 }, { wch: 38 }];
+    XLSX.utils.book_append_sheet(wb, ws, safeSheetName(engine.nome));
+    XLSX.writeFile(wb, filename);
+    toast(`Catálogo do motor ${engine.nome} exportado com sucesso.`);
+  } catch(err) {
+    console.error(err);
+    toast('Erro ao gerar o ficheiro Excel.');
+  }
+}
+async function catalogImportSpecificEngineFile(file) {
+  if(!catalogUI.motorId) return toast('Seleciona um motor na barra lateral antes de importar.');
+  const idx = catalogIndex();
+  const engine = idx.engineById.get(catalogUI.motorId);
+  
+  try {
+    const rawRows = await readExcelRows(file);
+    if(!rawRows.length) return toast('O ficheiro não tem linhas.');
+
+    const map = catalogHeaderMap();
+    const now = new Date().toISOString();
+    const typeByKey = new Map(state.engineCatalogTypes.map(t => [catKey(t.nome), t]));
+    const usedT = new Set(state.engineCatalogTypes.map(t => t.id));
+    
+    const ops = [];
+    let novosTiposContador = 0;
+    let novasPecasContador = 0;
+
+    for (const raw of rawRows) {
+      const r = catalogMapRow(raw, map);
+      const tipoNome = String(r.tipo || '').trim();
+      const referencia = String(r.referencia || '').trim();
+      const marca = String(r.marca || '').trim();
+      
+      if(!tipoNome || !referencia) continue;
+
+      // Se a categoria/tipo de peça não existir, cria de raiz na app
+      let t = typeByKey.get(catKey(tipoNome));
+      if(!t) {
+        t = { id: catNewId('TPC', tipoNome, usedT), nome: tipoNome, icone: '', createdAt: now };
+        state.engineCatalogTypes.push(t);
+        typeByKey.set(catKey(tipoNome), t);
+        ops.push({ key: 'engineCatalogTypes', row: t });
+        novosTiposContador++;
+      }
+
+      // Evita duplicados idênticos dentro deste motor específico
+      const existe = state.engineCatalog.find(p => 
+        p.motorId === engine.id && 
+        p.tipoId === t.id && 
+        catCompact(p.referencia) === catCompact(referencia) && 
+        catKey(p.marca) === catKey(marca)
+      );
+
+      if(!existe) {
+        const novaPeca = {
+          id: uid('PEC'),
+          motorId: engine.id,
+          tipoId: t.id,
+          referencia: referencia,
+          descricao: String(r.descricao || '').trim(),
+          marca: marca,
+          observacoes: String(r.observacoes || '').trim(),
+          createdAt: now
+        };
+        state.engineCatalog.push(novaPeca);
+        ops.push({ key: 'engineCatalog', row: novaPeca });
+        novasPecasContador++;
+      }
+    }
+
+    if(!ops.length) return toast('Nenhum dado novo para importar deste Excel.');
+
+    renderPage(CATALOG_PAGE);
+    const ok = await catalogCommit(ops, `Importação Excel focada no Motor: ${engine.nome}`);
+    if(ok) toast(`Importado para ${engine.nome}: ${novasPecasContador} peças e ${novosTiposContador} categorias novas.`);
+  } catch(err) {
+    console.error(err);
+    toast('Falha ao processar o Excel do motor.');
+  }
+}
+
+function catalogHeaderMap(){
+  const m = {};
+  Object.entries(CATALOG_HEADERS).forEach(([k, list]) => list.forEach(h => { m[h] = k; }));
+  return m;
+}
+function catalogMapRow(raw, map){
+  const o = {};
+  Object.entries(raw || {}).forEach(([k, v]) => {
+    const key = map[normalizeExcelHeader(k)];
+    if(key && o[key] === undefined) o[key] = normalizeExcelValue(v);
+  });
+  return o;
+}
+async function catalogReadWorkbook(file){
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if(['csv','tsv','txt'].includes(ext)) return { pieces:await readExcelRows(file), engines:[], types:[] };
+  await loadExcelLibrary();
+  if(!window.XLSX) throw new Error('Não foi possível carregar a biblioteca Excel. Podes importar CSV.');
+  const wb = XLSX.read(await file.arrayBuffer(), { type:'array', cellDates:true, raw:false });
+  const norm = n => normalizeExcelHeader(n);
+  const find = names => wb.SheetNames.find(n => names.includes(norm(n)));
+  const engName = find(['motores', 'motor']);
+  const typeName = find(['tiposdepeca', 'tipospeca', 'tipos']);
+  const pieceName = find(['pecas', 'catalogo', 'catalogomotor', 'material']) || wb.SheetNames.find(n => n !== engName && n !== typeName) || wb.SheetNames[0];
+  const read = name => name ? XLSX.utils.sheet_to_json(wb.Sheets[name], { defval:'', raw:false }) : [];
+  return { pieces:read(pieceName), engines:pieceName === engName ? [] : read(engName), types:pieceName === typeName ? [] : read(typeName) };
+}
+/* Constrói o plano de importação SEM alterar o estado. */
+function catalogBuildImportPlan(parsed){
+  const map = catalogHeaderMap();
+  const now = new Date().toISOString();
+  const engByKey = new Map(state.engineCatalogEngines.map(e => [catKey(e.nome), e]));
+  const typeByKey = new Map(state.engineCatalogTypes.map(t => [catKey(t.nome), t]));
+  const usedE = new Set(state.engineCatalogEngines.map(e => e.id));
+  const usedT = new Set(state.engineCatalogTypes.map(t => t.id));
+  const plan = { newEngines:[], newTypes:[], engineEdits:[], typeEdits:[], newPieces:[], pieceEdits:[], unchanged:0, skipped:0, filled:0, total:0 };
+  const getEngine = name => {
+    const k = catKey(name); let e = engByKey.get(k);
+    if(!e){ e = { id:catNewId('EMO', name, usedE), nome:name.trim(), observacoes:'', createdAt:now }; engByKey.set(k, e); plan.newEngines.push(e); }
+    return e;
+  };
+  const getType = name => {
+    const k = catKey(name); let t = typeByKey.get(k);
+    if(!t){ t = { id:catNewId('TPC', name, usedT), nome:name.trim(), icone:'', createdAt:now }; typeByKey.set(k, t); plan.newTypes.push(t); }
+    return t;
+  };
+  const editsE = new Map(), editsT = new Map();
+  (parsed.engines || []).forEach(raw => {
+    const r = catalogMapRow(raw, map); const name = String(r.motor || '').trim(); if(!name) return;
+    const e = getEngine(name); const obs = String(r.observacoes || '').trim();
+    if(obs && obs !== (e.observacoes || '')){
+      if(plan.newEngines.includes(e)) e.observacoes = obs;
+      else { const cur = editsE.get(e.id) || { row:e, patch:{} }; cur.patch.observacoes = obs; editsE.set(e.id, cur); }
+    }
+  });
+  (parsed.types || []).forEach(raw => {
+    const r = catalogMapRow(raw, map); const name = String(r.tipo || '').trim(); if(!name) return;
+    const t = getType(name); const ic = String(r.icone || '').trim();
+    if(ic && ic !== (t.icone || '')){
+      if(plan.newTypes.includes(t)) t.icone = ic;
+      else { const cur = editsT.get(t.id) || { row:t, patch:{} }; cur.patch.icone = ic; editsT.set(t.id, cur); }
+    }
+  });
+  const byFull = new Map(), byRef = new Map();
+  state.engineCatalog.forEach(p => {
+    if(!p.motorId || !p.tipoId) return;
+    const k3 = `${p.motorId}|${p.tipoId}|${catCompact(p.referencia)}`;
+    byFull.set(`${k3}|${catKey(p.marca)}`, p);
+    if(!byRef.has(k3)) byRef.set(k3, []);
+    byRef.get(k3).push(p);
+  });
+  const planned = new Map();
+  let lastMotor = '', lastTipo = '';
+  (parsed.pieces || []).forEach(raw => {
+    const r = catalogMapRow(raw, map);
+    if(!Object.values(r).some(v => String(v).trim())) return;
+    plan.total++;
+    let motor = String(r.motor || '').trim(), tipo = String(r.tipo || '').trim(), carried = false;
+    if(!motor && lastMotor){ motor = lastMotor; carried = true; }
+    if(!tipo && lastTipo && (carried || catKey(motor) === catKey(lastMotor))){ tipo = lastTipo; carried = true; }
+    const ref = String(r.referencia || '').trim();
+    if(!motor || !tipo || !ref){ plan.skipped++; return; }
+    lastMotor = motor; lastTipo = tipo; if(carried) plan.filled++;
+    const marca = String(r.marca || '').trim();
+    const e = getEngine(motor), t = getType(tipo);
+    const k3 = `${e.id}|${t.id}|${catCompact(ref)}`;
+    let ex = byFull.get(`${k3}|${catKey(marca)}`);
+    if(!ex){ const cand = byRef.get(k3) || []; ex = marca ? cand.find(p => !p.marca) : cand[0]; }
+    const key = ex ? ex.id : `${k3}|${catKey(marca)}`;
+    let entry = planned.get(key);
+    if(!entry){
+      entry = ex
+        ? { row:ex, patch:{}, isNew:false }
+        : { row:{ id:uid('PEC'), motorId:e.id, tipoId:t.id, referencia:ref, descricao:'', marca, observacoes:'', createdAt:now }, patch:{}, isNew:true };
+      if(ex && marca && !ex.marca) entry.patch.marca = marca;
+      planned.set(key, entry);
+    }
+    ['descricao','observacoes'].forEach(f => {
+      const v = String(r[f] || '').trim();
+      if(v && v !== String(entry.row[f] || '')) entry.patch[f] = v;
+    });
+  });
+  planned.forEach(entry => {
+    if(entry.isNew){ Object.assign(entry.row, entry.patch); plan.newPieces.push(entry.row); }
+    else if(Object.keys(entry.patch).length) plan.pieceEdits.push(entry);
+    else plan.unchanged++;
+  });
+  plan.engineEdits = [...editsE.values()];
+  plan.typeEdits = [...editsT.values()];
+  return plan;
+}
+async function catalogImportFile(file){
+  if(!catalogCan('import')) return toast('Sem permissão para importar.');
+  if(!hasWritableFirebaseSession()) return toast('Importação bloqueada: entra com Firebase para gravar dados.');
+  if(!catalogReady()) return toast('O catálogo ainda está a carregar.');
+  try{
+    const parsed = await catalogReadWorkbook(file);
+    if(!parsed.pieces.length) return toast('O ficheiro não tem linhas de peças.');
+    const plan = catalogBuildImportPlan(parsed);
+    if(!plan.total) return toast('Não encontrei linhas válidas. Colunas esperadas: Motor, Tipo de Peça, Referência, Descrição, Marca, Observações.');
+    if(!plan.newPieces.length && !plan.pieceEdits.length && !plan.newEngines.length && !plan.newTypes.length && !plan.engineEdits.length && !plan.typeEdits.length){
+      return toast(`Nada a importar: ${plan.unchanged} peça(s) já existem sem alterações${plan.skipped ? ` · ${plan.skipped} linha(s) ignorada(s)` : ''}.`);
+    }
+    catalogUI.pendingPlan = plan;
+    const li = (n, txt) => n ? `<li><b>${n}</b> ${txt}</li>` : '';
+    openModal('📥 Confirmar importação', `<div class="cm-import">
+      <p>Ficheiro: <strong>${esc(file.name)}</strong> · ${plan.total} linha(s) lidas</p>
+      <ul class="cm-import-list">
+        ${li(plan.newPieces.length, 'peça(s) novas')}
+        ${li(plan.pieceEdits.length, 'peça(s) existentes a atualizar (descrição/marca/observações)')}
+        ${li(plan.newEngines.length, `motor(es) novos${plan.newEngines.length <= 6 ? `: ${esc(plan.newEngines.map(e => e.nome).join(', '))}` : ''}`)}
+        ${li(plan.newTypes.length, `tipo(s) de peça novos${plan.newTypes.length <= 6 ? `: ${esc(plan.newTypes.map(t => t.nome).join(', '))}` : ''}`)}
+        ${li(plan.engineEdits.length + plan.typeEdits.length, 'motor(es)/tipo(s) a atualizar')}
+        ${li(plan.unchanged, 'peça(s) já existentes, sem alterações')}
+        ${li(plan.filled, 'linha(s) com Motor/Tipo em branco, preenchidas com a linha anterior')}
+        ${li(plan.skipped, 'linha(s) ignoradas (falta Motor, Tipo de Peça ou Referência)')}
+      </ul>
+      <div class="cm-form-actions"><button type="button" class="cm-btn cm-btn-main" id="cmImportOk">✅ Importar</button><button type="button" class="cm-btn cm-btn-ghost" id="cmImportCancel">Cancelar</button></div>
+    </div>`);
+    qs('#cmImportCancel')?.addEventListener('click', () => { catalogUI.pendingPlan = null; closeModal(); });
+    qs('#cmImportOk')?.addEventListener('click', () => catalogApplyImportPlan(file.name));
+  } catch(err){
+    console.error(err);
+    toast(err?.message || 'Não consegui ler esse ficheiro.');
+  }
+}
+async function catalogApplyImportPlan(fileName){
+  const plan = catalogUI.pendingPlan; catalogUI.pendingPlan = null;
+  if(!plan) return;
+  if(!catalogGuard('add')) return;
+  const btn = qs('#cmImportOk'); if(btn){ btn.disabled = true; btn.textContent = 'A importar…'; }
+  const ops = [];
+  state.engineCatalogEngines.push(...plan.newEngines);
+  state.engineCatalogTypes.push(...plan.newTypes);
+  plan.newEngines.forEach(row => ops.push({ key:'engineCatalogEngines', row }));
+  plan.newTypes.forEach(row => ops.push({ key:'engineCatalogTypes', row }));
+  plan.engineEdits.forEach(({ row, patch }) => { Object.assign(row, patch); ops.push({ key:'engineCatalogEngines', row }); });
+  plan.typeEdits.forEach(({ row, patch }) => { Object.assign(row, patch); ops.push({ key:'engineCatalogTypes', row }); });
+  state.engineCatalog.push(...plan.newPieces);
+  plan.newPieces.forEach(row => ops.push({ key:'engineCatalog', row }));
+  plan.pieceEdits.forEach(({ row, patch }) => { Object.assign(row, patch); ops.push({ key:'engineCatalog', row }); });
+  const ok = await catalogCommit(ops, `Catálogo Motor: importação Excel (${plan.newPieces.length} novas, ${plan.pieceEdits.length} atualizadas) · ${fileName}`);
+  closeModal();
+  if(currentPage === CATALOG_PAGE) renderPage(CATALOG_PAGE);
+  if(ok) toast(`Importação concluída: ${plan.newPieces.length} nova(s), ${plan.pieceEdits.length} atualizada(s).`);
+}
+
 function stock(){
   return entityPage('Stock / Catálogo','stockForm',[
     ['referencia','Referência'],['nome','Nome da peça'],['marca','Marca'],['modelo','Modelo compatível'],['estado','Nova / Usada / Recondicionada'],['local','Localização'],['custo','Preço custo'],['venda','Preço venda'],['qtd','Quantidade']
@@ -2296,8 +5211,89 @@ function quoteMainDescription(q){
   const extra = items.length > 1 ? ` +${items.length - 1} ref.` : '';
   return `${first.nome || first.referencia || '-'}${extra}`;
 }
-function quoteItemsInputs(items){
+function quoteListArray(value){
+  if(Array.isArray(value)) return value.map(v=>String(v || '').trim()).filter(Boolean);
+  if(typeof value === 'string' && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      if(Array.isArray(parsed)) return parsed.map(v=>String(v || '').trim()).filter(Boolean);
+    } catch {}
+    return value.split('\n').map(v=>String(v || '').trim()).filter(Boolean);
+  }
+  return [];
+}
+function quoteListFromItems(items, field){
+  return (items || []).map(item=>{
+    if(field === 'refs') return String(item.referencia || item.nome || '').trim();
+    if(field === 'qtds') return String(item.unidade || item.quantidade || 1).trim();
+    return '';
+  }).filter(Boolean);
+}
+function quoteListSnapshot(source={}, items=[]){
+  const refs = quoteListArray(source.listaReferencias || source.quoteListRefsSnapshot || source.quoteListRefs);
+  const qtds = quoteListArray(source.listaQuantidades || source.quoteListQtySnapshot || source.quoteListQtys);
+  return {
+    refs: refs.length ? refs : quoteListFromItems(items, 'refs'),
+    qtds: qtds.length ? qtds : quoteListFromItems(items, 'qtds'),
+    updatedAt: source.listaAtualizadaAt || source.quoteListUpdatedAtSnapshot || '',
+    updatedBy: source.listaAtualizadaPor || source.quoteListUpdatedBySnapshot || ''
+  };
+}
+function quoteListBoxHtml(id, values, emptyText){
+  return `<div id="${id}">${values?.length ? values.map(v=>`<div>${esc(v)}</div>`).join('') : `<span class="muted">${esc(emptyText)}</span>`}</div>`;
+}
+function quoteListHiddenInputs(snapshot){
+  return `<input type="hidden" name="quoteListRefsSnapshot" value="${esc(JSON.stringify(snapshot.refs || []))}">
+    <input type="hidden" name="quoteListQtySnapshot" value="${esc(JSON.stringify(snapshot.qtds || []))}">
+    <input type="hidden" name="quoteListUpdatedAtSnapshot" value="${esc(snapshot.updatedAt || '')}">
+    <input type="hidden" name="quoteListUpdatedBySnapshot" value="${esc(snapshot.updatedBy || '')}">`;
+}
+function readQuoteListSnapshot(form, items=[]){
+  const refs = quoteListArray(form?.querySelector('[name="quoteListRefsSnapshot"]')?.value || '');
+  const qtds = quoteListArray(form?.querySelector('[name="quoteListQtySnapshot"]')?.value || '');
+  return {
+    listaReferencias: refs,
+    listaQuantidades: qtds,
+    listaAtualizadaAt: form?.querySelector('[name="quoteListUpdatedAtSnapshot"]')?.value || '',
+    listaAtualizadaPor: form?.querySelector('[name="quoteListUpdatedBySnapshot"]')?.value || ''
+  };
+}
+function setQuoteListHidden(form, snapshot){
+  const refsInput = form?.querySelector('[name="quoteListRefsSnapshot"]');
+  const qtyInput = form?.querySelector('[name="quoteListQtySnapshot"]');
+  const atInput = form?.querySelector('[name="quoteListUpdatedAtSnapshot"]');
+  const byInput = form?.querySelector('[name="quoteListUpdatedBySnapshot"]');
+  if(refsInput) refsInput.value = JSON.stringify(snapshot.refs || []);
+  if(qtyInput) qtyInput.value = JSON.stringify(snapshot.qtds || []);
+  if(atInput) atInput.value = snapshot.updatedAt || '';
+  if(byInput) byInput.value = snapshot.updatedBy || '';
+}
+function renderQuoteListSnapshot(form, snapshot){
+  const refsBox = form?.querySelector('#quoteFinalRefsList');
+  const qtdBox = form?.querySelector('#quoteQuantidadesList');
+  const stamp = form?.querySelector('#quoteListUpdatedStamp');
+  if(refsBox) refsBox.innerHTML = snapshot.refs?.length ? snapshot.refs.map(v=>`<div>${esc(v)}</div>`).join('') : '<span class="muted">Lista ainda não atualizada.</span>';
+  if(qtdBox) qtdBox.innerHTML = snapshot.qtds?.length ? snapshot.qtds.map(v=>`<div>${esc(v)}</div>`).join('') : '<span class="muted">Sem quantidades.</span>';
+  if(stamp) stamp.textContent = snapshot.updatedAt ? `Último update: ${formatDatePt(snapshot.updatedAt.slice(0,10))} · ${snapshot.updatedBy || '-'}` : 'Ainda sem update guardado.';
+}
+function updateQuoteListByAdmin(form){
+  if(!isAdminMaster()) return toast('Só o Admin Master pode atualizar esta lista.');
+  const items = collectQuoteItems(form);
+  const snapshot = {
+    refs: quoteListFromItems(items, 'refs'),
+    qtds: quoteListFromItems(items, 'qtds'),
+    updatedAt: new Date().toISOString(),
+    updatedBy: preferredUserName('Admin')
+  };
+  setQuoteListHidden(form, snapshot);
+  renderQuoteListSnapshot(form, snapshot);
+  saveQuoteDraft(form);
+  toast('Lista do orçamento atualizada. Guarda o orçamento para ficar gravado.');
+}
+
+function quoteItemsInputs(items, source={}){
   const rows = (items && items.length ? items : [normalizeQuoteItem({})]);
+  const snapshot = quoteListSnapshot(source, rows);
   return `<div class="quote-items-editor" id="quoteItemsEditor">
     <div class="quote-items-head">
       <strong>Referências / peças</strong>
@@ -2308,6 +5304,17 @@ function quoteItemsInputs(items){
     </div>
     <div id="quoteItemsRows">
       ${rows.map((item,idx)=>quoteItemRow(item, idx)).join('')}
+    </div>
+    <div class="quote-admin-list-panel">
+      <div class="pedido-final-summary quote-final-summary">
+        <div class="pedido-final-box"><strong>Lista de Referências</strong>${quoteListBoxHtml('quoteFinalRefsList', snapshot.refs, 'Lista ainda não atualizada.')}</div>
+        <div class="pedido-final-box"><strong>Quantidades</strong>${quoteListBoxHtml('quoteQuantidadesList', snapshot.qtds, 'Sem quantidades.')}</div>
+      </div>
+      <div class="quote-list-update-row">
+        <span id="quoteListUpdatedStamp">${snapshot.updatedAt ? `Último update: ${formatDatePt(snapshot.updatedAt.slice(0,10))} · ${esc(snapshot.updatedBy || '-')}` : 'Ainda sem update guardado.'}</span>
+        ${isAdminMaster()?`<button class="btn primary small" type="button" id="updateQuoteListBtn">Atualizar lista</button>`:`<span class="badge orange">Só Admin Master atualiza</span>`}
+      </div>
+      ${quoteListHiddenInputs(snapshot)}
     </div>
     <div class="quote-items-total"><span>Total orçamento</span><b id="quoteItemsLiveTotal">${money(quoteItemsTotal(rows))}</b></div>
   </div>`;
@@ -2373,6 +5380,11 @@ function bindQuoteItemsEditor(scope=document){
     input.dataset.boundQuoteInput = '1';
     input.addEventListener('input',()=>refreshQuoteItemsTotal(rows));
   });
+  const updateListBtn = rootEl.querySelector('#updateQuoteListBtn');
+  if(updateListBtn && !updateListBtn.dataset.boundQuoteListUpdate){
+    updateListBtn.dataset.boundQuoteListUpdate = '1';
+    updateListBtn.addEventListener('click',()=>updateQuoteListByAdmin(rootEl.querySelector('form') || rootEl.closest?.('form') || qs('#quoteForm') || qs('#editQuoteForm')));
+  }
 }
 
 function quoteDraftKey(){ return 'bragalis_quote_draft_v1'; }
@@ -2401,7 +5413,7 @@ function quoteCreateFormHtmlFromDraft(draft=null){
     <input class="field span3" name="matricula" placeholder="Matrícula" value="${esc(data.matricula||'')}">
     <input class="field span3" name="marcaModelo" placeholder="Marca & Modelo" value="${esc(data.marcaModelo||'')}">
     <input class="field span3" name="motor" placeholder="Motor" value="${esc(data.motor||'')}">
-    <div class="span3">${quoteItemsInputs(items)}</div>
+    <div class="span3">${quoteItemsInputs(items, data)}</div>
     <select class="select" name="estado">${['Rascunho','Enviado','Aceite','Recusado'].map(s=>`<option ${String(data.estado||'Rascunho')===s?'selected':''}>${s}</option>`).join('')}</select>
     <input class="field" name="validade" type="date" value="${esc(data.validade||today())}">
     <input class="field" name="prazoEntrega" placeholder="Prazo de entrega" value="${esc(data.prazoEntrega||'')}">
@@ -3335,6 +6347,10 @@ function excelPageRegistry(){
         ['groupId','ID Secção'], ['contactId','ID Contacto'], ['armazem','Armazém / Local'], ['seccao','Secção / Sessão'], ['nome','Nome Contacto'], ['extensao','Extensão'], ['telemovel','Telemóvel'], ['telefone','Telefone'], ['email','Email'], ['local','Local / Empresa']
       ]
     },
+    referencias: {
+      key:'references', title:'Referências da Empresa', file:'referencias', prefix:'REF', edit:()=>canEditOperational(),
+      fields:[['referencia','Referência'],['familia','Família'],['marca','Marca'],['descricao','Descrição']]
+    },
     fornecedores: {
       key:'suppliers', title:'Fornecedores', file:'fornecedores', prefix:'FOR', edit:()=>canEditOperational(),
       fields:[
@@ -3802,6 +6818,7 @@ function applyImportedRows(pageId, cfg, rows){
     if(pageId === 'rotas') upsertVehicleFromRoute(row);
   });
   if(pageId === 'fornecedores') sortSuppliersState();
+  if(pageId === 'referencias') target.sort((a,b)=>String(a.referencia||'').localeCompare(String(b.referencia||''), 'pt', {numeric:true,sensitivity:'base'}));
   return pageId === 'rotas' ? rows.filter(r => r.viatura || r.matricula || r.destino || r.condutor).length : rows.length;
 }
 function uniqueExcelMatch(pageId, existing, row){
@@ -3823,6 +6840,7 @@ function uniqueExcelMatch(pageId, existing, row){
       normalizeText(existing.horaInicio) === normalizeText(row.horaInicio);
   }
   if(pageId === 'users') return row.email && existing.email === row.email;
+  if(pageId === 'referencias') return row.referencia && normalizeText(existing.referencia) === normalizeText(row.referencia);
   if(pageId === 'orcamentos') return false;
   return false;
 }
@@ -3887,18 +6905,42 @@ function bindPage(id){
   if(dashboardLogout) dashboardLogout.addEventListener('click', logoutCurrentUser);
   qsa('[data-client-detail]').forEach(b=>b.addEventListener('click',()=>openClientDetail(b.dataset.clientDetail)));
   qsa('[data-client-email]').forEach(b=>b.addEventListener('click',()=>emailClient(b.dataset.clientEmail)));
-  const globalSearch = qs('#globalSearch');
-  if(globalSearch) globalSearch.addEventListener('input',()=>{ qs('#globalSearchResults').innerHTML = globalSearchResults(globalSearch.value); bindGlobalResults(); });
+  bindGlobalSearchInput(qs('#globalSearch'), 'globalSearchResults');
   const clientSearch = qs('#clientSearch');
-  if(clientSearch) clientSearch.addEventListener('input',()=>{ qs('#clientsTable').innerHTML = clientsTable(filterClients()); bindEntities(); });
+  const updateClientSearch = () => {
+    const rows = filterClients();
+    const table = qs('#clientsTable');
+    if(table) table.innerHTML = clientsTable(rows);
+    const count = qs('#clientSearchCount');
+    if(count) count.textContent = clientSearch?.value.trim() ? `${rows.length} de ${state.clients.length} clientes` : `${state.clients.length} clientes`;
+    const clear = qs('#clearClientSearch');
+    if(clear) clear.disabled = !clientSearch?.value;
+    bindEntities();
+    qs('[data-clear-client-search]')?.addEventListener('click',()=>{ if(clientSearch) clientSearch.value=''; updateClientSearch(); clientSearch?.focus(); });
+  };
+  if(clientSearch) clientSearch.addEventListener('input',updateClientSearch);
+  qs('#clearClientSearch')?.addEventListener('click',()=>{ if(clientSearch) clientSearch.value=''; updateClientSearch(); clientSearch?.focus(); });
+  clientSearch?.addEventListener('keydown',e=>{ if(e.key==='Escape'){ clientSearch.value=''; updateClientSearch(); } });
   const contactSearch = qs('#contactSearch');
-  if(contactSearch) contactSearch.addEventListener('input',()=>{ qs('#contactsTable').innerHTML = contactGroupsView(filterContactGroups()); bindContactDirectory(); });
+  const updateContactSearch = () => {
+    const groups = filterContactGroups();
+    const table = qs('#contactsTable');
+    if(table) table.innerHTML = contactGroupsView(groups);
+    const count = qs('#contactSearchCount');
+    const matched = groups.reduce((sum,g)=>sum+(g.contactos||[]).length,0);
+    if(count) count.textContent = contactSearch?.value.trim() ? `${matched} contactos · ${groups.length} secções` : `${contactCount()} contactos`;
+    const clear = qs('#clearContactSearch');
+    if(clear) clear.disabled = !contactSearch?.value;
+    bindContactDirectory();
+    qs('[data-clear-contact-search]')?.addEventListener('click',()=>{ if(contactSearch) contactSearch.value=''; updateContactSearch(); contactSearch?.focus(); });
+  };
+  if(contactSearch) contactSearch.addEventListener('input',updateContactSearch);
+  qs('#clearContactSearch')?.addEventListener('click',()=>{ if(contactSearch) contactSearch.value=''; updateContactSearch(); contactSearch?.focus(); });
+  contactSearch?.addEventListener('keydown',e=>{ if(e.key==='Escape'){ contactSearch.value=''; updateContactSearch(); } });
+  if(id==='referencias') bindReferencesPage();
   const supplierSearch = qs('#supplierSearch');
   if(supplierSearch) supplierSearch.addEventListener('input',()=>{ qs('#suppliersTable').innerHTML = suppliersTable(filterSuppliers()); bindEntities(); });
   if(id==='nova-chamada') bindCallForm();
-  if(id==='pedidos') bindPedidos();
-  if(id==='orcamentos') bindQuotes();
-  if(id==='rotas') bindRoutes();
   if(id==='contactos') bindContactDirectory();
   if(id==='users') bindUsersPage();
   bindEntities();
@@ -3909,7 +6951,11 @@ function bindPage(id){
 }
 
 function bindGlobalResults(){
-  qsa('#globalSearchResults [data-go]').forEach(b=>b.addEventListener('click',()=>goPage(b.dataset.go)));
+  qsa('#globalSearchResults [data-go]').forEach(b=>{
+    if(b.dataset.searchBound === '1') return;
+    b.dataset.searchBound = '1';
+    b.addEventListener('click',()=>goPage(b.dataset.go));
+  });
 }
 function bindCallForm(){
   qs('#callForm').addEventListener('submit', e=>{
@@ -4241,7 +7287,8 @@ function bindNewQuoteForm(form){
     const first = items[0];
     const viatura = composeQuoteVehicle(data);
     const creator = currentQuoteCreator();
-    state.quotes.push({ id:nextQuoteId(), createdAt:today(), createdByName:creator.name, createdByEmail:creator.email, estado:data.estado || 'Rascunho', ...data, viatura, items, peca:first.nome, referencia:first.referencia, quantidade:first.unidade, precoUnitario:first.preco, total: quoteItemsTotal(items), history:[{ date:today(), action:'Criado', by:creator.email || '' }] });
+    const listSnapshot = readQuoteListSnapshot(e.target, items);
+    state.quotes.push({ id:nextQuoteId(), createdAt:today(), createdByName:creator.name, createdByEmail:creator.email, estado:data.estado || 'Rascunho', ...data, ...listSnapshot, viatura, items, peca:first.nome, referencia:first.referencia, quantidade:first.unidade, precoUnitario:first.preco, total: quoteItemsTotal(items), history:[{ date:today(), action:'Criado', by:creator.email || '' }] });
     clearQuoteDraft(); saveState(); closeModal(); renderPage('orcamentos'); toast('Orçamento criado.');
   });
 }
@@ -4276,7 +7323,7 @@ function openQuoteModal(id){
     <input class="field span3" name="matricula" placeholder="Matrícula" value="${esc(v.matricula)}">
     <input class="field span3" name="marcaModelo" placeholder="Marca & Modelo" value="${esc(v.marcaModelo)}">
     <input class="field span3" name="motor" placeholder="Motor" value="${esc(v.motor)}">
-    <div class="span3">${quoteItemsInputs(items)}</div>
+    <div class="span3">${quoteItemsInputs(items, q)}</div>
     <select class="select" name="estado">${['Rascunho','Enviado','Aceite','Recusado'].map(s=>`<option ${q.estado===s?'selected':''}>${s}</option>`).join('')}</select>
     <input class="field" name="validade" type="date" value="${esc(q.validade||today())}">
     <input class="field" name="prazoEntrega" placeholder="Prazo de entrega" value="${esc(q.prazoEntrega||'')}">
@@ -4293,7 +7340,8 @@ function openQuoteModal(id){
     const newItems = collectQuoteItems(e.target);
     if(!newItems.length) return toast('Adiciona pelo menos uma referência.');
     const first = newItems[0];
-    Object.assign(q, data, {
+    const listSnapshot = readQuoteListSnapshot(e.target, newItems);
+    Object.assign(q, data, listSnapshot, {
       viatura:composeQuoteVehicle(data),
       items:newItems,
       peca:first.nome,
@@ -4693,9 +7741,15 @@ function openEditContactModal(groupId, contactId){
 }
 
 function bindContactDirectory(){
-  qs('#openQuickContactBtn')?.addEventListener('click', openQuickContactCreateModal);
+  const quickCreateBtn = qs('#openQuickContactBtn');
+  if(quickCreateBtn && quickCreateBtn.dataset.contactBound !== '1'){
+    quickCreateBtn.dataset.contactBound = '1';
+    quickCreateBtn.addEventListener('click', openQuickContactCreateModal);
+  }
   const quickForm = qs('#quickContactForm');
-  if(quickForm) quickForm.addEventListener('submit',e=>{
+  if(quickForm && quickForm.dataset.contactBound !== '1'){
+    quickForm.dataset.contactBound = '1';
+    quickForm.addEventListener('submit',e=>{
     e.preventDefault();
     if(!canEditOperational()) return toast('Sem permissão para alterar contactos.');
     normalizeContactDirectory();
@@ -4719,7 +7773,8 @@ function bindContactDirectory(){
     group.aberto = true;
     setDirectoryRuntimeOpen(group.id, true);
     saveState(); renderPage('contactos'); toast('Contacto adicionado.');
-  });
+    });
+  }
 
   qsa('[data-toggle-contact-group]').forEach(btn=>btn.addEventListener('click',()=>{
     normalizeContactDirectory();
@@ -4995,6 +8050,7 @@ function createEntityFormHtml(type){
     <input class="field" name="codigoFicha" placeholder="Código de ficha" required>
     <button class="btn primary full" type="submit">Guardar fornecedor</button>
   </form>`;
+  if(type==='reference') return referenceFormHtml();
   if(type==='stock') return `<form id="entityCreateForm" data-create-type="stock" class="form-grid modal-grid-form">
     ${[['referencia','Referência'],['nome','Nome da peça'],['marca','Marca'],['modelo','Modelo compatível'],['estado','Nova / Usada / Recondicionada'],['local','Localização'],['custo','Preço custo'],['venda','Preço venda'],['qtd','Quantidade']].map(f=>`<input class="field" name="${f[0]}" placeholder="${f[1]}">`).join('')}
     <div class="span3"><button class="btn primary" type="submit">Guardar registo</button></div>
@@ -5002,7 +8058,7 @@ function createEntityFormHtml(type){
   return '';
 }
 function createEntityTitle(type){
-  return type==='client' ? 'Adicionar cliente' : type==='supplier' ? 'Adicionar fornecedor' : type==='stock' ? 'Adicionar stock' : 'Adicionar registo';
+  return type==='client' ? 'Adicionar cliente' : type==='supplier' ? 'Adicionar fornecedor' : type==='stock' ? 'Adicionar stock' : type==='reference' ? 'Adicionar referência' : 'Adicionar registo';
 }
 function openCreateEntityModal(type){
   if(!canEditOperational()) return toast('Sem permissão para guardar.');
@@ -5019,12 +8075,13 @@ function bindCreateEntityForm(form){
     e.preventDefault();
     if(!canEditOperational()) return toast('Sem permissão para guardar.');
     const type = form.dataset.createType;
-    const map = { client:['clients','CLI'], supplier:['suppliers','FOR'], stock:['stock','STK'] };
+    const map = { client:['clients','CLI'], supplier:['suppliers','FOR'], stock:['stock','STK'], reference:['references','REF'] };
     const target = map[type];
     if(!target) return toast('Tipo de registo inválido.');
     const [key,prefix] = target;
     let row = { id:uid(prefix), ...Object.fromEntries(new FormData(form).entries()) };
     if(type==='client') row = { ...row, ...collectClientContacts(form) };
+    if(type==='reference') { row.referencia=String(row.referencia||'').trim(); row.familia=String(row.familia||'').trim(); row.marca=String(row.marca||'').trim(); row.descricao=String(row.descricao||'').trim(); }
     state[key] = Array.isArray(state[key]) ? state[key] : [];
     state[key].push(row);
     if(key==='suppliers') sortSuppliersState();
@@ -5114,8 +8171,8 @@ function bindEntities(){
     else window.scrollTo({ top:0, behavior:'smooth' });
   });
   qsa('[data-create-entity]').forEach(b=>b.addEventListener('click',()=>openCreateEntityModal(b.dataset.createEntity)));
-  const map = { client:[state.clients,'clients'], supplier:[state.suppliers,'suppliers'], stock:[state.stock,'stock'], user:[state.users,'users'], follow:[state.followups,'followups'] };
-  qsa('[data-delete-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.deleteEntity.split(':'); if(!canDelete()) return toast('Sem permissão para apagar.'); if(type==='user' && !isAdminMaster()) return toast('Só o Admin Master pode alterar utilizadores.'); const target=map[type]; state[target[1]] = target[0].filter(x=>x.id!==id); saveState(); renderPage(currentPage); toast('Registo apagado.'); }));
+  const map = { client:[state.clients,'clients'], supplier:[state.suppliers,'suppliers'], stock:[state.stock,'stock'], reference:[state.references,'references'], user:[state.users,'users'], follow:[state.followups,'followups'] };
+  qsa('[data-delete-entity]').forEach(b=>b.addEventListener('click',async()=>{ const [type,id]=b.dataset.deleteEntity.split(':'); if(!canDelete(type==='reference'?'referencias':currentPage)) return toast('Sem permissão para apagar.'); if(type==='user' && !isAdminMaster()) return toast('Só o Admin Master pode alterar utilizadores.'); const target=map[type]; if(type==='reference' && firebaseReady && firebaseDb){ try{ await firebaseDb.collection(FIREBASE_COLLECTIONS.references).doc(id).delete(); state.references=(state.references||[]).filter(x=>x.id!==id); renderPage(currentPage); toast('Referência apagada da Firebase.'); }catch(err){toast('Não foi possível apagar a referência.');} return; } state[target[1]] = target[0].filter(x=>x.id!==id); saveState(); renderPage(currentPage); toast('Registo apagado.'); }));
   qsa('[data-edit-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.editEntity.split(':'); if(type==='user' && !isAdminMaster()) return toast('Só o Admin Master pode alterar utilizadores.'); openEntityModal(type,id); }));
   qsa('[data-view-entity]').forEach(b=>b.addEventListener('click',()=>{ const [type,id]=b.dataset.viewEntity.split(':'); openEntityReadModal(type,id); }));
   const forms = [{id:'clientForm',key:'clients',prefix:'CLI'},{id:'supplierForm',key:'suppliers',prefix:'FOR'},{id:'stockForm',key:'stock',prefix:'STK'},{id:'userForm',key:'users',prefix:'USR'}];
@@ -5142,17 +8199,17 @@ function bindEntities(){
   }); });
 }
 function openEntityModal(type,id){
-  const map = { client:['clients','CLI'], supplier:['suppliers','FOR'], stock:['stock','STK'], user:['users','USR'], follow:['followups','AGE'] };
+  const map = { client:['clients','CLI'], supplier:['suppliers','FOR'], stock:['stock','STK'], reference:['references','REF'], user:['users','USR'], follow:['followups','AGE'] };
   const [key] = map[type]; const item = state[key].find(x=>x.id===id); if(!item) return;
-  const fields = type === 'client'
-    ? ['codigoCliente','nome','telefone','email','morada','codigoPostal','notas']
-    : Object.keys(item).filter(k=>k!=='id' && !(type==='user' && k==='pageAccess'));
-  openModal('Editar registo', `<form id="entityEditForm" class="form-grid">${type==='client' ? clientFormHtml(item) : fields.map(k=>`<input class="field" name="${k}" placeholder="${k}" value="${esc(item[k])}">`).join('')}<div class="span3"><button class="btn primary">Guardar</button></div></form>`);
+  const fields = type === 'client' ? ['codigoCliente','nome','telefone','email','morada','codigoPostal','notas'] : Object.keys(item).filter(k=>k!=='id' && !(type==='user' && k==='pageAccess'));
+  const editHtml = type==='reference' ? referenceFormHtml(item).replace('id="entityCreateForm" data-create-type="reference"','id="entityEditForm"') : `<form id="entityEditForm" class="form-grid">${type==='client' ? clientFormHtml(item) : fields.map(k=>`<input class="field" name="${k}" placeholder="${k}" value="${esc(item[k])}">`).join('')}<div class="span3"><button class="btn primary">Guardar</button></div></form>`;
+  openModal(type==='reference' ? 'Editar referência' : 'Editar registo', editHtml);
   bindClientMultiContacts(qs('#entityEditForm'));
   qs('#entityEditForm').addEventListener('submit',async e=>{
     e.preventDefault(); 
     const data = Object.fromEntries(new FormData(e.target).entries());
     if(type==='client') Object.assign(data, collectClientContacts(e.target));
+    if(type==='reference') { data.referencia=String(data.referencia||'').trim(); data.familia=String(data.familia||'').trim(); data.marca=String(data.marca||'').trim(); data.descricao=String(data.descricao||'').trim(); }
     Object.assign(item,data); 
     if(key==='suppliers') sortSuppliersState(); 
     try{
@@ -5382,7 +8439,7 @@ function cleanDemoData(){
     clients: [],
     suppliers: [],
     quotes: [],
-    routes: [{"id":"ROT-0001","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-03","pedidoPor":"André Veloso","destino":"Segurança Social","periodo":"Tarde","carga":"sem carga","condutor":"André Veloso","kmInicio":287999,"horaInicio":"14:45","kmFim":288010,"horaFim":"16:38","observacoes":"","kmPercorridos":11},{"id":"ROT-0002","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-02-04","pedidoPor":"Joao Silva","destino":"Soarauto","periodo":"Tarde","carga":"2 paletes","condutor":"Simba","kmInicio":169176,"horaInicio":"15:00","kmFim":169190,"horaFim":"15:25","observacoes":"","kmPercorridos":14},{"id":"ROT-0003","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-04","pedidoPor":"Machado","destino":"CTT","periodo":"Tarde","carga":"sem carga","condutor":"André Costa","kmInicio":288010,"horaInicio":"15:13","kmFim":288011,"horaFim":"15:36","observacoes":"","kmPercorridos":1},{"id":"ROT-0004","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-02-05","pedidoPor":"Joao Silva","destino":"Barcelpeças Barcelos","periodo":"Manha","carga":"Levantar palete","condutor":"Simba","kmInicio":169190,"horaInicio":"09:45","kmFim":169242,"horaFim":"11:00","observacoes":"","kmPercorridos":52},{"id":"ROT-0005","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-05","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":288011,"horaInicio":"10:08","kmFim":288023,"horaFim":"11:10","observacoes":"","kmPercorridos":12},{"id":"ROT-0006","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-02-05","pedidoPor":"Claudia","destino":"Gabinete de Contabilidade","periodo":"Tarde","carga":"sem carga","condutor":"Claudia","kmInicio":153782,"horaInicio":"16:04","kmFim":153791,"horaFim":"16:41","observacoes":"","kmPercorridos":9},{"id":"ROT-0007","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-06","pedidoPor":"André Veloso","destino":"Boleia Abel","periodo":"M","carga":"sem carga","condutor":"Andre Veloso","kmInicio":288023,"horaInicio":"10:35","kmFim":288028,"horaFim":"10:42","observacoes":"","kmPercorridos":5},{"id":"ROT-0008","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-02-06","pedidoPor":"Claudia","destino":"Compras","periodo":"Tarde","carga":"sem carga","condutor":"Claudia","kmInicio":153791,"horaInicio":"15:23","kmFim":153795,"horaFim":"15:45","observacoes":"","kmPercorridos":4},{"id":"ROT-0009","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-02-06","pedidoPor":"Miga","destino":"Soarauto","periodo":"Tarde","carga":"1 palete","condutor":"Leo","kmInicio":153795,"horaInicio":"15:45","kmFim":153796,"horaFim":"15:57","observacoes":"","kmPercorridos":1},{"id":"ROT-0010","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-07","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":288028,"horaInicio":"11:15","kmFim":288039,"horaFim":"12:10","observacoes":"","kmPercorridos":11},{"id":"ROT-0011","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-02-07","pedidoPor":"Miga","destino":"Soarauto","periodo":"Tarde","carga":"4 paletes","condutor":"Fabio Vaz","kmInicio":169242,"horaInicio":"14:36","kmFim":169243,"horaFim":"15:24","observacoes":"","kmPercorridos":1},{"id":"ROT-0012","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-10","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":288039,"horaInicio":"11:13","kmFim":288049,"horaFim":"12:10","observacoes":"","kmPercorridos":10},{"id":"ROT-0013","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-02-10","pedidoPor":"Miga","destino":"Soarauto","periodo":"Tarde","carga":"1 palete","condutor":"Fabio Vaz","kmInicio":153796,"horaInicio":"14:43","kmFim":153796,"horaFim":"15:00","observacoes":"","kmPercorridos":0},{"id":"ROT-0014","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-02-10","pedidoPor":"Miga","destino":"Inovpeças Lousada","periodo":"Tarde","carga":"6 paletes","condutor":"André Costa","kmInicio":169243,"horaInicio":"14:43","kmFim":169355,"horaFim":"16:21","observacoes":"","kmPercorridos":112},{"id":"ROT-0015","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-02-11","pedidoPor":"Simba","destino":"levantar enc.na Volvo","periodo":"M","carga":"sem carga","condutor":"Simba","kmInicio":153796,"horaInicio":"09:48","kmFim":153797,"horaFim":"09:57","observacoes":"","kmPercorridos":1},{"id":"ROT-0016","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-11","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":288049,"horaInicio":"11:25","kmFim":288057,"horaFim":"11:50","observacoes":"","kmPercorridos":8},{"id":"ROT-0017","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-02-12","pedidoPor":"Carlos Avelino","destino":"Invospeças Lousada","periodo":"M","carga":"6 paletes","condutor":"Simba","kmInicio":169243,"horaInicio":"09:30","kmFim":169469,"horaFim":"11:25","observacoes":"","kmPercorridos":226},{"id":"ROT-0018","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-02-12","pedidoPor":"Miga","destino":"Inovpeças Lousada","periodo":"Tarde","carga":"6 paletes","condutor":"André Costa","kmInicio":169469,"horaInicio":"14:35","kmFim":169580,"horaFim":"16:20","observacoes":"","kmPercorridos":111},{"id":"ROT-0019","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-02-12","pedidoPor":"Rui","destino":"CTT","periodo":"Tarde","carga":"sem carga","condutor":"Rui","kmInicio":153797,"horaInicio":"14:40","kmFim":153797,"horaFim":"14:50","observacoes":"","kmPercorridos":0},{"id":"ROT-0020","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-12","pedidoPor":"Lucinda","destino":"Advogada","periodo":"Tarde","carga":"sem carga","condutor":"Elisabete","kmInicio":288057,"horaInicio":"15:30","kmFim":288065,"horaFim":"18:20","observacoes":"","kmPercorridos":8},{"id":"ROT-0021","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-02-13","pedidoPor":"Miga","destino":"Soarauto","periodo":"M","carga":"4 paletes","condutor":"André Costa","kmInicio":169580,"horaInicio":"09:45","kmFim":169581,"horaFim":"10:06","observacoes":"","kmPercorridos":1},{"id":"ROT-0022","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-13","pedidoPor":"Claudia","destino":"Estação cp","periodo":"M","carga":"sem carga","condutor":"Claudia","kmInicio":288065,"horaInicio":"10:18","kmFim":288072,"horaFim":"10:45","observacoes":"","kmPercorridos":7},{"id":"ROT-0023","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-13","pedidoPor":"Elisabete","destino":"almoço Draª Rita Palma","periodo":"Tarde","carga":"sem carga","condutor":"Elisabete","kmInicio":288072,"horaInicio":"12:36","kmFim":288073,"horaFim":"14:00","observacoes":"","kmPercorridos":1},{"id":"ROT-0024","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-02-13","pedidoPor":"Miga","destino":"Soarauto","periodo":"Tarde","carga":"1 palete","condutor":"Cunha","kmInicio":153797,"horaInicio":"14:35","kmFim":153798,"horaFim":"14:48","observacoes":"","kmPercorridos":1},{"id":"ROT-0025","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-13","pedidoPor":"Elisabete","destino":"Estação CP","periodo":"Tarde","carga":"sem carga","condutor":"Elisabete","kmInicio":288073,"horaInicio":"17:38","kmFim":288080,"horaFim":"18:15","observacoes":"","kmPercorridos":7},{"id":"ROT-0026","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-14","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":288080,"horaInicio":"11:57","kmFim":288091,"horaFim":"13:00","observacoes":"","kmPercorridos":11},{"id":"ROT-0027","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-14","pedidoPor":"Joao Silva","destino":"Mecanico","periodo":"Tarde","carga":"sem carga","condutor":"Joao Silva","kmInicio":288091,"horaInicio":"15:04","kmFim":288095,"horaFim":"15:38","observacoes":"","kmPercorridos":4},{"id":"ROT-0028","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-02-14","pedidoPor":"Simba","destino":"Volta Barcelos","periodo":"Tarde","carga":"Varios Volumes","condutor":"Simba","kmInicio":153798,"horaInicio":"16:00","kmFim":153880,"horaFim":"17:55","observacoes":"","kmPercorridos":82},{"id":"ROT-0029","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-17","pedidoPor":"Joao Silva","destino":"My Force","periodo":"M","carga":"sem carga","condutor":"Zezito","kmInicio":288095,"horaInicio":"10:50","kmFim":288112,"horaFim":"11;15:00","observacoes":"","kmPercorridos":17},{"id":"ROT-0030","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-02-17","pedidoPor":"Joao Silva","destino":"Barcelpeças Barcelos","periodo":"Tarde","carga":"1 palete","condutor":"Simba","kmInicio":154073,"horaInicio":"15:20","kmFim":154127,"horaFim":"16:28","observacoes":"","kmPercorridos":54},{"id":"ROT-0031","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-02-18","pedidoPor":"Joao Silva","destino":"Trapotop","periodo":"M","carga":"3 paletes","condutor":"Zezito","kmInicio":169581,"horaInicio":"09:45","kmFim":169654,"horaFim":"11:15","observacoes":"","kmPercorridos":73},{"id":"ROT-0032","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-19","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":288112,"horaInicio":"10:28","kmFim":288123,"horaFim":"11:15","observacoes":"","kmPercorridos":11},{"id":"ROT-0033","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-02-19","pedidoPor":"Avelino","destino":"Soarauto","periodo":"Tarde","carga":"5 paletes","condutor":"Micael","kmInicio":169654,"horaInicio":"14:39","kmFim":169655,"horaFim":"15:25","observacoes":"","kmPercorridos":1},{"id":"ROT-0034","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-19","pedidoPor":"Elisabete","destino":"Bancos","periodo":"Tarde","carga":"sem carga","condutor":"Elisabete","kmInicio":288123,"horaInicio":"14:00","kmFim":288132,"horaFim":"14:46","observacoes":"","kmPercorridos":9},{"id":"ROT-0035","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-20","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":288132,"horaInicio":"10:50","kmFim":288141,"horaFim":"12:01","observacoes":"","kmPercorridos":9},{"id":"ROT-0036","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-02-20","pedidoPor":"Machado","destino":"Sucata","periodo":"Tarde","carga":"2 paletes","condutor":"Cunha","kmInicio":169655,"horaInicio":"15:00","kmFim":169675,"horaFim":"16:03","observacoes":"","kmPercorridos":20},{"id":"ROT-0037","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-02-21","pedidoPor":"Avelino","destino":"Inovpeças Lousada","periodo":"M","carga":"5 paletes","condutor":"Leo","kmInicio":169675,"horaInicio":"09:45","kmFim":169789,"horaFim":"11:50","observacoes":"","kmPercorridos":114},{"id":"ROT-0038","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-21","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":288141,"horaInicio":"11:30","kmFim":288151,"horaFim":"12:05","observacoes":"","kmPercorridos":10},{"id":"ROT-0039","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-24","pedidoPor":"André Veloso","destino":"Serviço externo","periodo":"M","carga":"sem carga","condutor":"Claudia","kmInicio":288151,"horaInicio":"10:45","kmFim":288167,"horaFim":"11:20","observacoes":"","kmPercorridos":16},{"id":"ROT-0040","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-24","pedidoPor":"André Veloso","destino":"serviço externo","periodo":"M","carga":"sem carga","condutor":"André Veloso","kmInicio":288167,"horaInicio":"12:45","kmFim":288187,"horaFim":"14:10","observacoes":"","kmPercorridos":20},{"id":"ROT-0041","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-02-24","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":154156,"horaInicio":"11:56","kmFim":154165,"horaFim":"12:33","observacoes":"","kmPercorridos":9},{"id":"ROT-0042","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-24","pedidoPor":"André Veloso","destino":"Trabalho / Casa","periodo":"Tarde","carga":"sem carga","condutor":"Andre Veloso","kmInicio":288187,"horaInicio":"19:10","kmFim":288218,"horaFim":"07:55","observacoes":"","kmPercorridos":31},{"id":"ROT-0043","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-25","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":288218,"horaInicio":"11:17","kmFim":288228,"horaFim":"11:53","observacoes":"","kmPercorridos":10},{"id":"ROT-0044","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-25","pedidoPor":"André Veloso","destino":"Trabalho / Casa","periodo":"Tarde","carga":"sem carga","condutor":"Andre Veloso","kmInicio":288228,"horaInicio":"19:15","kmFim":288257,"horaFim":"07:55","observacoes":"","kmPercorridos":29},{"id":"ROT-0045","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-26","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":288257,"horaInicio":"12:02","kmFim":288272,"horaFim":"12:47","observacoes":"","kmPercorridos":15},{"id":"ROT-0046","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-26","pedidoPor":"Joao Silva","destino":"serviço externo","periodo":"Tarde","carga":"sem carga","condutor":"Joao Silva","kmInicio":288272,"horaInicio":"19:00","kmFim":288425,"horaFim":"12:44","observacoes":"","kmPercorridos":153},{"id":"ROT-0047","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-02-27","pedidoPor":"Simba","destino":"pichelaria palmeira","periodo":"Tarde","carga":"sem carga","condutor":"Simba","kmInicio":154165,"horaInicio":"15:26","kmFim":154173,"horaFim":"15:52","observacoes":"","kmPercorridos":8},{"id":"ROT-0048","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-02-28","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":154173,"horaInicio":"10:49","kmFim":154183,"horaFim":"11:41","observacoes":"","kmPercorridos":10},{"id":"ROT-0049","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-02-28","pedidoPor":"AVelino","destino":"Soarauto","periodo":"Tarde","carga":"6 paletes","condutor":"Teles","kmInicio":169789,"horaInicio":"16:00","kmFim":169790,"horaFim":"16:47","observacoes":"","kmPercorridos":1},{"id":"ROT-0050","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-02-28","pedidoPor":"Claudia","destino":"Gabinete contabilidade","periodo":"Tarde","carga":"Sem carga","condutor":"Claudia","kmInicio":288425,"horaInicio":"16:40","kmFim":288434,"horaFim":"17:12","observacoes":"","kmPercorridos":9},{"id":"ROT-0051","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-03","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":288434,"horaInicio":"11:12","kmFim":288446,"horaFim":"11:48","observacoes":"","kmPercorridos":12},{"id":"ROT-0052","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-05","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":288446,"horaInicio":"10:39","kmFim":288455,"horaFim":"11:23","observacoes":"","kmPercorridos":9},{"id":"ROT-0053","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-03-05","pedidoPor":"Avelino","destino":"Barcelpeças/Trapotop","periodo":"Tarde","carga":"6 paletes","condutor":"Costa","kmInicio":169790,"horaInicio":"14:35","kmFim":169899,"horaFim":"17:03","observacoes":"","kmPercorridos":109},{"id":"ROT-0054","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-05","pedidoPor":"Machado","destino":"Correios / Agarb","periodo":"Tarde","carga":"sem carga","condutor":"Zezito","kmInicio":288455,"horaInicio":"15:24","kmFim":288456,"horaFim":"16:08","observacoes":"","kmPercorridos":1},{"id":"ROT-0055","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-05","pedidoPor":"André Veloso","destino":"serviço externo","periodo":"Tarde","carga":"sem carga","condutor":"Claudia","kmInicio":288456,"horaInicio":"16:59","kmFim":288464,"horaFim":"17:37","observacoes":"","kmPercorridos":8},{"id":"ROT-0056","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-03-06","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":154183,"horaInicio":"09:05","kmFim":154192,"horaFim":"09:30","observacoes":"","kmPercorridos":9},{"id":"ROT-0057","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-06","pedidoPor":"Claudia","destino":"Estação CP","periodo":"M","carga":"sem carga","condutor":"Claudia","kmInicio":288464,"horaInicio":"10:20","kmFim":288470,"horaFim":"10:45","observacoes":"","kmPercorridos":6},{"id":"ROT-0058","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-06","pedidoPor":"Elisabete","destino":"almoço Draª Rita","periodo":"Tarde","carga":"sem carga","condutor":"Elisabete","kmInicio":288470,"horaInicio":"12:40","kmFim":288471,"horaFim":"14:30","observacoes":"","kmPercorridos":1},{"id":"ROT-0059","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-03-06","pedidoPor":"Miga","destino":"Barcelpeças","periodo":"Tarde","carga":"2 paletes","condutor":"Andre´Costa","kmInicio":169899,"horaInicio":"14:40","kmFim":169951,"horaFim":"15:47","observacoes":"","kmPercorridos":52},{"id":"ROT-0060","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-06","pedidoPor":"Machado","destino":"CTT","periodo":"Tarde","carga":"sem carga","condutor":"Rafael Cunha","kmInicio":288471,"horaInicio":"15:12","kmFim":288472,"horaFim":"15:30","observacoes":"","kmPercorridos":1},{"id":"ROT-0061","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-03-06","pedidoPor":"Tiago","destino":"Volta Barcelos","periodo":"Tarde","carga":"Varios Volumes","condutor":"Fabio Vaz","kmInicio":154192,"horaInicio":"13:15","kmFim":154283,"horaFim":"15:17","observacoes":"","kmPercorridos":91},{"id":"ROT-0062","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-03-06","pedidoPor":"Tiago","destino":"Volta Barcelos","periodo":"Tarde","carga":"Varios Volumes","condutor":"Simba","kmInicio":154283,"horaInicio":"16:00","kmFim":154370,"horaFim":"17:55","observacoes":"","kmPercorridos":87},{"id":"ROT-0063","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-06","pedidoPor":"Elisabete","destino":"Estação CP","periodo":"Tarde","carga":"sem carga","condutor":"Elisabete","kmInicio":288472,"horaInicio":"17:38","kmFim":288478,"horaFim":"18:00","observacoes":"","kmPercorridos":6},{"id":"ROT-0064","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-07","pedidoPor":"Tiago","destino":"Ramoa","periodo":"M","carga":"sem carga","condutor":"Tiago","kmInicio":288478,"horaInicio":"09:25","kmFim":288482,"horaFim":"09:41","observacoes":"","kmPercorridos":4},{"id":"ROT-0065","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-03-07","pedidoPor":"Tiago","destino":"Volta Amares Vila Verde","periodo":"M","carga":"Varios Volumes","condutor":"Micael","kmInicio":154370,"horaInicio":"10:30","kmFim":154497,"horaFim":"11:43","observacoes":"","kmPercorridos":127},{"id":"ROT-0066","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-07","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"Sem carga","condutor":"Elisabete","kmInicio":288482,"horaInicio":"10:56","kmFim":288491,"horaFim":"11:46","observacoes":"","kmPercorridos":9},{"id":"ROT-0067","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-07","pedidoPor":"André Veloso","destino":"Serviço externo","periodo":"Tarde","carga":"sem carga","condutor":"André Veloso","kmInicio":288491,"horaInicio":"15:05","kmFim":288531,"horaFim":"17:00","observacoes":"","kmPercorridos":40},{"id":"ROT-0068","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-10","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":288531,"horaInicio":"11:30","kmFim":288540,"horaFim":"12:30","observacoes":"","kmPercorridos":9},{"id":"ROT-0069","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-03-08","pedidoPor":"André Veloso","destino":"Gaiafor","periodo":"M","carga":"Paletes","condutor":"Rafael Cunha","kmInicio":169951,"horaInicio":"09:00","kmFim":170086,"horaFim":"11:00","observacoes":"","kmPercorridos":135},{"id":"ROT-0070","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-03-10","pedidoPor":"Avelino","destino":"Trapotop","periodo":"Tarde","carga":"2 paletes","condutor":"Fabio","kmInicio":170086,"horaInicio":"14:40","kmFim":170159,"horaFim":"16:18","observacoes":"","kmPercorridos":73},{"id":"ROT-0071","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-10","pedidoPor":"Machado","destino":"CTT","periodo":"M","carga":"um volume","condutor":"André Costa","kmInicio":288540,"horaInicio":"15:16","kmFim":288541,"horaFim":"15:30","observacoes":"","kmPercorridos":1},{"id":"ROT-0072","viatura":"Toyota Prius","matricula":"05-QR-43","data":"11-12 /03/2025","pedidoPor":"Jose Luis","destino":"Reparaçao carro habitual","periodo":"M/T","carga":"sem carga","condutor":"Jose Luis","kmInicio":288541,"horaInicio":"16:24","kmFim":289219,"horaFim":"16:30","observacoes":"","kmPercorridos":678},{"id":"ROT-0073","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-03-11","pedidoPor":"Claudia","destino":"Gabinete contabilidade","periodo":"Tarde","carga":"sem carga","condutor":"Claudia","kmInicio":154497,"horaInicio":"14:45","kmFim":154505,"horaFim":"15:17","observacoes":"","kmPercorridos":8},{"id":"ROT-0074","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-03-11","pedidoPor":"Avelino","destino":"Soarauto","periodo":"Tarde","carga":"6 Paletes","condutor":"Cunha","kmInicio":170159,"horaInicio":"16:20","kmFim":170159,"horaFim":"16:51","observacoes":"","kmPercorridos":0},{"id":"ROT-0075","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-03-12","pedidoPor":"Machado","destino":"CTT","periodo":"Tarde","carga":"sem carga","condutor":"Cunha","kmInicio":154505,"horaInicio":"15:20","kmFim":154506,"horaFim":"15:28","observacoes":"","kmPercorridos":1},{"id":"ROT-0076","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-13","pedidoPor":"Machado","destino":"Reivax","periodo":"M","carga":"sem carga","condutor":"Fabio Silva","kmInicio":289219,"horaInicio":"09:35","kmFim":289230,"horaFim":"10:00","observacoes":"","kmPercorridos":11},{"id":"ROT-0077","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-13","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":289230,"horaInicio":"11:15","kmFim":289240,"horaFim":"11:54","observacoes":"","kmPercorridos":10},{"id":"ROT-0078","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-03-13","pedidoPor":"Miga","destino":"Soarauto","periodo":"Tarde","carga":"1 palete","condutor":"Mario","kmInicio":154506,"horaInicio":"14:45","kmFim":154507,"horaFim":"15:14","observacoes":"","kmPercorridos":1},{"id":"ROT-0079","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-14","pedidoPor":"Tiago","destino":"Ramoa","periodo":"M","carga":"sem carga","condutor":"Tiago","kmInicio":289240,"horaInicio":"09:30","kmFim":289244,"horaFim":"09:45","observacoes":"","kmPercorridos":4},{"id":"ROT-0080","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-14","pedidoPor":"Machado","destino":"P.S.P","periodo":"M","carga":"1 bateria","condutor":"Rui","kmInicio":289244,"horaInicio":"09:56","kmFim":289253,"horaFim":"10:36","observacoes":"","kmPercorridos":9},{"id":"ROT-0081","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-14","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":289253,"horaInicio":"11:44","kmFim":289261,"horaFim":"12:43","observacoes":"","kmPercorridos":8},{"id":"ROT-0082","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-03-14","pedidoPor":"Avelino","destino":"Inovpeças Lousada","periodo":"M","carga":"6 Paletes","condutor":"Simba","kmInicio":170159,"horaInicio":"10:00","kmFim":170275,"horaFim":"12:25","observacoes":"","kmPercorridos":116},{"id":"ROT-0083","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-03-14","pedidoPor":"Avelino","destino":"Inovpeças Lousada","periodo":"Tarde","carga":"6 Paletes","condutor":"Fabio SIlva","kmInicio":170275,"horaInicio":"14:40","kmFim":170387,"horaFim":"15:56","observacoes":"","kmPercorridos":112},{"id":"ROT-0084","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-03-15","pedidoPor":"Joao Silva","destino":"Inovpeças Lousada","periodo":"M","carga":"5 Paletes","condutor":"Leo","kmInicio":170387,"horaInicio":"09:00","kmFim":170499,"horaFim":"12:00","observacoes":"","kmPercorridos":112},{"id":"ROT-0085","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-17","pedidoPor":"Tiago","destino":"Ramoa","periodo":"M","carga":"sem carga","condutor":"Tiago","kmInicio":289261,"horaInicio":"09:45","kmFim":289265,"horaFim":"10:00","observacoes":"","kmPercorridos":4},{"id":"ROT-0086","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-17","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":289265,"horaInicio":"11:59","kmFim":289276,"horaFim":"12:45","observacoes":"","kmPercorridos":11},{"id":"ROT-0087","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-17","pedidoPor":"Elisabete","destino":"CTT","periodo":"Tarde","carga":"sem carga","condutor":"Elisabete","kmInicio":289276,"horaInicio":"14:52","kmFim":289277,"horaFim":"15:08","observacoes":"","kmPercorridos":1},{"id":"ROT-0088","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-17","pedidoPor":"Tiago","destino":"Ramoa","periodo":"Tarde","carga":"sem carga","condutor":"Tiago","kmInicio":289277,"horaInicio":"17:35","kmFim":289281,"horaFim":"17:54","observacoes":"","kmPercorridos":4},{"id":"ROT-0089","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-18","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":289281,"horaInicio":"10:44","kmFim":289291,"horaFim":"11:15","observacoes":"","kmPercorridos":10},{"id":"ROT-0090","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-19","pedidoPor":"Tiago","destino":"Myforce","periodo":"M","carga":"sem carga","condutor":"Tiago","kmInicio":289291,"horaInicio":"12:00","kmFim":289301,"horaFim":"12:15","observacoes":"","kmPercorridos":10},{"id":"ROT-0091","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-20","pedidoPor":"Joao silva","destino":"Myforce","periodo":"M","carga":"sem carga","condutor":"Joao Silva","kmInicio":289301,"horaInicio":"10:27","kmFim":289309,"horaFim":"10:50","observacoes":"","kmPercorridos":8},{"id":"ROT-0092","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-03-21","pedidoPor":"Miga","destino":"Gaiafor","periodo":"M","carga":"6 paletes","condutor":"Zezito","kmInicio":170499,"horaInicio":"09:32","kmFim":170636,"horaFim":"12:15","observacoes":"","kmPercorridos":137},{"id":"ROT-0093","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-21","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":289309,"horaInicio":"11:54","kmFim":289322,"horaFim":"13:19","observacoes":"","kmPercorridos":13},{"id":"ROT-0094","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-03-21","pedidoPor":"Miga","destino":"Gaiafor VNG","periodo":"Tarde","carga":"4 paletes","condutor":"Teles","kmInicio":170636,"horaInicio":"14:28","kmFim":170776,"horaFim":"17:24","observacoes":"","kmPercorridos":140},{"id":"ROT-0095","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-26","pedidoPor":"André Veloso","destino":"serviço externo","periodo":"Tarde","carga":"sem carga","condutor":"André Veloso","kmInicio":289360,"horaInicio":"16:45","kmFim":289390,"horaFim":"17:29","observacoes":"","kmPercorridos":30},{"id":"ROT-0096","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-03-26","pedidoPor":"Joao Silva","destino":"levar o Cesar","periodo":"Tarde","carga":"sem carga","condutor":"Joao Silva","kmInicio":154507,"horaInicio":"17:18","kmFim":155118,"horaFim":"18:00","observacoes":"","kmPercorridos":611},{"id":"ROT-0097","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-03-27","pedidoPor":"Avelino","destino":"Primopeças","periodo":"M","carga":"1 palete","condutor":"Zezito","kmInicio":155118,"horaInicio":"11:14","kmFim":155142,"horaFim":"11:57","observacoes":"","kmPercorridos":24},{"id":"ROT-0098","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-03-28","pedidoPor":"Miga","destino":"Soarauto","periodo":"M","carga":"1 palete","condutor":"Leo","kmInicio":155142,"horaInicio":"09:35","kmFim":155142,"horaFim":"09:48","observacoes":"","kmPercorridos":0},{"id":"ROT-0099","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-28","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":289390,"horaInicio":"12:00","kmFim":289403,"horaFim":"12:40","observacoes":"","kmPercorridos":13},{"id":"ROT-0100","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-03-28","pedidoPor":"Miga","destino":"Soarauto","periodo":"Tarde","carga":"4 paletes","condutor":"Ruben","kmInicio":170854,"horaInicio":"14:35","kmFim":170855,"horaFim":"15:00","observacoes":"","kmPercorridos":1},{"id":"ROT-0101","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-03-31","pedidoPor":"Avelino","destino":"Inovpeças Lousada","periodo":"M","carga":"6 paletes","condutor":"Simba","kmInicio":170855,"horaInicio":"09:35","kmFim":170971,"horaFim":"11:40","observacoes":"","kmPercorridos":116},{"id":"ROT-0102","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-31","pedidoPor":"Joao Silva","destino":"buscar Cesar","periodo":"M","carga":"sem carga","condutor":"Joao silva","kmInicio":289403,"horaInicio":"10:51","kmFim":289410,"horaFim":"11:09","observacoes":"","kmPercorridos":7},{"id":"ROT-0103","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-03-31","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":289410,"horaInicio":"11:44","kmFim":289420,"horaFim":"12:22","observacoes":"","kmPercorridos":10},{"id":"ROT-0104","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-03-31","pedidoPor":"Avelino","destino":"Inovpeças Lousada","periodo":"Tarde","carga":"6 paletes","condutor":"Teles","kmInicio":170971,"horaInicio":"14:33","kmFim":171082,"horaFim":"16:46","observacoes":"","kmPercorridos":111},{"id":"ROT-0105","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-03-31","pedidoPor":"Machado","destino":"Trabalho - Casa","periodo":"M/T","carga":"sem carga","condutor":"Machado","kmInicio":155142,"horaInicio":"13:00","kmFim":155150,"horaFim":"14:30","observacoes":"","kmPercorridos":8},{"id":"ROT-0106","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-04-01","pedidoPor":"Machado","destino":"Pichelaria-Palmeira","periodo":"M","carga":"sem carga","condutor":"Simba","kmInicio":155150,"horaInicio":"09:35","kmFim":155160,"horaFim":"10:15","observacoes":"","kmPercorridos":10},{"id":"ROT-0107","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-04-01","pedidoPor":"Miga","destino":"Barcelpeças","periodo":"Tarde","carga":"4 paletes","condutor":"Teles","kmInicio":171082,"horaInicio":"14:39","kmFim":171137,"horaFim":"16:01","observacoes":"","kmPercorridos":55},{"id":"ROT-0108","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-04-01","pedidoPor":"Machado","destino":"CTT","periodo":"Tarde","carga":"sem carga","condutor":"Vaz","kmInicio":155160,"horaInicio":"15:15","kmFim":155161,"horaFim":"16:00","observacoes":"","kmPercorridos":1},{"id":"ROT-0109","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-02","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":289420,"horaInicio":"11:15","kmFim":289430,"horaFim":"12:55","observacoes":"","kmPercorridos":10},{"id":"ROT-0110","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-04-02","pedidoPor":"Jose Miguel","destino":"Deslocaçao a casa","periodo":"M/T","carga":"sem carga","condutor":"Jose Miguel","kmInicio":155161,"horaInicio":"12:00","kmFim":155184,"horaFim":"12:45","observacoes":"","kmPercorridos":23},{"id":"ROT-0111","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-04-03","pedidoPor":"Machado","destino":"Jantes Xavier","periodo":"M","carga":"sem carga","condutor":"Simba","kmInicio":155184,"horaInicio":"09:30","kmFim":155199,"horaFim":"10:07","observacoes":"","kmPercorridos":15},{"id":"ROT-0112","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-04-03","pedidoPor":"Avelino","destino":"Soarauto","periodo":"T","carga":"6 Paletes","condutor":"Zezito","kmInicio":171137,"horaInicio":"15:44","kmFim":171138,"horaFim":"16:25","observacoes":"","kmPercorridos":1},{"id":"ROT-0113","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-04-03","pedidoPor":"Avelino","destino":"Soarauto","periodo":"T","carga":"5 Paletes","condutor":"André Costa","kmInicio":171138,"horaInicio":"16:30","kmFim":171138,"horaFim":"16:53","observacoes":"","kmPercorridos":0},{"id":"ROT-0114","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-04","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":289430,"horaInicio":"10:30","kmFim":289441,"horaFim":"11:15","observacoes":"","kmPercorridos":11},{"id":"ROT-0115","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-04-04","pedidoPor":"Claudia","destino":"Gabinete contabilidade","periodo":"M","carga":"sem carga","condutor":"Claudia","kmInicio":155199,"horaInicio":"11:10","kmFim":155208,"horaFim":"11:52","observacoes":"","kmPercorridos":9},{"id":"ROT-0116","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-07","pedidoPor":"Tiago","destino":"Mecanico","periodo":"M","carga":"sem carga","condutor":"Tiago","kmInicio":289441,"horaInicio":"09:30","kmFim":289452,"horaFim":"10:00","observacoes":"","kmPercorridos":11},{"id":"ROT-0117","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-07","pedidoPor":"Claudia","destino":"Gabinete contabilidade","periodo":"M","carga":"sem carga","condutor":"Claudia","kmInicio":289452,"horaInicio":"11:11","kmFim":289460,"horaFim":"11:40","observacoes":"","kmPercorridos":8},{"id":"ROT-0118","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-04-07","pedidoPor":"Avelino","destino":"Primopeças","periodo":"T","carga":"1 palete","condutor":"Rafael Cunha","kmInicio":155208,"horaInicio":"14:44","kmFim":155254,"horaFim":"15:33","observacoes":"","kmPercorridos":46},{"id":"ROT-0119","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-07","pedidoPor":"André Veloso","destino":"Bomba Combustivel","periodo":"T","carga":"sem carga","condutor":"Ricardo","kmInicio":289460,"horaInicio":"17:10","kmFim":289471,"horaFim":"17:30","observacoes":"","kmPercorridos":11},{"id":"ROT-0120","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-08","pedidoPor":"Elisabete","destino":"Bancos","periodo":"T","carga":"sem carga","condutor":"Elisabete","kmInicio":289471,"horaInicio":"14:25","kmFim":289480,"horaFim":"15:02","observacoes":"","kmPercorridos":9},{"id":"ROT-0121","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-04-08","pedidoPor":"Machado","destino":"CTT","periodo":"T","carga":"sem carga","condutor":"Ruben","kmInicio":155254,"horaInicio":"15:22","kmFim":155255,"horaFim":"15:35","observacoes":"","kmPercorridos":1},{"id":"ROT-0122","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-08","pedidoPor":"Claudia","destino":"serviço externo","periodo":"T","carga":"sem carga","condutor":"Claudia","kmInicio":289480,"horaInicio":"15:39","kmFim":289489,"horaFim":"16:03","observacoes":"","kmPercorridos":9},{"id":"ROT-0123","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-04-09","pedidoPor":"Miga","destino":"Inovpeças Lousada","periodo":"M","carga":"6 paletes","condutor":"Vaz","kmInicio":171138,"horaInicio":"09:10","kmFim":171250,"horaFim":"11:37","observacoes":"","kmPercorridos":112},{"id":"ROT-0124","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-04-09","pedidoPor":"André Veloso","destino":"Volta Guimaraes","periodo":"M","carga":"Varios Volumes","condutor":"Zezito","kmInicio":155255,"horaInicio":"08:15","kmFim":155510,"horaFim":"15:20","observacoes":"","kmPercorridos":255},{"id":"ROT-0125","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-09","pedidoPor":"André Veloso","destino":"Myforce Braga","periodo":"M","carga":"sem carga","condutor":"Tiago","kmInicio":289489,"horaInicio":"09:30","kmFim":289499,"horaFim":"09:52","observacoes":"","kmPercorridos":10},{"id":"ROT-0126","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-09","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":289499,"horaInicio":"11:31","kmFim":289508,"horaFim":"12:06","observacoes":"","kmPercorridos":9},{"id":"ROT-0127","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-09","pedidoPor":"Machado","destino":"Myforce Braga","periodo":"T","carga":"sem carga","condutor":"Ricardo","kmInicio":289508,"horaInicio":"15:10","kmFim":289517,"horaFim":"15:33","observacoes":"","kmPercorridos":9},{"id":"ROT-0128","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-10","pedidoPor":"Claudia","destino":"Estação C.P.","periodo":"M","carga":"sem carga","condutor":"Claudia","kmInicio":289517,"horaInicio":"10:30","kmFim":289524,"horaFim":"10:43","observacoes":"","kmPercorridos":7},{"id":"ROT-0129","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-04-10","pedidoPor":"Avelino","destino":"Soarauto","periodo":"M","carga":"3 paletes","condutor":"André Costa","kmInicio":171250,"horaInicio":"11:28","kmFim":171251,"horaFim":"11:57","observacoes":"","kmPercorridos":1},{"id":"ROT-0130","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-11","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":289524,"horaInicio":"10:04","kmFim":289533,"horaFim":"11:01","observacoes":"","kmPercorridos":9},{"id":"ROT-0131","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-04-11","pedidoPor":"Avelino","destino":"Soarauto","periodo":"T","carga":"1 palete","condutor":"Fabio Silva","kmInicio":155510,"horaInicio":"15:53","kmFim":155511,"horaFim":"16:05","observacoes":"","kmPercorridos":1},{"id":"ROT-0132","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-14","pedidoPor":"Claudia","destino":"Gabinete contabilidade / Banco","periodo":"M","carga":"sem carga","condutor":"Claudia","kmInicio":289533,"horaInicio":"11:35","kmFim":289542,"horaFim":"12:17","observacoes":"","kmPercorridos":9},{"id":"ROT-0133","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-04-14","pedidoPor":"André Veloso","destino":"Volta Amares","periodo":"T","carga":"Varios Volumes","condutor":"Ricardo","kmInicio":155511,"horaInicio":"13:30","kmFim":155607,"horaFim":"17:00","observacoes":"","kmPercorridos":96},{"id":"ROT-0134","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-15","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":289542,"horaInicio":"11:01","kmFim":289551,"horaFim":"11:45","observacoes":"","kmPercorridos":9},{"id":"ROT-0135","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-04-15","pedidoPor":"Miga","destino":"Trapotop","periodo":"T","carga":"3 paletes","condutor":"3 paletes","kmInicio":171251,"horaInicio":"14:30","kmFim":171326,"horaFim":"16:51","observacoes":"","kmPercorridos":75},{"id":"ROT-0136","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-15","pedidoPor":"Claudia","destino":"Gabinete contabilidade","periodo":"T","carga":"sem carga","condutor":"Claudia","kmInicio":289551,"horaInicio":"16:02","kmFim":289560,"horaFim":"16:36","observacoes":"","kmPercorridos":9},{"id":"ROT-0137","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-04-15","pedidoPor":"André Veloso","destino":"Volta Amares","periodo":"M/T","carga":"Varios Volumes","condutor":"Ricardo","kmInicio":155607,"horaInicio":"08:15","kmFim":155757,"horaFim":"17:00","observacoes":"","kmPercorridos":150},{"id":"ROT-0138","viatura":"Toyota Prius","matricula":"05-QR-43","data":"15/04/2025-16/04/2025","pedidoPor":"Tiago","destino":"Deslocaçao a casa","periodo":"M/T","carga":"sem carga","condutor":"Tiago","kmInicio":289560,"horaInicio":"19:00","kmFim":289617,"horaFim":"08:30","observacoes":"","kmPercorridos":57},{"id":"ROT-0139","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-16","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":289617,"horaInicio":"11:20","kmFim":289627,"horaFim":"11:58","observacoes":"","kmPercorridos":10},{"id":"ROT-0140","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-04-16","pedidoPor":"André Veloso","destino":"Volta Amares","periodo":"M/T","carga":"Varios Volumes","condutor":"Ricardo","kmInicio":155757,"horaInicio":"08:15","kmFim":155929,"horaFim":"16:48","observacoes":"","kmPercorridos":172},{"id":"ROT-0141","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-04-17","pedidoPor":"Miga","destino":"Gaiafor","periodo":"M","carga":"5 paletes","condutor":"zezito","kmInicio":171326,"horaInicio":"09:30","kmFim":171480,"horaFim":"12:31","observacoes":"","kmPercorridos":154},{"id":"ROT-0142","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-17","pedidoPor":"André Veloso","destino":"Volta Amares","periodo":"M/T","carga":"Varios Volumes","condutor":"Ricardo","kmInicio":289627,"horaInicio":"16:00","kmFim":289669,"horaFim":"17:06","observacoes":"","kmPercorridos":42},{"id":"ROT-0143","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-18","pedidoPor":"André Veloso","destino":"Entrega de Convites","periodo":"M","carga":"sem carga","condutor":"André Veloso","kmInicio":289669,"horaInicio":"09:36","kmFim":289736,"horaFim":"12:20","observacoes":"","kmPercorridos":67},{"id":"ROT-0144","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-04-18","pedidoPor":"Miga","destino":"Inovpeças Lousada","periodo":"M","carga":"4 paletes","condutor":"Rafael Cunha","kmInicio":171480,"horaInicio":"10:15","kmFim":171592,"horaFim":"12:06","observacoes":"","kmPercorridos":112},{"id":"ROT-0145","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-04-18","pedidoPor":"André Veloso","destino":"Volta Amares","periodo":"M","carga":"Varios Volumes","condutor":"Ricardo","kmInicio":155929,"horaInicio":"10:00","kmFim":156171,"horaFim":"11:00","observacoes":"","kmPercorridos":242},{"id":"ROT-0146","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-18","pedidoPor":"André Veloso","destino":"Entrega de Convites","periodo":"T","carga":"sem carga","condutor":"andré Veloso","kmInicio":289736,"horaInicio":"15:00","kmFim":289898,"horaFim":"17:00","observacoes":"","kmPercorridos":162},{"id":"ROT-0147","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-04-18","pedidoPor":"Miga","destino":"Inovpeças Lousada","periodo":"T","carga":"6 paletes","condutor":"Rafael Cunha","kmInicio":171592,"horaInicio":"14:33","kmFim":171711,"horaFim":"17:05","observacoes":"","kmPercorridos":119},{"id":"ROT-0148","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-04-18","pedidoPor":"André Veloso","destino":"Volta Barcelos","periodo":"T","carga":"Varios Volumes","condutor":"Fabio Silva","kmInicio":156171,"horaInicio":"15:00","kmFim":156262,"horaFim":"17:00","observacoes":"","kmPercorridos":91},{"id":"ROT-0149","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-04-21","pedidoPor":"Machado","destino":"Deslocação almoço","periodo":"T","carga":"sem carga","condutor":"Machado","kmInicio":156262,"horaInicio":"13:00","kmFim":156273,"horaFim":"15:04","observacoes":"","kmPercorridos":11},{"id":"ROT-0150","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-22","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":289898,"horaInicio":"10:40","kmFim":289909,"horaFim":"11:32","observacoes":"","kmPercorridos":11},{"id":"ROT-0151","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-04-22","pedidoPor":"Avelino","destino":"Soarauto","periodo":"M","carga":"6 paletes","condutor":"Zezito","kmInicio":171711,"horaInicio":"09:30","kmFim":171712,"horaFim":"10:00","observacoes":"","kmPercorridos":1},{"id":"ROT-0152","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-22","pedidoPor":"Joao Carlos","destino":"Medicina no Trabalho","periodo":"M","carga":"sem carga","condutor":"Paulo Pimenta","kmInicio":289909,"horaInicio":"13:45","kmFim":289918,"horaFim":"15:03","observacoes":"","kmPercorridos":9},{"id":"ROT-0153","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-22","pedidoPor":"André Veloso","destino":"Entrega de Convites","periodo":"T","carga":"sem carga","condutor":"André Veloso","kmInicio":289918,"horaInicio":"15:10","kmFim":290071,"horaFim":"17:58","observacoes":"","kmPercorridos":153},{"id":"ROT-0154","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-23","pedidoPor":"César","destino":"Ida ao Mecanico","periodo":"M","carga":"sem carga","condutor":"César","kmInicio":290071,"horaInicio":"09:00","kmFim":290088,"horaFim":"09:28","observacoes":"","kmPercorridos":17},{"id":"ROT-0155","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-23","pedidoPor":"Machado","destino":"Peritagem Carro volta","periodo":"M","carga":"sem carga","condutor":"Zezito","kmInicio":290088,"horaInicio":"09:53","kmFim":290099,"horaFim":"10:28","observacoes":"","kmPercorridos":11},{"id":"ROT-0156","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-23","pedidoPor":"Joao Silva","destino":"Deslocação a casa","periodo":"","carga":"sem carga","condutor":"Joao Silva","kmInicio":290099,"horaInicio":"10:20","kmFim":290142,"horaFim":"14:30","observacoes":"","kmPercorridos":43},{"id":"ROT-0157","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-23","pedidoPor":"Leonel","destino":"Agarb","periodo":"T","carga":"sem carga","condutor":"Leonel","kmInicio":290142,"horaInicio":"15:22","kmFim":290144,"horaFim":"15:45","observacoes":"","kmPercorridos":2},{"id":"ROT-0158","viatura":"Toyota Prius","matricula":"05-QR-43","data":"23/04/2025-24/04/2025","pedidoPor":"André Veloso","destino":"Ida ao Mecanico","periodo":"T","carga":"sem carga","condutor":"André Veloso","kmInicio":290144,"horaInicio":"18:08","kmFim":290226,"horaFim":"09:00","observacoes":"","kmPercorridos":82},{"id":"ROT-0159","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-24","pedidoPor":"Elisabete","destino":"Bancos","periodo":"T","carga":"sem carga","condutor":"Elisabete","kmInicio":290226,"horaInicio":"14:38","kmFim":290235,"horaFim":"15:43","observacoes":"","kmPercorridos":9},{"id":"ROT-0160","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-04-24","pedidoPor":"Tiago","destino":"Master escapes","periodo":"T","carga":"sem carga","condutor":"Tiago","kmInicio":171712,"horaInicio":"15:08","kmFim":171724,"horaFim":"15:40","observacoes":"","kmPercorridos":12},{"id":"ROT-0161","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"28/04/2025 - 29/04/2025","pedidoPor":"Tiago","destino":"Master escapes","periodo":"M","carga":"sem carga","condutor":"Tiago","kmInicio":171724,"horaInicio":"09:00","kmFim":171737,"horaFim":"15:00","observacoes":"","kmPercorridos":13},{"id":"ROT-0162","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-29","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":290235,"horaInicio":"10:28","kmFim":290250,"horaFim":"11:27","observacoes":"","kmPercorridos":15},{"id":"ROT-0163","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-29","pedidoPor":"Claudia","destino":"Gabinete contabilidade","periodo":"M","carga":"sem carga","condutor":"Claudia","kmInicio":290250,"horaInicio":"12:10","kmFim":290259,"horaFim":"12:40","observacoes":"","kmPercorridos":9},{"id":"ROT-0164","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-29","pedidoPor":"Tiago","destino":"Master escapes","periodo":"T","carga":"sem carga","condutor":"Tiago","kmInicio":290259,"horaInicio":"14:30","kmFim":290270,"horaFim":"15:00","observacoes":"","kmPercorridos":11},{"id":"ROT-0165","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-04-30","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":290270,"horaInicio":"09:32","kmFim":290284,"horaFim":"10:17","observacoes":"","kmPercorridos":14},{"id":"ROT-0166","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-04-30","pedidoPor":"Avelino","destino":"Primopeças","periodo":"M","carga":"5 paletes","condutor":"Simba","kmInicio":171737,"horaInicio":"09:35","kmFim":171763,"horaFim":"10:35","observacoes":"","kmPercorridos":26},{"id":"ROT-0167","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-04-30","pedidoPor":"Avelino","destino":"Soarauto","periodo":"T","carga":"4 paletes","condutor":"Mario","kmInicio":171763,"horaInicio":"14:39","kmFim":171764,"horaFim":"15:19","observacoes":"","kmPercorridos":1},{"id":"ROT-0168","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-05-05","pedidoPor":"Miga","destino":"Gaiafor","periodo":"T","carga":"6 paletes","condutor":"Fabio Silva","kmInicio":171764,"horaInicio":"14:42","kmFim":171899,"horaFim":"16:50","observacoes":"","kmPercorridos":135},{"id":"ROT-0169","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-05","pedidoPor":"Andre Veloso","destino":"7 fontes","periodo":"T","carga":"sem carga","condutor":"André Veloso","kmInicio":290284,"horaInicio":"17:15","kmFim":290293,"horaFim":"17:57","observacoes":"","kmPercorridos":9},{"id":"ROT-0170","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-05-06","pedidoPor":"Avelino","destino":"Soarauto","periodo":"M","carga":"2 paletes","condutor":"Fabio Silva","kmInicio":171899,"horaInicio":"09:00","kmFim":171899,"horaFim":"09:30","observacoes":"","kmPercorridos":0},{"id":"ROT-0171","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-06","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":290293,"horaInicio":"12:10","kmFim":290303,"horaFim":"12:44","observacoes":"","kmPercorridos":10},{"id":"ROT-0172","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-05-06","pedidoPor":"Avelino","destino":"Trapotop","periodo":"T","carga":"3 paletes","condutor":"Fabio Silva","kmInicio":171899,"horaInicio":"14:30","kmFim":171974,"horaFim":"16:26","observacoes":"","kmPercorridos":75},{"id":"ROT-0173","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-05-07","pedidoPor":"Machado","destino":"Sucata","periodo":"M","carga":"2 paletes","condutor":"Fabio Silva","kmInicio":171974,"horaInicio":"09:40","kmFim":171996,"horaFim":"10:36","observacoes":"","kmPercorridos":22},{"id":"ROT-0174","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-07","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":290303,"horaInicio":"10:37","kmFim":290313,"horaFim":"11:15","observacoes":"","kmPercorridos":10},{"id":"ROT-0175","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-07","pedidoPor":"Machado","destino":"almoço","periodo":"T","carga":"sem carga","condutor":"Machado","kmInicio":290313,"horaInicio":"13:00","kmFim":290321,"horaFim":"14:28","observacoes":"","kmPercorridos":8},{"id":"ROT-0176","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-07","pedidoPor":"Machado","destino":"CTT","periodo":"T","carga":"1 volume","condutor":"Fabio Silva","kmInicio":290321,"horaInicio":"15:21","kmFim":290322,"horaFim":"15:45","observacoes":"","kmPercorridos":1},{"id":"ROT-0177","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-08","pedidoPor":"Marcelino","destino":"Agarb","periodo":"M","carga":"sem carga","condutor":"Marcelino","kmInicio":290322,"horaInicio":"09:41","kmFim":290324,"horaFim":"10:04","observacoes":"","kmPercorridos":2},{"id":"ROT-0178","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-08","pedidoPor":"Joao Silva","destino":"Stapples","periodo":"M","carga":"sem carga","condutor":"Joao Silva","kmInicio":290324,"horaInicio":"11:27","kmFim":290338,"horaFim":"12:00","observacoes":"","kmPercorridos":14},{"id":"ROT-0179","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-08","pedidoPor":"Joao Silva","destino":"Deslocação a casa","periodo":"","carga":"sem carga","condutor":"Avelino","kmInicio":290338,"horaInicio":"13:30","kmFim":290347,"horaFim":"14:00","observacoes":"","kmPercorridos":9},{"id":"ROT-0180","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-08","pedidoPor":"Claudia","destino":"Stapples / Compras","periodo":"T","carga":"sem carga","condutor":"Claudia","kmInicio":290347,"horaInicio":"15:04","kmFim":290367,"horaFim":"17:35","observacoes":"","kmPercorridos":20},{"id":"ROT-0181","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"08/05/2025 - 09/05/2025","pedidoPor":"Machado","destino":"Deslocação a casa","periodo":"T","carga":"sem carga","condutor":"Machado","kmInicio":171996,"horaInicio":"19:00","kmFim":172009,"horaFim":"09:30","observacoes":"","kmPercorridos":13},{"id":"ROT-0182","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-09","pedidoPor":"Claudia","destino":"40 anos Bragalis","periodo":"M","carga":"sem carga","condutor":"Claudia","kmInicio":290367,"horaInicio":"10:00","kmFim":290392,"horaFim":"19:00","observacoes":"","kmPercorridos":25},{"id":"ROT-0183","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-05-09","pedidoPor":"Avelino","destino":"Barcelpeças Barcelos","periodo":"T","carga":"4 paletes","condutor":"Fabio Silva","kmInicio":172009,"horaInicio":"14:40","kmFim":172066,"horaFim":"15:52","observacoes":"","kmPercorridos":57},{"id":"ROT-0184","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-05-12","pedidoPor":"Avelino","destino":"Soarauto","periodo":"M","carga":"6 paletes","condutor":"Leonardo","kmInicio":172066,"horaInicio":"11:50","kmFim":172067,"horaFim":"12:27","observacoes":"","kmPercorridos":1},{"id":"ROT-0185","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-05-13","pedidoPor":"Avelino","destino":"Inovpeças Lousada","periodo":"M","carga":"5 paletes","condutor":"Fabio Silva","kmInicio":172067,"horaInicio":"09:31","kmFim":172178,"horaFim":"11:20","observacoes":"","kmPercorridos":111},{"id":"ROT-0186","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-05-13","pedidoPor":"Avelino","destino":"Barcelpeças Barcelos","periodo":"T","carga":"5 Paletes","condutor":"Fabio Silva","kmInicio":172178,"horaInicio":"14:45","kmFim":172236,"horaFim":"16:05","observacoes":"","kmPercorridos":58},{"id":"ROT-0187","viatura":"Toyota Prius","matricula":"05-QR-43","data":"x","pedidoPor":"Jose Luis","destino":"Carro Substituiçao","periodo":"x","carga":"sem carga","condutor":"Jose Luis","kmInicio":290392,"horaInicio":"x","kmFim":291420,"horaFim":"x","observacoes":"","kmPercorridos":1028},{"id":"ROT-0188","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-15","pedidoPor":"Rafael","destino":"Medicina no Trabalho","periodo":"T","carga":"sem carga","condutor":"Rafael","kmInicio":290420,"horaInicio":"14:00","kmFim":290424,"horaFim":"15:30","observacoes":"","kmPercorridos":4},{"id":"ROT-0189","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-19","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":291489,"horaInicio":"11:07","kmFim":291498,"horaFim":"11:40","observacoes":"","kmPercorridos":9},{"id":"ROT-0190","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-05-17","pedidoPor":"Fabio Silva","destino":"Deslocação a casa","periodo":"M","carga":"sem carga","condutor":"Fabio Silva","kmInicio":172526,"horaInicio":"09:00","kmFim":172542,"horaFim":"12:00","observacoes":"","kmPercorridos":16},{"id":"ROT-0191","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-05-19","pedidoPor":"Miga","destino":"Inovpeças Lousada","periodo":"T","carga":"5 paletes","condutor":"André Costa","kmInicio":172542,"horaInicio":"15:00","kmFim":172653,"horaFim":"16:18","observacoes":"","kmPercorridos":111},{"id":"ROT-0192","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-05-20","pedidoPor":"Carlos Avelino","destino":"Soarauto","periodo":"M","carga":"6 paletes","condutor":"Cunha","kmInicio":172653,"horaInicio":"10:00","kmFim":172654,"horaFim":"10:43","observacoes":"","kmPercorridos":1},{"id":"ROT-0193","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-20","pedidoPor":"Andre Veloso","destino":"Volta Amares","periodo":"M","carga":"Varios volumes","condutor":"Fabio Vaz","kmInicio":291498,"horaInicio":"10:30","kmFim":291530,"horaFim":"11:22","observacoes":"","kmPercorridos":32},{"id":"ROT-0194","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-21","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":291530,"horaInicio":"10:48","kmFim":291539,"horaFim":"11:44","observacoes":"","kmPercorridos":9},{"id":"ROT-0195","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-22","pedidoPor":"Claudia","destino":"Estação de comboios","periodo":"M","carga":"sem carga","condutor":"Claudia","kmInicio":291539,"horaInicio":"10:55","kmFim":291546,"horaFim":"11:17","observacoes":"","kmPercorridos":7},{"id":"ROT-0196","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-22","pedidoPor":"Elisabete","destino":"Estação de comboios","periodo":"T","carga":"sem carga","condutor":"Elisabete","kmInicio":291546,"horaInicio":"17.40:00","kmFim":291552,"horaFim":"18:00","observacoes":"","kmPercorridos":6},{"id":"ROT-0197","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-23","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":291552,"horaInicio":"11,20:00","kmFim":291562,"horaFim":"12:00","observacoes":"","kmPercorridos":10},{"id":"ROT-0198","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-26","pedidoPor":"Claudia","destino":"Gabinete contabilidade","periodo":"M","carga":"sem carga","condutor":"Claudia","kmInicio":291562,"horaInicio":"09:38","kmFim":291571,"horaFim":"10:15","observacoes":"","kmPercorridos":9},{"id":"ROT-0199","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-26","pedidoPor":"Andre Veloso","destino":"Consulta","periodo":"T","carga":"sem carga","condutor":"Andre","kmInicio":291571,"horaInicio":"12:30","kmFim":291605,"horaFim":"14:30","observacoes":"","kmPercorridos":34},{"id":"ROT-0200","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-26","pedidoPor":"Joao Carlos","destino":"Sogima","periodo":"T","carga":"4 pistões","condutor":"Tiago","kmInicio":291605,"horaInicio":"14:30","kmFim":291618,"horaFim":"15:05","observacoes":"","kmPercorridos":13},{"id":"ROT-0201","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-26","pedidoPor":"Machado","destino":"PSP","periodo":"T","carga":"1 volume","condutor":"Cunha","kmInicio":291618,"horaInicio":"15:05","kmFim":291626,"horaFim":"15:30","observacoes":"","kmPercorridos":8},{"id":"ROT-0202","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-29","pedidoPor":"Joao Silva","destino":"Serviço Externo","periodo":"T","carga":"sem carga","condutor":"Joao Silva","kmInicio":291626,"horaInicio":"09:00","kmFim":292191,"horaFim":".....","observacoes":"","kmPercorridos":565},{"id":"ROT-0203","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-05-29","pedidoPor":"Avelino","destino":"Primopeças","periodo":"M","carga":"2 paletes","condutor":"Teles","kmInicio":172654,"horaInicio":"09:48","kmFim":172680,"horaFim":"10:57","observacoes":"","kmPercorridos":26},{"id":"ROT-0204","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-05-30","pedidoPor":"Claudia","destino":"Gabinete contabilidade","periodo":"T","carga":"sem carga","condutor":"Claudia","kmInicio":160512,"horaInicio":"14:43","kmFim":160522,"horaFim":"15:17","observacoes":"","kmPercorridos":10},{"id":"ROT-0205","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-02","pedidoPor":"André","destino":"Team building","periodo":"M","carga":"sem carga","condutor":"André","kmInicio":292191,"horaInicio":"10:35","kmFim":292197,"horaFim":"11:20","observacoes":"","kmPercorridos":6},{"id":"ROT-0206","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-06-02","pedidoPor":"Carlos Avelino","destino":"Gaiafor","periodo":"T","carga":"6 paletes","condutor":"Cunha","kmInicio":172680,"horaInicio":"14:30","kmFim":172822,"horaFim":"17:00","observacoes":"","kmPercorridos":142},{"id":"ROT-0207","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-03","pedidoPor":"Tiago","destino":"Ethos Braga","periodo":"M","carga":"sem carga","condutor":"Tiago","kmInicio":292197,"horaInicio":"08:30","kmFim":292209,"horaFim":"09:00","observacoes":"","kmPercorridos":12},{"id":"ROT-0208","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-03","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":292209,"horaInicio":"11:06","kmFim":292215,"horaFim":"11:50","observacoes":"","kmPercorridos":6},{"id":"ROT-0209","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-03","pedidoPor":"Joao Silva","destino":"Myforce","periodo":"T","carga":"sem carga","condutor":"Joao Silva","kmInicio":292215,"horaInicio":"15:11","kmFim":292293,"horaFim":"15:34","observacoes":"","kmPercorridos":78},{"id":"ROT-0210","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-03","pedidoPor":"Joao Silva","destino":"Volta Amares","periodo":"T","carga":"Varios volumes","condutor":"Zezito","kmInicio":292293,"horaInicio":"16:00","kmFim":292515,"horaFim":"18:30","observacoes":"","kmPercorridos":222},{"id":"ROT-0211","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-06-03","pedidoPor":"Carlos Avelino","destino":"Soarauto","periodo":"M","carga":"4 paletes","condutor":"Joao Fernandes","kmInicio":172822,"horaInicio":"11:00","kmFim":172823,"horaFim":"11:35","observacoes":"","kmPercorridos":1},{"id":"ROT-0212","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-06-04","pedidoPor":"Joao Silva","destino":"Deslocação a casa","periodo":"M","carga":"sem carga","condutor":"Fabio Silva","kmInicio":172823,"horaInicio":"13:00","kmFim":172832,"horaFim":"14:00","observacoes":"","kmPercorridos":9},{"id":"ROT-0213","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-06-04","pedidoPor":"Avelino","destino":"Soarauto","periodo":"T","carga":"6 paletes","condutor":"Leo","kmInicio":172832,"horaInicio":"14:40","kmFim":172833,"horaFim":"16:00","observacoes":"","kmPercorridos":1},{"id":"ROT-0214","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-05","pedidoPor":"Claudia","destino":"Gabinete contabilidade","periodo":"M","carga":"sem carga","condutor":"Claudia","kmInicio":292515,"horaInicio":"11:50","kmFim":292528,"horaFim":"12:20","observacoes":"","kmPercorridos":13},{"id":"ROT-0215","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-06-05","pedidoPor":"Avelino","destino":"Inovpeças Lousada","periodo":"T","carga":"6 paletes","condutor":"Cunha","kmInicio":172833,"horaInicio":"15:11","kmFim":172945,"horaFim":"17:00","observacoes":"","kmPercorridos":112},{"id":"ROT-0216","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-05","pedidoPor":"Joao Silva","destino":"Levantar carrinha","periodo":"T","carga":"sem carga","condutor":"Ricardo","kmInicio":292528,"horaInicio":"17:00","kmFim":292624,"horaFim":"17:55","observacoes":"","kmPercorridos":96},{"id":"ROT-0217","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-05","pedidoPor":"Andre Veloso","destino":"Team building","periodo":"T","carga":"sem carga","condutor":"André Veloso","kmInicio":292624,"horaInicio":"17:55","kmFim":292635,"horaFim":"19:00","observacoes":"","kmPercorridos":11},{"id":"ROT-0218","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-06-06","pedidoPor":"Avelino","destino":"Inovpeças Lousada","periodo":"M","carga":"6 paletes","condutor":"Simba","kmInicio":172945,"horaInicio":"09:36","kmFim":173061,"horaFim":"11:28","observacoes":"","kmPercorridos":116},{"id":"ROT-0219","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-06-09","pedidoPor":"Avelino","destino":"Inovpeças Lousada","periodo":"M","carga":"6 paletes","condutor":"Zezito","kmInicio":173061,"horaInicio":"09:40","kmFim":173173,"horaFim":"11:40","observacoes":"","kmPercorridos":112},{"id":"ROT-0220","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-09","pedidoPor":"Joao Silva","destino":"Team building","periodo":"M","carga":"sem carga","condutor":"Joao Silva","kmInicio":292635,"horaInicio":"10:17","kmFim":292648,"horaFim":"11:30","observacoes":"","kmPercorridos":13},{"id":"ROT-0221","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-09","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":292648,"horaInicio":"11:38","kmFim":292658,"horaFim":"12:15","observacoes":"","kmPercorridos":10},{"id":"ROT-0222","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-06-09","pedidoPor":"Avelino","destino":"Inovpeças Lousada","periodo":"T","carga":"5 paletes","condutor":"Fabio Silva","kmInicio":173173,"horaInicio":"14:30","kmFim":173287,"horaFim":"16:22","observacoes":"","kmPercorridos":114},{"id":"ROT-0223","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-09","pedidoPor":"Leonel","destino":"Agarb","periodo":"T","carga":"sem carga","condutor":"Leonel","kmInicio":292658,"horaInicio":"15:00","kmFim":292659,"horaFim":"15:27","observacoes":"","kmPercorridos":1},{"id":"ROT-0224","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-06-09","pedidoPor":"Avelino","destino":"Primopeças","periodo":"T","carga":"1 palete","condutor":"Fabio Silva","kmInicio":173287,"horaInicio":"17:00","kmFim":173310,"horaFim":"17:45","observacoes":"","kmPercorridos":23},{"id":"ROT-0225","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-06-11","pedidoPor":"Avelino","destino":"Soarauto","periodo":"M","carga":"2 paletes","condutor":"Fabio Silva","kmInicio":173310,"horaInicio":"09:47","kmFim":173311,"horaFim":"10:13","observacoes":"","kmPercorridos":1},{"id":"ROT-0226","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-11","pedidoPor":"Joao Silva","destino":"Confiauto","periodo":"M","carga":"sem carga","condutor":"Tiago","kmInicio":292659,"horaInicio":"09:15","kmFim":292679,"horaFim":"10:10","observacoes":"","kmPercorridos":20},{"id":"ROT-0227","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-11","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":292679,"horaInicio":"10:45","kmFim":292689,"horaFim":"11:19","observacoes":"","kmPercorridos":10},{"id":"ROT-0228","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-13","pedidoPor":"Fabio Silva","destino":"Medicina no Trabalho","periodo":"T","carga":"sem carga","condutor":"Fabio Silva","kmInicio":292689,"horaInicio":"14:30","kmFim":292697,"horaFim":"15:15","observacoes":"","kmPercorridos":8},{"id":"ROT-0229","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-16","pedidoPor":"Joao Silva","destino":"Confiauto","periodo":"M","carga":"sem carga","condutor":"Joao Silva","kmInicio":292697,"horaInicio":"10:10","kmFim":292708,"horaFim":"10:48","observacoes":"","kmPercorridos":11},{"id":"ROT-0230","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-16","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":292708,"horaInicio":"11:15","kmFim":292719,"horaFim":"12:00","observacoes":"","kmPercorridos":11},{"id":"ROT-0231","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-06-16","pedidoPor":"Avelino","destino":"Gaiafor Gaia","periodo":"T","carga":"6 paletes","condutor":"Rui Bernardo","kmInicio":173311,"horaInicio":"14:38","kmFim":173445,"horaFim":"16:49","observacoes":"","kmPercorridos":134},{"id":"ROT-0232","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-17","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":292719,"horaInicio":"09:18","kmFim":292728,"horaFim":"09:44","observacoes":"","kmPercorridos":9},{"id":"ROT-0233","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-06-17","pedidoPor":"Tiago","destino":"Ramoa","periodo":"M","carga":"sem carga","condutor":"Ricardo","kmInicio":163595,"horaInicio":"09:44","kmFim":163600,"horaFim":"10:04","observacoes":"","kmPercorridos":5},{"id":"ROT-0234","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-06-17","pedidoPor":"André Costa","destino":"Medicina no Trabalho","periodo":"T","carga":"sem carga","condutor":"André Costa","kmInicio":163600,"horaInicio":"14:00","kmFim":163607,"horaFim":"15:09","observacoes":"","kmPercorridos":7},{"id":"ROT-0235","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-06-17","pedidoPor":"Machado","destino":"CTT","periodo":"T","carga":"sem carga","condutor":"Ruben","kmInicio":163607,"horaInicio":"15:33","kmFim":163608,"horaFim":"15:48","observacoes":"","kmPercorridos":1},{"id":"ROT-0236","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"17/062025","pedidoPor":"Tiago","destino":"Ramoa","periodo":"T","carga":"sem carga","condutor":"Gomes","kmInicio":163608,"horaInicio":"18:30","kmFim":163612,"horaFim":"18:53","observacoes":"","kmPercorridos":4},{"id":"ROT-0237","viatura":"Toyota Prius","matricula":"05-QR-43","data":"17/062025","pedidoPor":"Tiago","destino":"Ramoa","periodo":"T","carga":"sem carga","condutor":"Tiago","kmInicio":292728,"horaInicio":"18:30","kmFim":292732,"horaFim":"18:53","observacoes":"","kmPercorridos":4},{"id":"ROT-0238","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-18","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":292732,"horaInicio":"09:53","kmFim":292741,"horaFim":"10:22","observacoes":"","kmPercorridos":9},{"id":"ROT-0239","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-20","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":292741,"horaInicio":"09:40","kmFim":292751,"horaFim":"10:46","observacoes":"","kmPercorridos":10},{"id":"ROT-0240","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-06-20","pedidoPor":"Machado","destino":"Sapol","periodo":"T","carga":"sem carga","condutor":"Rui Bernardo","kmInicio":163612,"horaInicio":"14:58","kmFim":163612,"horaFim":"15:08","observacoes":"","kmPercorridos":0},{"id":"ROT-0241","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-06-20","pedidoPor":"Avelino","destino":"Primopeças","periodo":"T","carga":"7 paletes","condutor":"Rui Bernardo","kmInicio":173445,"horaInicio":"15:14","kmFim":173468,"horaFim":"16:29","observacoes":"","kmPercorridos":23},{"id":"ROT-0242","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-06-23","pedidoPor":"Avelino","destino":"Soarauto","periodo":"T","carga":"1 palete","condutor":"Rui Bernardo","kmInicio":163612,"horaInicio":"16:15","kmFim":163613,"horaFim":"16:39","observacoes":"","kmPercorridos":1},{"id":"ROT-0243","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-06-25","pedidoPor":"Avelino","destino":"Soarauto","periodo":"M","carga":"Baterias","condutor":"Rui  Fernandes","kmInicio":163613,"horaInicio":"09:05","kmFim":163614,"horaFim":"09:20","observacoes":"","kmPercorridos":1},{"id":"ROT-0244","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-06-25","pedidoPor":"Avelino","destino":"Trapotop","periodo":"M","carga":"4 paletes","condutor":"Rui  Fernandes","kmInicio":173468,"horaInicio":"09:35","kmFim":173542,"horaFim":"10:53","observacoes":"","kmPercorridos":74},{"id":"ROT-0245","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-06-25","pedidoPor":"Andre Veloso","destino":"Repsol","periodo":"T","carga":"sem carga","condutor":"André Veloso","kmInicio":292751,"horaInicio":"15:10","kmFim":292759,"horaFim":"1530:00","observacoes":"","kmPercorridos":8},{"id":"ROT-0246","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-06-25","pedidoPor":"Avelino","destino":"Inovpeças Lousada","periodo":"T","carga":"5 paletes","condutor":"Cunha","kmInicio":173542,"horaInicio":"14:40","kmFim":173669,"horaFim":"16:45","observacoes":"","kmPercorridos":127},{"id":"ROT-0247","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-06-26","pedidoPor":"Avelino","destino":"Soarauto","periodo":"M","carga":"4 paletes","condutor":"Rui","kmInicio":173669,"horaInicio":"09:50","kmFim":173670,"horaFim":"10:20","observacoes":"","kmPercorridos":1},{"id":"ROT-0248","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-06-30","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":163614,"horaInicio":"10:18","kmFim":163623,"horaFim":"10:49","observacoes":"","kmPercorridos":9},{"id":"ROT-0249","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-06-30","pedidoPor":"Miga","destino":"Soarauto","periodo":"T","carga":"1 palete","condutor":"Rui Bernardo","kmInicio":163623,"horaInicio":"14:36","kmFim":163623,"horaFim":"14:49","observacoes":"","kmPercorridos":0},{"id":"ROT-0250","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-07-01","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":163623,"horaInicio":"10:20","kmFim":163635,"horaFim":"11:07","observacoes":"","kmPercorridos":12},{"id":"ROT-0251","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-07-01","pedidoPor":"Claudia","destino":"Gabinete contabilidade","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":163635,"horaInicio":"12:05","kmFim":163644,"horaFim":"12:31","observacoes":"","kmPercorridos":9},{"id":"ROT-0252","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-07-01","pedidoPor":"Miga","destino":"Gaiafor Gaia","periodo":"T","carga":"6 paletes","condutor":"Cunha","kmInicio":173670,"horaInicio":"14:35","kmFim":173796,"horaFim":"16:40","observacoes":"","kmPercorridos":126},{"id":"ROT-0253","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-07-01","pedidoPor":"Jose Miguel","destino":"Medicina no Trabalho","periodo":"T","carga":"sem carga","condutor":"Jose Miguel","kmInicio":163644,"horaInicio":"13:45","kmFim":163650,"horaFim":"14:50","observacoes":"","kmPercorridos":6},{"id":"ROT-0254","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-07-01","pedidoPor":"Joao Silva","destino":"Myforce","periodo":"T","carga":"sem carga","condutor":"Rafael Silva","kmInicio":163650,"horaInicio":"15:15","kmFim":163659,"horaFim":"15:35","observacoes":"","kmPercorridos":9},{"id":"ROT-0255","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-07-02","pedidoPor":"Miga","destino":"Soarauto","periodo":"T","carga":"7 paletes","condutor":"Rui Bernardo","kmInicio":173796,"horaInicio":"15:06","kmFim":173797,"horaFim":"15:51","observacoes":"","kmPercorridos":1},{"id":"ROT-0256","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-07-02","pedidoPor":"Machado","destino":"Volta Guimarães","periodo":"M/T","carga":"varios Volumes","condutor":"Leonardo / Micael","kmInicio":163659,"horaInicio":"08:15","kmFim":164012,"horaFim":"15:15","observacoes":"","kmPercorridos":353},{"id":"ROT-0257","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-07-03","pedidoPor":"Miga","destino":"Soarauto","periodo":"T","carga":"1 palete","condutor":"Rui Bernardo","kmInicio":164012,"horaInicio":"14:38","kmFim":164012,"horaFim":"14:49","observacoes":"","kmPercorridos":0},{"id":"ROT-0258","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-07-04","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":292759,"horaInicio":"10:55","kmFim":292769,"horaFim":"11:34","observacoes":"","kmPercorridos":10},{"id":"ROT-0259","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-07-04","pedidoPor":"Elisabete","destino":"Bancos","periodo":"T","carga":"sem carga","condutor":"Elisabete","kmInicio":292769,"horaInicio":"14:32","kmFim":292777,"horaFim":"15:14","observacoes":"","kmPercorridos":8},{"id":"ROT-0260","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-07-04","pedidoPor":"Miga","destino":"Inovpeças Lousada","periodo":"T","carga":"6 paletes","condutor":"Rui Bernardo","kmInicio":173797,"horaInicio":"14:45","kmFim":173908,"horaFim":"17:00","observacoes":"","kmPercorridos":111},{"id":"ROT-0261","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-07-07","pedidoPor":"Elisabete","destino":"Bancos","periodo":"T","carga":"sem carga","condutor":"Elisabete","kmInicio":292777,"horaInicio":"14:34","kmFim":292786,"horaFim":"15:09","observacoes":"","kmPercorridos":9},{"id":"ROT-0262","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-07-08","pedidoPor":"Miga","destino":"Inovpeças Lousada","periodo":"M","carga":"6 paletes","condutor":"Zezito","kmInicio":173908,"horaInicio":"09:35","kmFim":174022,"horaFim":"11:42","observacoes":"","kmPercorridos":114},{"id":"ROT-0263","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-07-08","pedidoPor":"Rafael Silva","destino":"CTT","periodo":"T","carga":"1 volume","condutor":"Rafael Silva","kmInicio":164012,"horaInicio":"15:01","kmFim":164014,"horaFim":"15:18","observacoes":"","kmPercorridos":2},{"id":"ROT-0264","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-07-09","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":292786,"horaInicio":"10:28","kmFim":292796,"horaFim":"11:02","observacoes":"","kmPercorridos":10},{"id":"ROT-0265","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-07-09","pedidoPor":"Miga","destino":"Soarauto","periodo":"T","carga":"6 paletes","condutor":"Zezito","kmInicio":174022,"horaInicio":"14:46","kmFim":174023,"horaFim":"15:19","observacoes":"","kmPercorridos":1},{"id":"ROT-0266","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-07-10","pedidoPor":"Miga","destino":"Trapotop","periodo":"M","carga":"3 paletes","condutor":"Zezito","kmInicio":174023,"horaInicio":"09:31","kmFim":174096,"horaFim":"11:10","observacoes":"","kmPercorridos":73},{"id":"ROT-0267","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-07-10","pedidoPor":"Miga","destino":"Barcelpeças","periodo":"T","carga":"5 paletes","condutor":"Rui Bernardo","kmInicio":174096,"horaInicio":"14:29","kmFim":174145,"horaFim":"15:40","observacoes":"","kmPercorridos":49},{"id":"ROT-0268","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-07-11","pedidoPor":"Joao Silva","destino":"Serviço Externo","periodo":"M/T","carga":"sem carga","condutor":"Joao Silva","kmInicio":292796,"horaInicio":"09:00","kmFim":293016,"horaFim":"17:43","observacoes":"","kmPercorridos":220},{"id":"ROT-0269","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-07-11","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":164014,"horaInicio":"09:30","kmFim":164025,"horaFim":"10:38","observacoes":"","kmPercorridos":11},{"id":"ROT-0270","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-07-11","pedidoPor":"Jose Miguel","destino":"Medicina no Trabalho","periodo":"T","carga":"sem carga","condutor":"Jose Miguel","kmInicio":164025,"horaInicio":"14:00","kmFim":164032,"horaFim":"14:04","observacoes":"","kmPercorridos":7},{"id":"ROT-0271","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-07-12","pedidoPor":"Avelino","destino":"Barcelpeças","periodo":"T","carga":"5 paletes","condutor":"Fabio Silva","kmInicio":174145,"horaInicio":"09:00","kmFim":174201,"horaFim":"10:30","observacoes":"","kmPercorridos":56},{"id":"ROT-0272","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-07-14","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":293016,"horaInicio":"10:22","kmFim":293024,"horaFim":"10:59","observacoes":"","kmPercorridos":8},{"id":"ROT-0273","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-07-14","pedidoPor":"Claudia","destino":"Gabinete contabilidade","periodo":"M","carga":"sem carga","condutor":"Claudia","kmInicio":293024,"horaInicio":"11:13","kmFim":293032,"horaFim":"11:47","observacoes":"","kmPercorridos":8},{"id":"ROT-0274","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-07-14","pedidoPor":"Andre Veloso","destino":"Consulta Medica","periodo":"M/T","carga":"sem carga","condutor":"André Veloso","kmInicio":293032,"horaInicio":"13:00","kmFim":293036,"horaFim":"14:00","observacoes":"","kmPercorridos":4},{"id":"ROT-0275","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-07-14","pedidoPor":"Andre Veloso","destino":"Deslocação a Escola de Artes","periodo":"T","carga":"sem carga","condutor":"André Veloso","kmInicio":293036,"horaInicio":"17:30","kmFim":293040,"horaFim":"17:37","observacoes":"","kmPercorridos":4},{"id":"ROT-0276","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-07-14","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":293040,"horaInicio":"09:23","kmFim":293049,"horaFim":"09:54","observacoes":"","kmPercorridos":9},{"id":"ROT-0277","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-07-15","pedidoPor":"Joao Leite","destino":"Medicina no Trabalho","periodo":"T","carga":"sem carga","condutor":"Joao Leite","kmInicio":293049,"horaInicio":"14:00","kmFim":293059,"horaFim":"16:34","observacoes":"","kmPercorridos":10},{"id":"ROT-0278","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-05-16","pedidoPor":"Marcelino","destino":"Agarb","periodo":"M","carga":"sem carga","condutor":"Marcelino","kmInicio":293059,"horaInicio":"09:11","kmFim":293060,"horaFim":"09:37","observacoes":"","kmPercorridos":1},{"id":"ROT-0279","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-05-16","pedidoPor":"Machado","destino":"P.S.P.","periodo":"M","carga":"sem carga","condutor":"Ruben","kmInicio":164032,"horaInicio":"09:32","kmFim":164048,"horaFim":"10:00","observacoes":"","kmPercorridos":16},{"id":"ROT-0280","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-05-16","pedidoPor":"Avelino","destino":"Soarauto","periodo":"T","carga":"2 paletes","condutor":"Simba","kmInicio":174201,"horaInicio":"15:13","kmFim":174201,"horaFim":"15:29","observacoes":"","kmPercorridos":0},{"id":"ROT-0281","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-05-17","pedidoPor":"Avelino","destino":"Acessorio Soares Geme","periodo":"M","carga":"2 paletes","condutor":"Teles","kmInicio":174201,"horaInicio":"09:33","kmFim":174234,"horaFim":"10:40","observacoes":"","kmPercorridos":33},{"id":"ROT-0282","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-05-17","pedidoPor":"Avelino","destino":"Soarauto","periodo":"T","carga":"1 palete","condutor":"Leonardo","kmInicio":164048,"horaInicio":"14:40","kmFim":164048,"horaFim":"14:50","observacoes":"","kmPercorridos":0},{"id":"ROT-0284","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-09-16","pedidoPor":"Miga","destino":"Gaiafor Gaia","periodo":"T","carga":"5 paletes","condutor":"Teles","kmInicio":175910,"horaInicio":"15:00","kmFim":176107,"horaFim":"17:15","observacoes":"","kmPercorridos":197},{"id":"ROT-0285","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-09-17","pedidoPor":"Tiago","destino":"mecanico","periodo":"M","carga":"sem carga","condutor":"Tiago","kmInicio":294472,"horaInicio":"10:45","kmFim":294485,"horaFim":"11:15","observacoes":"","kmPercorridos":13},{"id":"ROT-0286","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-09-17","pedidoPor":"Miga","destino":"Soarauto","periodo":"T","carga":"1 palete","condutor":"Gonçalo","kmInicio":171043,"horaInicio":"15:15","kmFim":171044,"horaFim":"171044","observacoes":"","kmPercorridos":1},{"id":"ROT-0287","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-09-18","pedidoPor":"Miga","destino":"Trapotop","periodo":"M","carga":"3 paletes","condutor":"Teles","kmInicio":176107,"horaInicio":"09:30","kmFim":176180,"horaFim":"11:18","observacoes":"","kmPercorridos":73},{"id":"ROT-0288","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-09-18","pedidoPor":"Tiago","destino":"Mecanico","periodo":"T","carga":"sem carga","condutor":"Tiago","kmInicio":171044,"horaInicio":"14:15","kmFim":171056,"horaFim":"14:55","observacoes":"","kmPercorridos":12},{"id":"ROT-0289","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-09-19","pedidoPor":"Miga","destino":"Soarauto","periodo":"M","carga":"5 paletes","condutor":"Teles","kmInicio":176180,"horaInicio":"09:48","kmFim":176181,"horaFim":"10:15","observacoes":"","kmPercorridos":1},{"id":"ROT-0290","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-09-19","pedidoPor":"Elisabete","destino":"bancos","periodo":"T","carga":"sem carga","condutor":"Elisabete","kmInicio":294485,"horaInicio":"12:09","kmFim":294495,"horaFim":"13:10","observacoes":"","kmPercorridos":10},{"id":"ROT-0291","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-09-19","pedidoPor":"Andre Veloso","destino":"casa","periodo":"T","carga":"sem carga","condutor":"Andre Veloso","kmInicio":171056,"horaInicio":"13:00","kmFim":171083,"horaFim":"14:12","observacoes":"","kmPercorridos":27},{"id":"ROT-0292","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-09-19","pedidoPor":"Machado","destino":"casa","periodo":"T","carga":"Estantes","condutor":"Machado","kmInicio":176181,"horaInicio":"16:00","kmFim":176199,"horaFim":"17:30","observacoes":"","kmPercorridos":18},{"id":"ROT-0293","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-09-22","pedidoPor":"Elisabete","destino":"bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":294495,"horaInicio":"11:22","kmFim":294505,"horaFim":"12:30","observacoes":"","kmPercorridos":10},{"id":"ROT-0294","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-09-22","pedidoPor":"Machado","destino":"CTT","periodo":"T","carga":"sem carga","condutor":"Mario","kmInicio":171083,"horaInicio":"15:45","kmFim":171084,"horaFim":"15:50","observacoes":"","kmPercorridos":1},{"id":"ROT-0295","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-09-24","pedidoPor":"Avelino","destino":"Soarauto","periodo":"M","carga":"4 paletes","condutor":"Vaz","kmInicio":176199,"horaInicio":"10:08","kmFim":176200,"horaFim":"10:30","observacoes":"","kmPercorridos":1},{"id":"ROT-0296","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-09-24","pedidoPor":"Elisabete","destino":"bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":294505,"horaInicio":"11:40","kmFim":294519,"horaFim":"12:39","observacoes":"","kmPercorridos":14},{"id":"ROT-0297","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-09-24","pedidoPor":"Andre Veloso","destino":"Escola do filho","periodo":"T","carga":"sem carga","condutor":"Andre Veloso","kmInicio":294519,"horaInicio":"15:05","kmFim":294546,"horaFim":"16:09","observacoes":"","kmPercorridos":27},{"id":"ROT-0298","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-09-24","pedidoPor":"Machado","destino":"CTT","periodo":"T","carga":"sem carga","condutor":"Teles","kmInicio":171084,"horaInicio":"15:20","kmFim":171085,"horaFim":"15:30","observacoes":"","kmPercorridos":1},{"id":"ROT-0299","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-09-24","pedidoPor":"Machado","destino":"Primopeças","periodo":"T","carga":"2 Paletes","condutor":"Batista","kmInicio":176200,"horaInicio":"15:35","kmFim":176228,"horaFim":"17:35","observacoes":"","kmPercorridos":28},{"id":"ROT-0300","viatura":"FIAt Doblo","matricula":"52-PM-78","data":"2025-09-25","pedidoPor":"Machado","destino":"AZ/PORTO","periodo":"M","carga":"Volumes","condutor":"Vaz","kmInicio":171085,"horaInicio":"10:00","kmFim":171124,"horaFim":"10:45","observacoes":"","kmPercorridos":39},{"id":"ROT-0301","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-09-25","pedidoPor":"Elisabete","destino":"bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":294546,"horaInicio":"12:05","kmFim":294560,"horaFim":"13:00","observacoes":"","kmPercorridos":14},{"id":"ROT-0302","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-09-25","pedidoPor":"Joao Carlos","destino":"Normed (Dmitri)","periodo":"T","carga":"sem carga","condutor":"Joao Carlos","kmInicio":294560,"horaInicio":"14:00","kmFim":294564,"horaFim":"14:55","observacoes":"","kmPercorridos":4},{"id":"ROT-0303","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-09-25","pedidoPor":"Avelino","destino":"Soarauto","periodo":"T","carga":"2 paletes","condutor":"Teles","kmInicio":171124,"horaInicio":"15.35:00","kmFim":171126,"horaFim":"16:00","observacoes":"","kmPercorridos":2},{"id":"ROT-0304","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-09-26","pedidoPor":"Avelino","destino":"Soarauto","periodo":"M","carga":"1 palete","condutor":"Vaz","kmInicio":171126,"horaInicio":"10:45","kmFim":171127,"horaFim":"11:00","observacoes":"","kmPercorridos":1},{"id":"ROT-0305","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-09-26","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":294564,"horaInicio":"11:33","kmFim":294575,"horaFim":"12:30","observacoes":"","kmPercorridos":11},{"id":"ROT-0306","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-09-26","pedidoPor":"Claudia","destino":"G.Contabilidade","periodo":"T","carga":"sem carga","condutor":"Caudia","kmInicio":294575,"horaInicio":"16:13","kmFim":294583,"horaFim":"17:00","observacoes":"","kmPercorridos":8},{"id":"ROT-0307","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-09-26","pedidoPor":"Avelino","destino":"Soarauto","periodo":"T","carga":"1 palete","condutor":"Batista","kmInicio":171157,"horaInicio":"14:41","kmFim":171158,"horaFim":"14:52","observacoes":"","kmPercorridos":1},{"id":"ROT-0308","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-09-26","pedidoPor":"Machado","destino":"Braginox","periodo":"T","carga":"Ferro velho","condutor":"Marcelino","kmInicio":176228,"horaInicio":"16:00","kmFim":176251,"horaFim":"17:16","observacoes":"","kmPercorridos":23},{"id":"ROT-0309","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-09-28","pedidoPor":"Claudia","destino":"estação cp","periodo":"M","carga":"sem carga","condutor":"Claudia","kmInicio":294583,"horaInicio":"10:15","kmFim":294590,"horaFim":"10:45","observacoes":"","kmPercorridos":7},{"id":"ROT-0310","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-09-29","pedidoPor":"Leonel","destino":"Agarbe","periodo":"m","carga":"sem carga","condutor":"Leonel","kmInicio":294590,"horaInicio":"11:00","kmFim":294591,"horaFim":"11:26","observacoes":"","kmPercorridos":1},{"id":"ROT-0311","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-09-29","pedidoPor":"Elisabete","destino":"estação cp","periodo":"T","carga":"sem carga","condutor":"Elisabete","kmInicio":294591,"horaInicio":"17:45","kmFim":294598,"horaFim":"18:04","observacoes":"","kmPercorridos":7},{"id":"ROT-0312","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-09-30","pedidoPor":"Machado","destino":"Ramoa","periodo":"M","carga":"sem carga","condutor":"André Costa","kmInicio":176251,"horaInicio":"10:35","kmFim":176261,"horaFim":"17:45","observacoes":"","kmPercorridos":10},{"id":"ROT-0313","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-09-30","pedidoPor":"Machado","destino":"Ramoa","periodo":"M","carga":"sem carga","condutor":"Zezito","kmInicio":171158,"horaInicio":"10:35","kmFim":171160,"horaFim":"10:47","observacoes":"","kmPercorridos":2},{"id":"ROT-0314","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-09-30","pedidoPor":"Joao Silva","destino":"Mecanico","periodo":"M","carga":"sem carga","condutor":"Joao Silva","kmInicio":294598,"horaInicio":"10:40","kmFim":294603,"horaFim":"10:57","observacoes":"","kmPercorridos":5},{"id":"ROT-0315","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-01","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":294603,"horaInicio":"11:19","kmFim":294613,"horaFim":"11:55","observacoes":"","kmPercorridos":10},{"id":"ROT-0316","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-01","pedidoPor":"Machado","destino":"arm.Porto","periodo":"M/T","carga":"sem carga","condutor":"Machado","kmInicio":294603,"horaInicio":"19:00","kmFim":294752,"horaFim":"18:40","observacoes":"","kmPercorridos":149},{"id":"ROT-0317","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-02","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":171136,"horaInicio":"11:00","kmFim":171146,"horaFim":"11:50","observacoes":"","kmPercorridos":10},{"id":"ROT-0318","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-02","pedidoPor":"Claudia","destino":"G.Contabilidade","periodo":"T","carga":"sem carga","condutor":"Claudia","kmInicio":171146,"horaInicio":"17:16","kmFim":171155,"horaFim":"17:49","observacoes":"","kmPercorridos":9},{"id":"ROT-0319","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-03","pedidoPor":"Machado","destino":"Ramoa","periodo":"M","carga":"sem carga","condutor":"Zezito","kmInicio":171155,"horaInicio":"10:00","kmFim":171158,"horaFim":"11:00","observacoes":"","kmPercorridos":3},{"id":"ROT-0320","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-03","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":294752,"horaInicio":"11:17","kmFim":294762,"horaFim":"12:06","observacoes":"","kmPercorridos":10},{"id":"ROT-0321","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-03","pedidoPor":"Machado","destino":"PSP","periodo":"T","carga":"sem carga","condutor":"Batista","kmInicio":171158,"horaInicio":"16:43","kmFim":171166,"horaFim":"17:28","observacoes":"","kmPercorridos":8},{"id":"ROT-0322","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-06","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":294762,"horaInicio":"10:40","kmFim":294772,"horaFim":"11:39","observacoes":"","kmPercorridos":10},{"id":"ROT-0323","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-10-06","pedidoPor":"Avelino","destino":"Inovpeças Lousada","periodo":"T","carga":"6 Paletes","condutor":"André Costa","kmInicio":176261,"horaInicio":"14:45","kmFim":176372,"horaFim":"16:21","observacoes":"","kmPercorridos":111},{"id":"ROT-0324","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-10-07","pedidoPor":"Avelino","destino":"Inovpeças Lousada","periodo":"M","carga":"4 paletes","condutor":"Zezito","kmInicio":176372,"horaInicio":"09:56","kmFim":176483,"horaFim":"11:50","observacoes":"","kmPercorridos":111},{"id":"ROT-0325","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-07","pedidoPor":"Avelino","destino":"Soarauto","periodo":"M","carga":"1 palete","condutor":"Avelino","kmInicio":171166,"horaInicio":"10:55","kmFim":171167,"horaFim":"11:05","observacoes":"","kmPercorridos":1},{"id":"ROT-0326","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-07","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":294772,"horaInicio":"11:25","kmFim":294781,"horaFim":"11:54","observacoes":"","kmPercorridos":9},{"id":"ROT-0327","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-07","pedidoPor":"Claudia","destino":"Gabinete de Contabilidade","periodo":"T","carga":"sem carga","condutor":"Claudia","kmInicio":294781,"horaInicio":"14:54","kmFim":294790,"horaFim":"15:46","observacoes":"","kmPercorridos":9},{"id":"ROT-0328","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-07","pedidoPor":"Rafael Silva","destino":"CTT","periodo":"T","carga":"1 volume","condutor":"André Batista","kmInicio":171167,"horaInicio":"15:20","kmFim":171168,"horaFim":"15:31","observacoes":"","kmPercorridos":1},{"id":"ROT-0329","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-08","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":294790,"horaInicio":"11:47","kmFim":294799,"horaFim":"12:18","observacoes":"","kmPercorridos":9},{"id":"ROT-0330","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-08","pedidoPor":"Rafael Silva","destino":"P.S.P.","periodo":"T","carga":"1 bateria","condutor":"André Batista","kmInicio":171168,"horaInicio":"14:48","kmFim":171175,"horaFim":"15:31","observacoes":"","kmPercorridos":7},{"id":"ROT-0331","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-09","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":294799,"horaInicio":"10:30","kmFim":294809,"horaFim":"11:17","observacoes":"","kmPercorridos":10},{"id":"ROT-0332","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-10-10","pedidoPor":"Avelino","destino":"Inovpeças Lousada","periodo":"M","carga":"6 paletes","condutor":"André Costa","kmInicio":176483,"horaInicio":"09:25","kmFim":176595,"horaFim":"11:15","observacoes":"","kmPercorridos":112},{"id":"ROT-0333","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-10","pedidoPor":"Joao Silva","destino":"Volta Amares","periodo":"M/T","carga":"varios volumes","condutor":"Simba e Batista","kmInicio":171175,"horaInicio":"10:30","kmFim":171259,"horaFim":"11:54","observacoes":"","kmPercorridos":84},{"id":"ROT-0334","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-10","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":294809,"horaInicio":"11:18","kmFim":294820,"horaFim":"12:08","observacoes":"","kmPercorridos":11},{"id":"ROT-0335","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-10","pedidoPor":"Joao Silva","destino":"Myforce","periodo":"T","carga":"sem carga","condutor":"Joao Silva","kmInicio":294820,"horaInicio":"15:10","kmFim":294828,"horaFim":"15:22","observacoes":"","kmPercorridos":8},{"id":"ROT-0336","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-10","pedidoPor":"Miga","destino":"Soarauto","periodo":"T","carga":"1 palete","condutor":"Batista","kmInicio":171259,"horaInicio":"17:30","kmFim":171260,"horaFim":"17:41","observacoes":"","kmPercorridos":1},{"id":"ROT-0337","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-13","pedidoPor":"Machado","destino":"CTT","periodo":"T","carga":"um volume","condutor":"Teles","kmInicio":294828,"horaInicio":"16:08","kmFim":294829,"horaFim":"16:31","observacoes":"","kmPercorridos":1},{"id":"ROT-0338","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-10-13","pedidoPor":"Avelino","destino":"Soarauto","periodo":"M","carga":"7paletes","condutor":"Teles","kmInicio":176595,"horaInicio":"17:31","kmFim":176596,"horaFim":"18:15","observacoes":"","kmPercorridos":1},{"id":"ROT-0339","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-14","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":294829,"horaInicio":"10:33","kmFim":294842,"horaFim":"11:40","observacoes":"","kmPercorridos":13},{"id":"ROT-0340","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-10-14","pedidoPor":"Avelino","destino":"Soarauto","periodo":"T","carga":"6 paletes","condutor":"Teles","kmInicio":176596,"horaInicio":"14:50","kmFim":176597,"horaFim":"15:55","observacoes":"","kmPercorridos":1},{"id":"ROT-0341","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-15","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":294842,"horaInicio":"10:33","kmFim":294851,"horaFim":"11:28","observacoes":"","kmPercorridos":9},{"id":"ROT-0342","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-15","pedidoPor":"Joao Silva","destino":"Volta Amares","periodo":"M/T","carga":"varios volumes","condutor":"Zezito","kmInicio":171260,"horaInicio":"08:00","kmFim":171697,"horaFim":"15:00","observacoes":"","kmPercorridos":437},{"id":"ROT-0343","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-15","pedidoPor":"Joao Silva","destino":"deslocação a V.Real","periodo":"T","carga":"sem carga","condutor":"Joao Carlos","kmInicio":294851,"horaInicio":"14:30","kmFim":295074,"horaFim":"18:22","observacoes":"","kmPercorridos":223},{"id":"ROT-0344","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-16","pedidoPor":"Elisabete","destino":"bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":295074,"horaInicio":"10:15","kmFim":295082,"horaFim":"10:52","observacoes":"","kmPercorridos":8},{"id":"ROT-0345","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-16","pedidoPor":"Machado","destino":"Armazem Famoes","periodo":"M/T","carga":"sem carga","condutor":"Machado","kmInicio":295082,"horaInicio":"06:45","kmFim":295900,"horaFim":"21:00","observacoes":"","kmPercorridos":818},{"id":"ROT-0346","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-10-17","pedidoPor":"Avelino","destino":"Soarauto","periodo":"M","carga":"4 paletes","condutor":"Simba","kmInicio":176597,"horaInicio":"09:51","kmFim":176598,"horaFim":"10:27","observacoes":"","kmPercorridos":1},{"id":"ROT-0347","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-17","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":171697,"horaInicio":"11:13","kmFim":171708,"horaFim":"12:18","observacoes":"","kmPercorridos":11},{"id":"ROT-0348","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-17","pedidoPor":"Joao Silva","destino":"Celeiros","periodo":"T","carga":"2 bidoes","condutor":"Fabio Silva","kmInicio":171708,"horaInicio":"14:35","kmFim":171732,"horaFim":"15:20","observacoes":"","kmPercorridos":24},{"id":"ROT-0349","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-17","pedidoPor":"Joao Carlos","destino":"Formaçao Empilhador","periodo":"M/T","carga":"sem carga","condutor":"Fabio Silva","kmInicio":295900,"horaInicio":"08:40","kmFim":295924,"horaFim":"17:00","observacoes":"","kmPercorridos":24},{"id":"ROT-0350","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-20","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":295924,"horaInicio":"11:12","kmFim":295935,"horaFim":"11:49","observacoes":"","kmPercorridos":11},{"id":"ROT-0351","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-20","pedidoPor":"Machado","destino":"CTT","periodo":"T","carga":"1 volume","condutor":"Rui Bernardo","kmInicio":295935,"horaInicio":"15:26","kmFim":295936,"horaFim":"15:35","observacoes":"","kmPercorridos":1},{"id":"ROT-0352","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-21","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":295936,"horaInicio":"09:46","kmFim":295946,"horaFim":"10:29","observacoes":"","kmPercorridos":10},{"id":"ROT-0353","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-21","pedidoPor":"Joao Carlos","destino":"Velorio Covelas","periodo":"M","carga":"sem carga","condutor":"Joao Carlos","kmInicio":295946,"horaInicio":"10:55","kmFim":295971,"horaFim":"11:40","observacoes":"","kmPercorridos":25},{"id":"ROT-0354","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-21","pedidoPor":"Leonardo","destino":"CTT","periodo":"T","carga":"sem carga","condutor":"Leonardo","kmInicio":172070,"horaInicio":"15:53","kmFim":172071,"horaFim":"16:08","observacoes":"","kmPercorridos":1},{"id":"ROT-0355","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-10-21","pedidoPor":"Tiago","destino":"Bascula","periodo":"T","carga":"sem carga","condutor":"Tiago","kmInicio":179596,"horaInicio":"14:30","kmFim":176603,"horaFim":"16:00","observacoes":"","kmPercorridos":0},{"id":"ROT-0356","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-21","pedidoPor":"André Veloso","destino":"Avenida","periodo":"T","carga":"sem carga","condutor":"André Veloso","kmInicio":295971,"horaInicio":"16:30","kmFim":295976,"horaFim":"16:50","observacoes":"","kmPercorridos":5},{"id":"ROT-0357","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-22","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":295976,"horaInicio":"10:47","kmFim":295985,"horaFim":"11:35","observacoes":"","kmPercorridos":9},{"id":"ROT-0358","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-22","pedidoPor":"Claudia","destino":"Gabinete de contabilidade","periodo":"T","carga":"sem carga","condutor":"Claudia","kmInicio":295985,"horaInicio":"14:23","kmFim":295995,"horaFim":"15:30","observacoes":"","kmPercorridos":10},{"id":"ROT-0359","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-22","pedidoPor":"Machado","destino":"CTT","periodo":"T","carga":"1 volume","condutor":"Teles","kmInicio":172071,"horaInicio":"15:29","kmFim":172072,"horaFim":"15:43","observacoes":"","kmPercorridos":1},{"id":"ROT-0360","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-10-23","pedidoPor":"Avelino","destino":"Barcelpeças","periodo":"M","carga":"6 paletes","condutor":"Cunha","kmInicio":176603,"horaInicio":"09:32","kmFim":176662,"horaFim":"11:42","observacoes":"","kmPercorridos":59},{"id":"ROT-0361","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-23","pedidoPor":"Machado","destino":"P.S.P.","periodo":"M","carga":"1 volume","condutor":"Rui Bernardo","kmInicio":172072,"horaInicio":"09:53","kmFim":172079,"horaFim":"10:23","observacoes":"","kmPercorridos":7},{"id":"ROT-0362","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-23","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":295995,"horaInicio":"11:06","kmFim":296005,"horaFim":"11:56","observacoes":"","kmPercorridos":10},{"id":"ROT-0363","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-24","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":296005,"horaInicio":"10:45","kmFim":296015,"horaFim":"11:38","observacoes":"","kmPercorridos":10},{"id":"ROT-0364","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-10-24","pedidoPor":"Machado","destino":"Sucata","periodo":"M","carga":"4 paletes","condutor":"Vaz","kmInicio":176662,"horaInicio":"11:04","kmFim":176686,"horaFim":"12:26","observacoes":"","kmPercorridos":24},{"id":"ROT-0365","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-24","pedidoPor":"Avelino","destino":"Soarauto","periodo":"T","carga":"1 palete","condutor":"Avelino","kmInicio":172079,"horaInicio":"14:28","kmFim":172080,"horaFim":"14:40","observacoes":"","kmPercorridos":1},{"id":"ROT-0366","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-24","pedidoPor":"Claudia","destino":"Gabinete de contabilidade","periodo":"T","carga":"sem carga","condutor":"Claudia","kmInicio":296015,"horaInicio":"16:50","kmFim":296024,"horaFim":"17:36","observacoes":"","kmPercorridos":9},{"id":"ROT-0367","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-27","pedidoPor":"Leonel","destino":"Agarb","periodo":"T","carga":"sem carga","condutor":"Leonel","kmInicio":296024,"horaInicio":"15:27","kmFim":296025,"horaFim":"15:47","observacoes":"","kmPercorridos":1},{"id":"ROT-0368","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-10-27","pedidoPor":"Machado","destino":"Sucata","periodo":"M","carga":"4 paletes","condutor":"André Costa","kmInicio":176686,"horaInicio":"15:00","kmFim":176707,"horaFim":"15:47","observacoes":"","kmPercorridos":21},{"id":"ROT-0369","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-28","pedidoPor":"Joao Silva","destino":"Bragalis Vila Real","periodo":"M","carga":"sem carga","condutor":"Joao Silva","kmInicio":296025,"horaInicio":"09:30","kmFim":296248,"horaFim":"17:55","observacoes":"","kmPercorridos":223},{"id":"ROT-0370","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-28","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":172080,"horaInicio":"11:16","kmFim":172089,"horaFim":"11:47","observacoes":"","kmPercorridos":9},{"id":"ROT-0371","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-29","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":172089,"horaInicio":"10:51","kmFim":172100,"horaFim":"11:28","observacoes":"","kmPercorridos":11},{"id":"ROT-0372","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-29","pedidoPor":"Machado","destino":"Soarauto / Alfilux / CTT","periodo":"T","carga":"1 palete","condutor":"Fabio","kmInicio":172100,"horaInicio":"15:28","kmFim":172101,"horaFim":"15:48","observacoes":"","kmPercorridos":1},{"id":"ROT-0373","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-30","pedidoPor":"Tiago","destino":"Mecanico","periodo":"M","carga":"sem carga","condutor":"Teles","kmInicio":172101,"horaInicio":"10:10","kmFim":172116,"horaFim":"10:35","observacoes":"","kmPercorridos":15},{"id":"ROT-0374","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-30","pedidoPor":"Tiago","destino":"Mecanico","periodo":"M","carga":"sem carga","condutor":"Tiago","kmInicio":296248,"horaInicio":"10:10","kmFim":296263,"horaFim":"10:40","observacoes":"","kmPercorridos":15},{"id":"ROT-0375","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-10-30","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":172116,"horaInicio":"12:11","kmFim":172122,"horaFim":"12:53","observacoes":"","kmPercorridos":6},{"id":"ROT-0376","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-31","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":296263,"horaInicio":"12:10","kmFim":296276,"horaFim":"13:15","observacoes":"","kmPercorridos":13},{"id":"ROT-0377","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-10-31","pedidoPor":"Claudia","destino":"Gabinete de contabilidade","periodo":"T","carga":"sem carga","condutor":"Claudia","kmInicio":296276,"horaInicio":"17:10","kmFim":296284,"horaFim":"18:52","observacoes":"","kmPercorridos":8},{"id":"ROT-0378","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-03","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":296284,"horaInicio":"10:33","kmFim":296293,"horaFim":"11:14","observacoes":"","kmPercorridos":9},{"id":"ROT-0379","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-03","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":296293,"horaInicio":"11:50","kmFim":296303,"horaFim":"12:30","observacoes":"","kmPercorridos":10},{"id":"ROT-0380","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-11-03","pedidoPor":"Rafael Silva","destino":"Sucata","periodo":"T","carga":"3 paletes","condutor":"Rafael Silva","kmInicio":176707,"horaInicio":"15:00","kmFim":176727,"horaFim":"16:31","observacoes":"","kmPercorridos":20},{"id":"ROT-0381","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-11-05","pedidoPor":"Avelino","destino":"Inovpeças","periodo":"T","carga":"6 paletes","condutor":"Teles","kmInicio":176800,"horaInicio":"15:00","kmFim":176912,"horaFim":"17:05","observacoes":"","kmPercorridos":112},{"id":"ROT-0382","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-11-06","pedidoPor":"Avelino","destino":"Primopeças","periodo":"M","carga":"6 paletes","condutor":"Teles","kmInicio":176912,"horaInicio":"09:35","kmFim":176939,"horaFim":"11:07","observacoes":"","kmPercorridos":27},{"id":"ROT-0383","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-06","pedidoPor":"Elisabete","destino":"Bancos","periodo":"T","carga":"sem carga","condutor":"Elisabete","kmInicio":296324,"horaInicio":"14:20","kmFim":296335,"horaFim":"15:17","observacoes":"","kmPercorridos":11},{"id":"ROT-0384","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-11-06","pedidoPor":"Avelino","destino":"Soarauto","periodo":"T","carga":"2 paletes","condutor":"Cunha","kmInicio":176939,"horaInicio":"14:54","kmFim":176940,"horaFim":"15:26","observacoes":"","kmPercorridos":1},{"id":"ROT-0385","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-11-06","pedidoPor":"Machado","destino":"CTT","periodo":"T","carga":"1 volume","condutor":"Teles","kmInicio":172122,"horaInicio":"14:45","kmFim":172123,"horaFim":"15:08","observacoes":"","kmPercorridos":1},{"id":"ROT-0386","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-07","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":296335,"horaInicio":"11:50","kmFim":296345,"horaFim":"12:54","observacoes":"","kmPercorridos":10},{"id":"ROT-0387","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-11-06","pedidoPor":"Machado","destino":"CTT","periodo":"T","carga":"1 volume","condutor":"Teles","kmInicio":172123,"horaInicio":"15:20","kmFim":172125,"horaFim":"15:32","observacoes":"","kmPercorridos":2},{"id":"ROT-0388","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-10","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":296345,"horaInicio":"10:42","kmFim":296355,"horaFim":"11:33","observacoes":"","kmPercorridos":10},{"id":"ROT-0389","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-11-10","pedidoPor":"Machado","destino":"Bomba de Combustivel","periodo":"T","carga":"sem carga","condutor":"Leonardo","kmInicio":176940,"horaInicio":"14:46","kmFim":176948,"horaFim":"15:38","observacoes":"","kmPercorridos":8},{"id":"ROT-0390","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-10","pedidoPor":"Joao Silva","destino":"Leroy Merlin","periodo":"T","carga":"sem carga","condutor":"Joao Silva","kmInicio":296355,"horaInicio":"14:51","kmFim":296367,"horaFim":"15:32","observacoes":"","kmPercorridos":12},{"id":"ROT-0391","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-11-10","pedidoPor":"Machado","destino":"CTT","periodo":"T","carga":"1 volume","condutor":"Andre Batista","kmInicio":172125,"horaInicio":"15:00","kmFim":172126,"horaFim":"15:23","observacoes":"","kmPercorridos":1},{"id":"ROT-0392","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-11","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":296367,"horaInicio":"11:54","kmFim":296377,"horaFim":"12:40","observacoes":"","kmPercorridos":10},{"id":"ROT-0393","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-11","pedidoPor":"Joao Silva","destino":"Myforce Pneus Volta Barcelos","periodo":"M","carga":"sem carga","condutor":"Tiago","kmInicio":296377,"horaInicio":"10:00","kmFim":296386,"horaFim":"10:30","observacoes":"","kmPercorridos":9},{"id":"ROT-0394","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-12","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":296377,"horaInicio":"11:48","kmFim":296406,"horaFim":"12:41","observacoes":"","kmPercorridos":29},{"id":"ROT-0395","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-13","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":296406,"horaInicio":"12:10","kmFim":296416,"horaFim":"13:17","observacoes":"","kmPercorridos":10},{"id":"ROT-0396","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-11-13","pedidoPor":"Machado","destino":"AZ Leiria","periodo":"m/t","carga":"Material convençao","condutor":"Machado","kmInicio":176948,"horaInicio":"08:00","kmFim":177940,"horaFim":"19:00","observacoes":"","kmPercorridos":992},{"id":"ROT-0397","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-11-13","pedidoPor":"Joao Silva","destino":"Volta Barcelos","periodo":"M/T","carga":"varios volumes","condutor":"Mario","kmInicio":172126,"horaInicio":"08:15","kmFim":172791,"horaFim":"18:00","observacoes":"","kmPercorridos":665},{"id":"ROT-0398","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-14","pedidoPor":"Machado","destino":"Convenção AD","periodo":"M/T","carga":"sem carga","condutor":"Machado","kmInicio":296416,"horaInicio":"06:00","kmFim":296619,"horaFim":"19:00","observacoes":"","kmPercorridos":203},{"id":"ROT-0399","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-11-14","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":172792,"horaInicio":"11:17","kmFim":172802,"horaFim":"11:57","observacoes":"","kmPercorridos":10},{"id":"ROT-0400","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-17","pedidoPor":"Tiago","destino":"Lavagem","periodo":"M/T","carga":"sem carga","condutor":"Tiago","kmInicio":296619,"horaInicio":"09:30","kmFim":296627,"horaFim":"17:30","observacoes":"","kmPercorridos":8},{"id":"ROT-0401","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-18","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":296627,"horaInicio":"11:20","kmFim":296637,"horaFim":"11:55","observacoes":"","kmPercorridos":10},{"id":"ROT-0402","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-18","pedidoPor":"Joao Silva","destino":"","periodo":"T","carga":"sem carga","condutor":"Joao Silva","kmInicio":296637,"horaInicio":"15:18","kmFim":296649,"horaFim":"16:00","observacoes":"","kmPercorridos":12},{"id":"ROT-0403","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-11-19","pedidoPor":"Avelino","destino":"Soarauto","periodo":"M","carga":"1 palete","condutor":"Fabio Vaz","kmInicio":172802,"horaInicio":"09:33","kmFim":172803,"horaFim":"09:46","observacoes":"","kmPercorridos":1},{"id":"ROT-0404","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-19","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":296637,"horaInicio":"10:54","kmFim":296647,"horaFim":"11:30","observacoes":"","kmPercorridos":10},{"id":"ROT-0405","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-11-20","pedidoPor":"Machado","destino":"Volta Barcelos","periodo":"M","carga":"sem carga","condutor":"Zezito","kmInicio":172803,"horaInicio":"10:30","kmFim":173019,"horaFim":"17:00","observacoes":"","kmPercorridos":216},{"id":"ROT-0406","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-11-20","pedidoPor":"Avelino","destino":"Soarauto","periodo":"T","carga":"3 paletes","condutor":"Zezito","kmInicio":177940,"horaInicio":"15:40","kmFim":177941,"horaFim":"16:20","observacoes":"","kmPercorridos":1},{"id":"ROT-0407","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-20","pedidoPor":"Machado","destino":"Myforce","periodo":"T","carga":"sem carga","condutor":"Machado","kmInicio":296647,"horaInicio":"15:18","kmFim":296711,"horaFim":"15:41","observacoes":"","kmPercorridos":64},{"id":"ROT-0408","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-11-21","pedidoPor":"Machado","destino":"Bragainox","periodo":"M","carga":"varios volumes","condutor":"Rui Bernardo","kmInicio":177941,"horaInicio":"09:30","kmFim":177961,"horaFim":"11:05","observacoes":"","kmPercorridos":20},{"id":"ROT-0409","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-21","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":296711,"horaInicio":"11:09","kmFim":296722,"horaFim":"11:58","observacoes":"","kmPercorridos":11},{"id":"ROT-0410","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-11-21","pedidoPor":"Machado","destino":"Bragainox","periodo":"T","carga":"varios volumes","condutor":"Rui Bernardo","kmInicio":177961,"horaInicio":"15:15","kmFim":177983,"horaFim":"16:51","observacoes":"","kmPercorridos":22},{"id":"ROT-0411","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-21","pedidoPor":"Claudia","destino":"Gabinete de contabilidade","periodo":"T","carga":"sem carga","condutor":"Claudia","kmInicio":296739,"horaInicio":"16:25","kmFim":296752,"horaFim":"17:20","observacoes":"","kmPercorridos":13},{"id":"ROT-0412","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-22","pedidoPor":"Machado","destino":"AZ Leiria","periodo":"M/T","carga":"sem carga","condutor":"Machado","kmInicio":296752,"horaInicio":"08:00","kmFim":297311,"horaFim":"19:00","observacoes":"","kmPercorridos":559},{"id":"ROT-0413","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-24","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":297311,"horaInicio":"11:12","kmFim":297321,"horaFim":"11:58","observacoes":"","kmPercorridos":10},{"id":"ROT-0414","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-11-25","pedidoPor":"Avelino","destino":"Soarauto - Ac. Soares Geme","periodo":"M","carga":"4 paletes","condutor":"André Batista","kmInicio":177983,"horaInicio":"09:32","kmFim":178015,"horaFim":"11:21","observacoes":"","kmPercorridos":32},{"id":"ROT-0415","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-25","pedidoPor":"Claudia","destino":"Gabinete de contabilidade","periodo":"T","carga":"sem carga","condutor":"Claudia","kmInicio":297321,"horaInicio":"16:25","kmFim":297329,"horaFim":"17:27","observacoes":"","kmPercorridos":8},{"id":"ROT-0416","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-26","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":297329,"horaInicio":"11:14","kmFim":297338,"horaFim":"11:57","observacoes":"","kmPercorridos":9},{"id":"ROT-0417","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-11-26","pedidoPor":"Avelino","destino":"Soarauto","periodo":"T","carga":"4 paletes","condutor":"Teles","kmInicio":178015,"horaInicio":"14:54","kmFim":178016,"horaFim":"15:24","observacoes":"","kmPercorridos":1},{"id":"ROT-0418","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-11-27","pedidoPor":"Elisabete","destino":"CTT","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":173019,"horaInicio":"11:12","kmFim":173021,"horaFim":"11:46","observacoes":"","kmPercorridos":2},{"id":"ROT-0419","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-11-27","pedidoPor":"Joao Silva","destino":"Soarauto","periodo":"T","carga":"sem carga","condutor":"Joao Silva","kmInicio":173021,"horaInicio":"14:46","kmFim":173022,"horaFim":"14:54","observacoes":"","kmPercorridos":1},{"id":"ROT-0420","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-27","pedidoPor":"André Veloso","destino":"Soarauto","periodo":"T","carga":"sem carga","condutor":"Andre Veloso","kmInicio":297338,"horaInicio":"15:30","kmFim":297340,"horaFim":"15:48","observacoes":"","kmPercorridos":2},{"id":"ROT-0421","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-11-28","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":297340,"horaInicio":"11:04","kmFim":297358,"horaFim":"11:40","observacoes":"","kmPercorridos":18},{"id":"ROT-0422","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-11-28","pedidoPor":"Avelino","destino":"Soarauto","periodo":"M","carga":"6 paletes","condutor":"Teles","kmInicio":178016,"horaInicio":"15:00","kmFim":178022,"horaFim":"15:14","observacoes":"","kmPercorridos":6},{"id":"ROT-0423","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-12-02","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":297359,"horaInicio":"12:11","kmFim":297368,"horaFim":"13:01","observacoes":"","kmPercorridos":9},{"id":"ROT-0424","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-12-03","pedidoPor":"Avelino","destino":"Soarauto","periodo":"M","carga":"1 palete","condutor":"Teles","kmInicio":173022,"horaInicio":"09:32","kmFim":173022,"horaFim":"09:46","observacoes":"","kmPercorridos":0},{"id":"ROT-0425","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-12-03","pedidoPor":"Tiago","destino":"Mecanico","periodo":"M","carga":"sem carga","condutor":"Tiago","kmInicio":297368,"horaInicio":"11:00","kmFim":297380,"horaFim":"11:28","observacoes":"","kmPercorridos":12},{"id":"ROT-0426","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-12-03","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":297380,"horaInicio":"11:32","kmFim":297389,"horaFim":"12:26","observacoes":"","kmPercorridos":9},{"id":"ROT-0427","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-12-04","pedidoPor":"Machado","destino":"Sucata","periodo":"T","carga":"varios volumes","condutor":"Rui Bernardo","kmInicio":178022,"horaInicio":"14:43","kmFim":178043,"horaFim":"16:20","observacoes":"","kmPercorridos":21},{"id":"ROT-0428","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-12-05","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":297389,"horaInicio":"11:55","kmFim":297399,"horaFim":"12:41","observacoes":"","kmPercorridos":10},{"id":"ROT-0429","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-12-09","pedidoPor":"Machado","destino":"Assistencia em viagem","periodo":"M","carga":"sem carga","condutor":"Ricardo","kmInicio":297399,"horaInicio":"09:00","kmFim":297410,"horaFim":"09:37","observacoes":"","kmPercorridos":11},{"id":"ROT-0430","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-12-09","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":297410,"horaInicio":"10:34","kmFim":297421,"horaFim":"11:29","observacoes":"","kmPercorridos":11},{"id":"ROT-0431","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-12-09","pedidoPor":"Machado","destino":"Deslocaçao a Casa","periodo":"M","carga":"sem carga","condutor":"Machado","kmInicio":297421,"horaInicio":"13:00","kmFim":297429,"horaFim":"14:30","observacoes":"","kmPercorridos":8},{"id":"ROT-0432","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-12-09","pedidoPor":"Tiago","destino":"Mecanico","periodo":"T","carga":"sem carga","condutor":"Tiago","kmInicio":297429,"horaInicio":"15:15","kmFim":297442,"horaFim":"15:45","observacoes":"","kmPercorridos":13},{"id":"ROT-0433","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-12-09","pedidoPor":"Machado","destino":"Inspeção","periodo":"M","carga":"sem carga","condutor":"Joao Fernandes","kmInicio":297442,"horaInicio":"09:43","kmFim":297450,"horaFim":"10:41","observacoes":"","kmPercorridos":8},{"id":"ROT-0434","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-12-10","pedidoPor":"Tiago","destino":"Mecanico","periodo":"M","carga":"sem carga","condutor":"Tiago","kmInicio":297450,"horaInicio":"11:20","kmFim":297461,"horaFim":"11:37","observacoes":"","kmPercorridos":11},{"id":"ROT-0435","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-12-10","pedidoPor":"Tiago","destino":"Mecanico","periodo":"M/T","carga":"sem carga","condutor":"Tiago","kmInicio":173022,"horaInicio":"16:00","kmFim":173037,"horaFim":"16:28","observacoes":"","kmPercorridos":15},{"id":"ROT-0436","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-12-10","pedidoPor":"Tiago","destino":"Mecanico","periodo":"T","carga":"sem carga","condutor":"Gonçalo","kmInicio":297461,"horaInicio":"16:00","kmFim":297474,"horaFim":"16:35","observacoes":"","kmPercorridos":13},{"id":"ROT-0437","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-12-11","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":297474,"horaInicio":"11:29","kmFim":297484,"horaFim":"12:03","observacoes":"","kmPercorridos":10},{"id":"ROT-0438","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-12-11","pedidoPor":"Avelino","destino":"Acessorios Soares Geme","periodo":"T","carga":"2 paletes","condutor":"Teles","kmInicio":178043,"horaInicio":"15:30","kmFim":178076,"horaFim":"16:10","observacoes":"","kmPercorridos":33},{"id":"ROT-0439","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-12-12","pedidoPor":"Avelino","destino":"Barcelpeças","periodo":"M","carga":"2 paletes","condutor":"Teles","kmInicio":178076,"horaInicio":"11:00","kmFim":178130,"horaFim":"12:03","observacoes":"","kmPercorridos":54},{"id":"ROT-0440","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-12-12","pedidoPor":"Elisabete","destino":"Bancos","periodo":"m","carga":"sem carga","condutor":"Elisabete","kmInicio":297484,"horaInicio":"11:15","kmFim":297494,"horaFim":"13:15","observacoes":"","kmPercorridos":10},{"id":"ROT-0441","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-12-12","pedidoPor":"Machado","destino":"Agarb","periodo":"T","carga":"sem carga","condutor":"Teles","kmInicio":173037,"horaInicio":"14:39","kmFim":173037,"horaFim":"15:09","observacoes":"","kmPercorridos":0},{"id":"ROT-0442","viatura":"Toyota Prius","matricula":"05-QR-43","data":"12/12/2025","pedidoPor":"Joao Silva","destino":"Bancos","periodo":"T","carga":"sem carga","condutor":"Machado","kmInicio":294494,"horaInicio":"15:12","kmFim":297515,"horaFim":"16:15","observacoes":"","kmPercorridos":3021},{"id":"ROT-0443","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-12-15","pedidoPor":"Joao Silva","destino":"Agencia aluguer automovel","periodo":"M","carga":"sem carga","condutor":"Andre Veloso","kmInicio":297515,"horaInicio":"09:24","kmFim":297593,"horaFim":"10:46","observacoes":"","kmPercorridos":78},{"id":"ROT-0444","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-12-15","pedidoPor":"Rafael","destino":"ferro velho","periodo":"M","carga":"varios volumes","condutor":"Cunha","kmInicio":178130,"horaInicio":"09:33","kmFim":178150,"horaFim":"11:10","observacoes":"","kmPercorridos":20},{"id":"ROT-0445","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-12-15","pedidoPor":"Avelino","destino":"Inovpeças Lousada","periodo":"T","carga":"6 paletes","condutor":"Cunha","kmInicio":178150,"horaInicio":"14:31","kmFim":178261,"horaFim":"17:19","observacoes":"","kmPercorridos":111},{"id":"ROT-0446","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-12-16","pedidoPor":"Elisabete","destino":"Gabinte / Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":297593,"horaInicio":"09:15","kmFim":297604,"horaFim":"10:01","observacoes":"","kmPercorridos":11},{"id":"ROT-0447","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-12-16","pedidoPor":"Avelino","destino":"Inovpeças","periodo":"M","carga":"6 paletes","condutor":"Joao Fernandes","kmInicio":178261,"horaInicio":"09:30","kmFim":178375,"horaFim":"12:20","observacoes":"","kmPercorridos":114},{"id":"ROT-0448","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-12-16","pedidoPor":"Avelino","destino":"Inovpeças","periodo":"T","carga":"6 paletes","condutor":"Cunha","kmInicio":178375,"horaInicio":"14:32","kmFim":178486,"horaFim":"16:52","observacoes":"","kmPercorridos":111},{"id":"ROT-0449","viatura":"Toyota Prius","matricula":"05-QR-43","data":"17-12-2025","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":297604,"horaInicio":"10:30","kmFim":297614,"horaFim":"11:37","observacoes":"","kmPercorridos":10},{"id":"ROT-0450","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"17-12-2025","pedidoPor":"Leonel","destino":"Sucata","periodo":"M","carga":"varios volumes","condutor":"Simba","kmInicio":178486,"horaInicio":"10:40","kmFim":178506,"horaFim":"11:45","observacoes":"","kmPercorridos":20},{"id":"ROT-0451","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-12-17","pedidoPor":"Avelino","destino":"Acessorios Soares Geme","periodo":"T","carga":"3 paletes","condutor":"Simba","kmInicio":178506,"horaInicio":"14:30","kmFim":178535,"horaFim":"15:30","observacoes":"","kmPercorridos":29},{"id":"ROT-0452","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-12-18","pedidoPor":"Machado","destino":"Sucata","periodo":"M","carga":"varios volumes","condutor":"Rafael","kmInicio":178535,"horaInicio":"09:30","kmFim":178555,"horaFim":"10:42","observacoes":"","kmPercorridos":20},{"id":"ROT-0453","viatura":"Toyota Prius","matricula":"05-QR-43","data":"18/12/2025","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":297614,"horaInicio":"11:00","kmFim":297625,"horaFim":"11:52","observacoes":"","kmPercorridos":11},{"id":"ROT-0454","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-12-18","pedidoPor":"Avelino","destino":"Gaiafor","periodo":"T","carga":"5 paletes","condutor":"Leo","kmInicio":178555,"horaInicio":"13:00","kmFim":178690,"horaFim":"16:23","observacoes":"","kmPercorridos":135},{"id":"ROT-0455","viatura":"Toyota Prius","matricula":"05-QR-43","data":"19-12-2025","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":297625,"horaInicio":"10:34","kmFim":297635,"horaFim":"11:35","observacoes":"","kmPercorridos":10},{"id":"ROT-0456","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"19/12/2025","pedidoPor":"Machado","destino":"Manutençao","periodo":"M/T","carga":"sem carga","condutor":"Andre Costa","kmInicio":173037,"horaInicio":"13:00","kmFim":173055,"horaFim":"14:30","observacoes":"","kmPercorridos":18},{"id":"ROT-0457","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"19/12/2025","pedidoPor":"Machado","destino":"Reivax","periodo":"T","carga":"sem carga","condutor":"Carlos Pinto","kmInicio":173055,"horaInicio":"15::45:00","kmFim":173065,"horaFim":"16:00","observacoes":"","kmPercorridos":10},{"id":"ROT-0458","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-12-19","pedidoPor":"Avelino","destino":"Gaiafor","periodo":"T","carga":"5 paletes","condutor":"Teles","kmInicio":178690,"horaInicio":"15:30","kmFim":178839,"horaFim":"17:40","observacoes":"","kmPercorridos":149},{"id":"ROT-0459","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-12-22","pedidoPor":"Marcelino","destino":"Agarb","periodo":"M","carga":"sem carga","condutor":"Marcelino","kmInicio":173065,"horaInicio":"10:48","kmFim":173066,"horaFim":"11:15","observacoes":"","kmPercorridos":1},{"id":"ROT-0460","viatura":"Toyota Prius","matricula":"05-QR-43","data":"","pedidoPor":"Joao Silva","destino":"","periodo":"M/T","carga":"sem carga","condutor":"Joao Silva","kmInicio":297635,"horaInicio":"09:00","kmFim":297875,"horaFim":"19:00","observacoes":"","kmPercorridos":240},{"id":"ROT-0461","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"22-12-2025","pedidoPor":"Machado","destino":"Manutençao","periodo":"M/T","carga":"sem carga","condutor":"Jose Miguel","kmInicio":173066,"horaInicio":"12:30","kmFim":173083,"horaFim":"14:30","observacoes":"","kmPercorridos":17},{"id":"ROT-0462","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"23-12-2025","pedidoPor":"Tiago","destino":"Inspeção","periodo":"M","carga":"sem carga","condutor":"Rui Bernardo","kmInicio":178839,"horaInicio":"09:31","kmFim":178907,"horaFim":"10:38","observacoes":"","kmPercorridos":68},{"id":"ROT-0463","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"23/12/2025","pedidoPor":"Cesar","destino":"Myforce","periodo":"M","carga":"sem carga","condutor":"Cesar","kmInicio":173066,"horaInicio":"11:30","kmFim":173096,"horaFim":"11:54","observacoes":"","kmPercorridos":30},{"id":"ROT-0464","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"26/12/2025","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":173096,"horaInicio":"11:20","kmFim":173110,"horaFim":"12:10","observacoes":"","kmPercorridos":14},{"id":"ROT-0465","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-12-26","pedidoPor":"Jose Miguel","destino":"Manutençao","periodo":"M/T","carga":"sem carga","condutor":"Jose Miguel","kmInicio":173110,"horaInicio":"13:00","kmFim":173126,"horaFim":"14:24","observacoes":"","kmPercorridos":16},{"id":"ROT-0466","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-12-29","pedidoPor":"Machado","destino":"Ramoa","periodo":"M","carga":"sem carga","condutor":"Batista","kmInicio":173126,"horaInicio":"09:37","kmFim":173130,"horaFim":"09:57","observacoes":"","kmPercorridos":4},{"id":"ROT-0467","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2025-12-29","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":297875,"horaInicio":"11:00","kmFim":297887,"horaFim":"11:54","observacoes":"","kmPercorridos":12},{"id":"ROT-0468","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-12-29","pedidoPor":"Jose Miguel","destino":"Manutençao","periodo":"T","carga":"sem carga","condutor":"Jose Miguel","kmInicio":173126,"horaInicio":"13:00","kmFim":173144,"horaFim":"14:25","observacoes":"","kmPercorridos":18},{"id":"ROT-0469","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-12-30","pedidoPor":"Avelino","destino":"Primo/acesoares","periodo":"T","carga":"1+1 palete","condutor":"Batista","kmInicio":178907,"horaInicio":"14:30","kmFim":178946,"horaFim":"16:35","observacoes":"","kmPercorridos":39},{"id":"ROT-0470","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2025-12-31","pedidoPor":"Avelino","destino":"Soarauto","periodo":"M","carga":"6 paletes","condutor":"Batista","kmInicio":178946,"horaInicio":"09:45","kmFim":178947,"horaFim":"10:30","observacoes":"","kmPercorridos":1},{"id":"ROT-0471","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2025-12-31","pedidoPor":"volta","destino":"amares/v.verde","periodo":"M","carga":"varios volumes","condutor":"Micael","kmInicio":173144,"horaInicio":"08:15","kmFim":173229,"horaFim":"09:30","observacoes":"","kmPercorridos":85},{"id":"ROT-0472","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2026-01-02","pedidoPor":"volta","destino":"amares/v.verde","periodo":"M/T","carga":"varios volumes","condutor":"Micael","kmInicio":173229,"horaInicio":"08:15","kmFim":173270,"horaFim":"09:25","observacoes":"","kmPercorridos":41},{"id":"ROT-0473","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2026-01-02","pedidoPor":"Joao Silva","destino":"Vila Real","periodo":"M","carga":"sem carga","condutor":"Jose Miguel","kmInicio":297887,"horaInicio":"11:24","kmFim":298220,"horaFim":"14:00","observacoes":"","kmPercorridos":333},{"id":"ROT-0474","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2026-01-02","pedidoPor":"Joao Silva","destino":"","periodo":"M","carga":"sem carga","condutor":"Joao Silva","kmInicio":173270,"horaInicio":"12:30","kmFim":173284,"horaFim":"14:15","observacoes":"","kmPercorridos":14},{"id":"ROT-0475","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2026-01-02","pedidoPor":"volta","destino":"amares/v.verde","periodo":"M/T","carga":"varios volumes","condutor":"Micael/leo","kmInicio":173284,"horaInicio":"16:00","kmFim":173326,"horaFim":"17:27","observacoes":"","kmPercorridos":42},{"id":"ROT-0478","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2026-06-26","pedidoPor":"Machado","destino":"Expomecanica","periodo":"m/t","carga":"sem carga","condutor":"Fabio Silva","kmInicio":181945,"horaInicio":"08:00","kmFim":182799,"horaFim":"18:20","observacoes":"","kmPercorridos":854},{"id":"ROT-0479","viatura":"Toyota Prius","matricula":"05-QR-43","data":"27-28/06/2026","pedidoPor":"Tiago","destino":"Mecanico","periodo":"m/t","carga":"sem carga","condutor":"Tiago","kmInicio":304801,"horaInicio":"09:00","kmFim":304815,"horaFim":"10:28","observacoes":"","kmPercorridos":14},{"id":"ROT-0480","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2026-06-27","pedidoPor":"Tiago","destino":"Mecanico","periodo":"Tarde","carga":"sem carga","condutor":"Tiago","kmInicio":178983,"horaInicio":"17:10","kmFim":178994,"horaFim":"17:35","observacoes":"","kmPercorridos":11},{"id":"ROT-0481","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2026-06-27","pedidoPor":"Claudia","destino":"Gabinete de contabilidade","periodo":"M","carga":"sem carga","condutor":"Claudia","kmInicio":178994,"horaInicio":"09:00","kmFim":179002,"horaFim":"09:42","observacoes":"","kmPercorridos":8},{"id":"ROT-0482","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"27/28 - 06/2026","pedidoPor":"Machado","destino":"Volta Amares 08h","periodo":"m","carga":"varios Volumes","condutor":"Gonçalo","kmInicio":179002,"horaInicio":"08:00","kmFim":179331,"horaFim":"18:15","observacoes":"","kmPercorridos":329},{"id":"ROT-0483","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2026-06-28","pedidoPor":"Machado","destino":"Expomecanica","periodo":"M","carga":"Sem carga","condutor":"Machado","kmInicio":304815,"horaInicio":"08:30","kmFim":305283,"horaFim":"10:20","observacoes":"","kmPercorridos":468},{"id":"ROT-0484","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2026-06-01","pedidoPor":"Machado","destino":"Volta Guimaraes","periodo":"m/t","carga":"varios Volumes","condutor":"Fabio Vaz / Rui Fernandes","kmInicio":179331,"horaInicio":"08:00","kmFim":179646,"horaFim":"18:00","observacoes":"","kmPercorridos":315},{"id":"ROT-0485","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2026-06-02","pedidoPor":"Machado","destino":"Deslocação a casa / Ramoa","periodo":"Tarde","carga":"sem carga","condutor":"Machado","kmInicio":305283,"horaInicio":"12:00","kmFim":305291,"horaFim":"14:32","observacoes":"Dia 03/06/2026","kmPercorridos":8},{"id":"ROT-0486","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2026-06-03","pedidoPor":"Machado","destino":"Primopeças","periodo":"m","carga":"1 palete","condutor":"Micael","kmInicio":179646,"horaInicio":"09:40","kmFim":179670,"horaFim":"10:35","observacoes":"","kmPercorridos":24},{"id":"ROT-0487","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2026-06-03","pedidoPor":"Avelino","destino":"Soarauto","periodo":"M","carga":"6 paletes","condutor":"Avelino","kmInicio":182799,"horaInicio":"14:32","kmFim":182800,"horaFim":"14:57","observacoes":"","kmPercorridos":1},{"id":"ROT-0488","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2026-06-05","pedidoPor":"Elisabete","destino":"Bancos","periodo":"M","carga":"sem carga","condutor":"Elisabete","kmInicio":305291,"horaInicio":"12:20","kmFim":305301,"horaFim":"13:00","observacoes":"","kmPercorridos":10},{"id":"ROT-0489","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2026-06-05","pedidoPor":"Machado","destino":"Volta Amares","periodo":"m/t","carga":"sem carga","condutor":"Diana / Aguinaldo","kmInicio":179670,"horaInicio":"08:00","kmFim":179756,"horaFim":"14:00","observacoes":"","kmPercorridos":86},{"id":"ROT-0490","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2026-06-05","pedidoPor":"Machado","destino":"Barcelpeças","periodo":"Tarde","carga":"6 paletes","condutor":"Rui Bernardo","kmInicio":182800,"horaInicio":"15:10","kmFim":182853,"horaFim":"16:32","observacoes":"","kmPercorridos":53},{"id":"ROT-0491","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2026-06-06","pedidoPor":"Machado","destino":"Inovpeças","periodo":"M","carga":"6 paletes","condutor":"Rui Bernardo","kmInicio":182853,"horaInicio":"09:15","kmFim":182965,"horaFim":"10:55","observacoes":"","kmPercorridos":112},{"id":"ROT-0492","viatura":"Fiat Doblo","matricula":"52-PM-78","data":"2026-06-08","pedidoPor":"Machado","destino":"Ramoa","periodo":"Tarde","carga":"sem carga","condutor":"Machado","kmInicio":179756,"horaInicio":"13:00","kmFim":179764,"horaFim":"14:50","observacoes":"","kmPercorridos":8},{"id":"ROT-0493","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2026-06-08","pedidoPor":"Elisabete","destino":"Bancos","periodo":"Tarde","carga":"sem carga","condutor":"Elisabete","kmInicio":305301,"horaInicio":"14:30","kmFim":305313,"horaFim":"15:22","observacoes":"","kmPercorridos":12},{"id":"ROT-0494","viatura":"Toyota Prius","matricula":"05-QR-43","data":"2026-06-09","pedidoPor":"Machado","destino":"Ramoa","periodo":"Tarde","carga":"sem carga","condutor":"Micael","kmInicio":305301,"horaInicio":"14:38","kmFim":305312,"horaFim":"14:52","observacoes":"","kmPercorridos":11},{"id":"ROT-0495","viatura":"Mitsubishi canter","matricula":"27-OG-41","data":"2026-06-09","pedidoPor":"Machado","destino":"Barcelpeças","periodo":"Tarde","carga":"3 paletes","condutor":"Leonardo","kmInicio":182965,"horaInicio":"15:30","kmFim":183020,"horaFim":"16:58","observacoes":"","kmPercorridos":55}],
+	routes: [],
     followups: [],
     stock: [],
     contactGroups: []
@@ -5491,6 +8548,7 @@ function ensureBrandFavicon(){
 
 function updateGlobalSearchVisibility(pageId){
   const wrap = qs('#globalSearchWrap');
+  // A pesquisa do Dashboard tem um campo próprio integrado no portal.
   if(wrap) wrap.classList.toggle('hidden', pageId === 'dashboard');
 }
 function copyText(value){

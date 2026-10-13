@@ -1,0 +1,16 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Os utilizadores autorizados pela própria app podem trabalhar com
+    // os livros DOCX do catálogo. A validação fina de permissões continua
+    // a ser feita pela app antes do upload/remoção.
+    match /catalogo-motores/{motorId}/{fileName} {
+      allow read, write: if signedIn();
+    }
+  }
+}

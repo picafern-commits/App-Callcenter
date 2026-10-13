@@ -101,6 +101,13 @@ service cloud.firestore {
       allow delete: if canPage('fornecedores', 'delete');
     }
 
+    match /referenciasEmpresa/{document} {
+      allow read: if canPage('referencias', 'view');
+      allow create: if canPage('referencias', 'add');
+      allow update: if canPage('referencias', 'edit');
+      allow delete: if canPage('referencias', 'delete');
+    }
+
 
     match /viaturas/{document} {
       allow read: if canPage('rotas', 'view');
@@ -142,6 +149,27 @@ service cloud.firestore {
       allow create: if canPage('stock', 'add');
       allow update: if canPage('stock', 'edit');
       allow delete: if canPage('stock', 'delete');
+    }
+
+    match /catalogoMotor/{document} {
+      allow read: if canPage('catalogo-motor', 'view');
+      allow create: if canPage('catalogo-motor', 'add');
+      allow update: if canPage('catalogo-motor', 'edit');
+      allow delete: if canPage('catalogo-motor', 'delete');
+    }
+
+    match /catalogoMotores/{document} {
+      allow read: if canPage('catalogo-motor', 'view');
+      allow create: if canPage('catalogo-motor', 'add');
+      allow update: if canPage('catalogo-motor', 'edit');
+      allow delete: if canPage('catalogo-motor', 'delete');
+    }
+
+    match /catalogoTiposPeca/{document} {
+      allow read: if canPage('catalogo-motor', 'view');
+      allow create: if canPage('catalogo-motor', 'add');
+      allow update: if canPage('catalogo-motor', 'edit');
+      allow delete: if canPage('catalogo-motor', 'delete');
     }
 
     match /diretorioContactos/{document} {

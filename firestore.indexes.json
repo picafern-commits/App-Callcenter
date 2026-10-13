@@ -1,0 +1,25 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "referenciasEmpresa",
+      "fieldPath": "referencia",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "referenciasEmpresa",
+      "fieldPath": "familia",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "referenciasEmpresa",
+      "fieldPath": "marca",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "referenciasEmpresa",
+      "fieldPath": "descricao",
+      "indexes": []
+    }
+  ]
+}
