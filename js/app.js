@@ -1,4 +1,4 @@
-const APP_VERSION = '2.9.41';
+const APP_VERSION = '2.9.54';
 const STORAGE_KEY = 'bragalis_callcenter_v1';
 const SESSION_KEY = 'bragalis_callcenter_session';
 const THEME_KEY = 'bragalis_user_theme_v1';
@@ -1903,13 +1903,13 @@ function referencias(){
   return `<div class="grid single-list clean-module-page references-page">
     <div class="card clean-main-card">
       <div class="clean-page-head">
-        <div><span class="clean-eyebrow">Base da empresa</span><h3>Referências</h3><p class="muted">Base central de referências, famílias, marcas e descrições. A pesquisa consulta apenas os resultados necessários.</p></div>
+        <div><span class="clean-eyebrow">Base da empresa</span><h3>Referências</h3><p class="muted">Base central de referências, famílias, marcas e descrições. Pesquisa referências e edita várias descrições diretamente numa grelha.</p></div>
         <div class="clean-stats"><span><b id="referencesTotal">—</b> resultados</span><span><b id="referencesFamilies">—</b> famílias nos resultados</span></div>
       </div>
       <div class="reference-toolbar">
         <input id="referenceSearch" class="field" type="search" autocomplete="off" placeholder="Pesquisar por início da referência, família, marca ou descrição…" aria-label="Pesquisar referências">
         <button class="btn primary" id="referenceSearchBtn" type="button">Pesquisar</button>
-        ${canEdit ? '<button class="btn" type="button" data-create-entity="reference">+ Adicionar referência</button>' : '<span class="readonly-note">Modo leitura</span>'}
+        ${canEdit ? '<button class="btn" type="button" id="referenceQuickEditBtn">Editar descrições em grelha</button><button class="btn" type="button" data-create-entity="reference">+ Adicionar referência</button>' : '<span class="readonly-note">Modo leitura</span>'}
       </div>
       <p class="muted reference-search-help">A lista é carregada em páginas de 100 registos. A pesquisa por referência, família, marca ou descrição continua disponível e só é executada quando carregas em Pesquisar.</p>
       <div id="referencesTable"><div class="empty">A carregar a primeira página de referências…</div></div>
@@ -1957,6 +1957,10 @@ async function searchCompanyReferences(query){
   rows.sort((a,b)=>String(a.referencia||'').localeCompare(String(b.referencia||''),'pt',{numeric:true,sensitivity:'base'}));
   return rows;
 }
+function referencesQuickEditor(rows){
+  if(!rows.length) return '<div class="empty">Não há referências para editar nesta página.</div>';
+  return `<div class="reference-quick-editor"><div class="reference-quick-editor-head"><div><strong>Editor rápido de descrições</strong><p class="muted">Altera várias células e guarda tudo de uma vez. Só são gravadas as descrições que modificares.</p></div><div class="actions"><button class="btn ghost" type="button" id="referenceQuickCancel">Cancelar</button><button class="btn primary" type="button" id="referenceQuickSave">Guardar alterações</button></div></div><div class="table-wrap"><table class="references-table reference-edit-grid"><thead><tr><th>Referência</th><th>Família</th><th>Marca</th><th>Descrição atual</th><th>Nova descrição</th></tr></thead><tbody>${rows.map(r=>`<tr><td><strong>${esc(r.referencia||'-')}</strong></td><td>${esc(r.familia||'-')}</td><td>${esc(r.marca||'-')}</td><td class="reference-old-description">${esc(r.descricao||'')}</td><td><input class="field reference-description-edit" data-reference-description="${esc(r.id)}" data-original-description="${esc(r.descricao||'')}" value="${esc(r.descricao||'')}" aria-label="Nova descrição para ${esc(r.referencia||'referência')}"></td></tr>`).join('')}</tbody></table></div><p class="muted">Dica: podes copiar uma coluna de descrições do Excel e colar célula a célula nesta grelha.</p></div>`;
+}
 async function bindReferencesPage(){
   const input=qs('#referenceSearch');
   const table=qs('#referencesTable');
@@ -1979,6 +1983,67 @@ async function bindReferencesPage(){
     const button=event.target.closest('[data-copy-family-reference]');
     if(!button) return;
     copyText(button.dataset.copyFamilyReference || '');
+  });
+  let quickEditMode=false;
+  const renderCurrentRows=()=>{ if(table) table.innerHTML=quickEditMode?referencesQuickEditor(state.references||[]):referencesTable(state.references||[]); };
+  // Guardar a descrição da célula atual ao carregar Enter, sem obrigar a sair da grelha.
+  const saveQuickDescription=async field=>{
+    if(!field || field.dataset.saving==='true') return false;
+    const id=field.dataset.referenceDescription;
+    const original=field.dataset.originalDescription||'';
+    const descricao=field.value.trim();
+    if(descricao===original){field.value=original;return true;}
+    if(!firebaseReady||!firebaseDb){toast('Firebase não está disponível. A descrição não foi guardada.');return false;}
+    if(!canEditOperational('referencias')){toast('Sem permissão para editar referências.');return false;}
+    field.dataset.saving='true';
+    field.disabled=true;
+    try{
+      await firebaseDb.collection(FIREBASE_COLLECTIONS.references).doc(id).update({descricao,descricaoNorm:normalizeSearchText(descricao),updatedAt:new Date().toISOString()});
+      state.references=(state.references||[]).map(r=>r.id===id?{...r,descricao,descricaoNorm:normalizeSearchText(descricao),updatedAt:new Date().toISOString()}:r);
+      field.dataset.originalDescription=descricao;
+      const oldCell=field.closest('tr')?.querySelector('.reference-old-description');
+      if(oldCell) oldCell.textContent=descricao;
+      toast('Descrição guardada.');
+      return true;
+    }catch(err){
+      console.error('Quick reference description save failed',err);
+      toast('Não foi possível guardar a descrição. Verifica a ligação e as permissões do Firestore.');
+      return false;
+    }finally{
+      field.disabled=false;
+      delete field.dataset.saving;
+    }
+  };
+  table?.addEventListener('keydown',async event=>{
+    const field=event.target.closest('[data-reference-description]');
+    if(!field || event.key!=='Enter') return;
+    event.preventDefault();
+    event.stopPropagation();
+    const saved=await saveQuickDescription(field);
+    if(saved){
+      const fields=[...table.querySelectorAll('[data-reference-description]')];
+      const next=fields[fields.indexOf(field)+1];
+      if(next){next.focus();next.select();}
+    }
+  });
+  qs('#referenceQuickEditBtn')?.addEventListener('click',()=>{ if(!canEditOperational('referencias')) return toast('Sem permissão para editar referências.'); quickEditMode=!quickEditMode; const b=qs('#referenceQuickEditBtn'); if(b)b.textContent=quickEditMode?'Voltar à lista':'Editar descrições em grelha'; renderCurrentRows(); });
+  table?.addEventListener('click',async event=>{
+    if(event.target.closest('#referenceQuickCancel')){quickEditMode=false;const b=qs('#referenceQuickEditBtn');if(b)b.textContent='Editar descrições em grelha';renderCurrentRows();return;}
+    if(!event.target.closest('#referenceQuickSave')) return;
+    const inputs=[...table.querySelectorAll('[data-reference-description]')];
+    const edits=inputs.map(input=>({id:input.dataset.referenceDescription,original:input.dataset.originalDescription||'',descricao:input.value.trim()})).filter(x=>x.descricao!==x.original);
+    if(!edits.length){toast('Não há alterações para guardar.');return;}
+    if(!firebaseReady||!firebaseDb){toast('Firebase não está disponível. As alterações não foram guardadas.');return;}
+    const save=event.target.closest('#referenceQuickSave');save.disabled=true;save.textContent='A guardar…';
+    try{
+      const batch=firebaseDb.batch();
+      edits.forEach(item=>batch.update(firebaseDb.collection(FIREBASE_COLLECTIONS.references).doc(item.id),{descricao:item.descricao,descricaoNorm:normalizeSearchText(item.descricao),updatedAt:new Date().toISOString()}));
+      await batch.commit();
+      const byId=new Map(edits.map(x=>[x.id,x.descricao]));
+      state.references=(state.references||[]).map(r=>byId.has(r.id)?{...r,descricao:byId.get(r.id),descricaoNorm:normalizeSearchText(byId.get(r.id))}:r);
+      toast(`${edits.length} descrição(ões) guardada(s).`);quickEditMode=false;const b=qs('#referenceQuickEditBtn');if(b)b.textContent='Editar descrições em grelha';renderCurrentRows();
+    }catch(err){console.error('Bulk reference description save failed',err);toast('Não foi possível guardar. Verifica as permissões do Firestore.');}
+    finally{const current=qs('#referenceQuickSave');if(current){current.disabled=false;current.textContent='Guardar alterações';}}
   });
 
   const updateStats=(rows,totalLabel)=>{
@@ -6549,6 +6614,12 @@ async function importPageExcel(pageId, file){
   try {
     const rows = await readExcelRows(file);
     if(!rows.length) return toast('O ficheiro não tem linhas para importar.');
+    if(pageId === 'referencias'){
+      const result = await importReferenceDescriptions(rows, cfg);
+      renderPage(pageId);
+      toast(`Excel de referências: ${result.updated} descrição(ões) atualizada(s), ${result.unchanged} já iguais, ${result.notFound} referência(s) não encontrada(s), ${result.skipped} linha(s) sem descrição.`);
+      return;
+    }
     const normalized = normalizeImportedRows(rows, cfg);
     const count = applyImportedRows(pageId, cfg, normalized);
     const saved = saveState(`Importação Excel: ${cfg.title}`);
@@ -6561,6 +6632,58 @@ async function importPageExcel(pageId, file){
     toast(err?.message || 'Não consegui importar esse ficheiro Excel.');
   }
 }
+async function importReferenceDescriptions(rawRows, cfg){
+  if(!hasWritableFirebaseSession()) throw new Error('Importação bloqueada: entra com Firebase para gravar dados.');
+  const rows = normalizeImportedRows(rawRows, cfg);
+  if(!rows.length) throw new Error('Não encontrei linhas com Referência, Família, Marca ou Descrição reconhecíveis no Excel.');
+  const collection = firebaseDb.collection(FIREBASE_COLLECTIONS.references);
+  const snapshot = await collection.get();
+  const byKey = new Map();
+  snapshot.docs.forEach(doc=>{
+    const data = doc.data() || {};
+    const key = normalizeText(data.referencia || data.reference);
+    if(!key) return;
+    const brandKey = normalizeText(data.marca || data.brand);
+    const compound = `${key}||${brandKey}`;
+    if(!byKey.has(compound)) byKey.set(compound, []);
+    byKey.get(compound).push({doc, data});
+  });
+  const updates = new Map();
+  let unchanged = 0, notFound = 0, skipped = 0;
+  for(const row of rows){
+    const ref = String(row.referencia || '').trim();
+    const brand = String(row.marca || '').trim();
+    const description = String(row.descricao || '').trim();
+    if(!ref || !description){ skipped++; continue; }
+    const key = normalizeText(ref), brandKey = normalizeText(brand);
+    let matches = brandKey ? (byKey.get(`${key}||${brandKey}`) || []) : [];
+    if(!brandKey){
+      matches = snapshot.docs.map(doc=>({doc,data:doc.data()||{}})).filter(x=>normalizeText(x.data.referencia || x.data.reference)===key);
+    }
+    // Never guess if a reference is duplicated across brands.
+    if(matches.length !== 1){ notFound++; continue; }
+    const match = matches[0];
+    const oldDescription = String(match.data.descricao || '').trim();
+    if(oldDescription === description){ unchanged++; continue; }
+    updates.set(match.doc.id, {ref:match.doc, descricao:description});
+  }
+  let updated = 0;
+  const entries = Array.from(updates.values());
+  for(let offset=0; offset<entries.length; offset+=400){
+    const batch = firebaseDb.batch();
+    const chunk = entries.slice(offset, offset+400);
+    chunk.forEach(item=>batch.update(item.ref, {descricao:item.descricao, descricaoNorm:normalizeSearchText(item.descricao), updatedAt:new Date().toISOString()}));
+    await batch.commit();
+    updated += chunk.length;
+  }
+  if(updated){
+    const latest = new Map(entries.map(item=>[item.ref.id,item.descricao]));
+    state.references = (state.references || []).map(item=>latest.has(item.id) ? {...item, descricao:latest.get(item.id), descricaoNorm:normalizeSearchText(latest.get(item.id))} : item);
+    addAuditLog(`Importação Excel: descrições de referências (${updated} atualizadas)`, 'referencias', `Atualizadas ${updated}; iguais ${unchanged}; não encontradas/ambíguas ${notFound}; sem descrição ${skipped}`);
+  }
+  return {updated, unchanged, notFound, skipped};
+}
+
 async function readExcelRows(file){
   const ext = (file.name.split('.').pop() || '').toLowerCase();
   if(['csv','tsv','txt'].includes(ext)){

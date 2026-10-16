@@ -1,0 +1,16 @@
+PESQUISA DE DESCRIÇÕES — OSRAM
+
+Extraído do ficheiro Artigos_FINAL_referencia_sem_familia(2).xlsx.
+Total de referências OSRAM: 522.
+
+Estado nesta versão:
+- 2 referências com descrição confirmada em fonte oficial (OBAG900 e OBSL200).
+- 520 referências por pesquisar.
+
+IMPORTANTE: não foram inventadas descrições para as referências ainda não confirmadas. A descrição original foi preservada em todos os registos.
+
+Ficheiros:
+- OSRAM_522_referencias_pesquisa.csv: abre no Excel (separador ponto e vírgula).
+- OSRAM_522_referencias_pesquisa.json: versão estruturada para desenvolvimento.
+
+Esta pasta é material de trabalho de pesquisa. Não altera nem importa dados para o Firestore automaticamente; os dados partilhados da aplicação continuam intactos.

@@ -1,0 +1,4700 @@
+[
+  {
+    "Referencia": "OBAG900",
+    "Descricao_original": "ANALISADOR BATERIA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "Analisador profissional de baterias OSRAM BATTERYtest PRO.",
+    "Estado_pesquisa": "Confirmada em fonte oficial",
+    "Fonte_oficial": "https://www.osram.com/appsj/pdc/pdf.do?cid=GPS01_3760292&lid=EN&mpid=ZMP_4062827&vid=MP_EUROPE_Europe_eCat"
+  },
+  {
+    "Referencia": "510639",
+    "Descricao_original": "ARMARIO 12V OSRAM",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "510838",
+    "Descricao_original": "ARMARIO 24V OSRAM",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OBSL200",
+    "Descricao_original": "ARRANCADORES BATTERYSTART",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "Arrancador de lítio OSRAM BATTERYstart 200 para veículos de 12 V com motores a gasolina até 3 L, com bateria de 6000 mAh e função powerbank.",
+    "Estado_pesquisa": "Confirmada em fonte oficial",
+    "Fonte_oficial": "https://www.osram.com/ecat/BATTERYstart%20200-Dispositivo%20de%20Arranque%20de%20L%C3%ADtio-Cuidado%20da%20bateria-Autom%C3%B3vel/pt/pt/GPS01_3388040/ZMP_4062121/"
+  },
+  {
+    "Referencia": "OBSL260",
+    "Descricao_original": "ARRANCADORES BATTERYSTART",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OBSL300",
+    "Descricao_original": "ARRANCADORES BATTERYSTART",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OBSL360",
+    "Descricao_original": "ARRANCADORES BATTERYSTART",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OBSL400",
+    "Descricao_original": "ARRANCADORES BATTERYSTART",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OEBSPL700",
+    "Descricao_original": "ARRANCADORES BATTERYSTART",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OMM600",
+    "Descricao_original": "BAT.TEST PRO600 MULTIFU 12/24V",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OEBCS1002",
+    "Descricao_original": "BATTERYCHARGE 1002",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OEBCS1005",
+    "Descricao_original": "BATTERYCHARGE 1005",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OEBCS1010",
+    "Descricao_original": "BATTERYCHARGE 1010",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OEBCS405ESN",
+    "Descricao_original": "BATTERYCHARGE ESSENTIAL 405",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OSCP10024",
+    "Descricao_original": "BATTERYCHARGE PRO 100A",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OEBSPL1000",
+    "Descricao_original": "BATTERYSTART PRO 1000",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OSC500A",
+    "Descricao_original": "CABO ARR.BATTERYSTA 1200A",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OSC060",
+    "Descricao_original": "CABOS BATERIA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OSC101",
+    "Descricao_original": "CABOS BATERIA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OSC160",
+    "Descricao_original": "CABOS BATERIA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OSC250",
+    "Descricao_original": "CABOS BATERIA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OSC250A",
+    "Descricao_original": "CABOS BATERIA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OSC350",
+    "Descricao_original": "CABOS BATERIA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OSC350A",
+    "Descricao_original": "CABOS BATERIA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OSC500",
+    "Descricao_original": "CABOS BATERIA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OSCP3024",
+    "Descricao_original": "CABOS BATERIA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OSCP5024",
+    "Descricao_original": "CABOS BATERIA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OSCP60T",
+    "Descricao_original": "CABOS BATERIA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OSL500A",
+    "Descricao_original": "CABOS BATERIA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OCC11605",
+    "Descricao_original": "CABOS CARREGAMENTO VEICULOS ELETRICOS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OCC13205",
+    "Descricao_original": "CABOS CARREGAMENTO VEICULOS ELETRICOS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OCC21605",
+    "Descricao_original": "CABOS CARREGAMENTO VEICULOS ELETRICOS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OCC23205",
+    "Descricao_original": "CABOS CARREGAMENTO VEICULOS ELETRICOS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OCC23P05",
+    "Descricao_original": "CABOS CARREGAMENTO VEICULOS ELETRICOS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OPC10A05",
+    "Descricao_original": "CABOS CARREGAMENTO VEICULOS ELETRICOS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OPC20A05",
+    "Descricao_original": "CABOS CARREGAMENTO VEICULOS ELETRICOS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "ORSDC20",
+    "Descricao_original": "CÂMARAS BORDO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "ORSDC30",
+    "Descricao_original": "CÂMARAS BORDO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "ORSDC50",
+    "Descricao_original": "CÂMARAS BORDO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "ORSDCR10",
+    "Descricao_original": "CÂMARAS BORDO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OEBCS901",
+    "Descricao_original": "CARREGADOR BATERIA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OEBCS904",
+    "Descricao_original": "CARREGADOR BATERIA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OEBCS906",
+    "Descricao_original": "CARREGADOR BATERIA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OEBCS908",
+    "Descricao_original": "CARREGADOR BATERIA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OTI1000",
+    "Descricao_original": "COMPRESSORES PNEUS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OTI200",
+    "Descricao_original": "COMPRESSORES PNEUS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OTI450",
+    "Descricao_original": "COMPRESSORES PNEUS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OTI830",
+    "Descricao_original": "COMPRESSORES PNEUS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OTIC650",
+    "Descricao_original": "COMPRESSORES PNEUS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OTIR2000",
+    "Descricao_original": "COMPRESSORES PNEUS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OTIR6000",
+    "Descricao_original": "COMPRESSORES PNEUS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDDL114CBSM",
+    "Descricao_original": "FX1000-CB SM GEN 2 6000K, 140W",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL103",
+    "Descricao_original": "GAMBIARRA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL108",
+    "Descricao_original": "GAMBIARRA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9005CBN2HB",
+    "Descricao_original": "KIT LAMPADA HB3",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7507DC2BL",
+    "Descricao_original": "KIT LAMPADAS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9726CW",
+    "Descricao_original": "KIT LAMPADAS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150N2HB",
+    "Descricao_original": "KIT LAMPADAS H1 OSRAM",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150NL2HB",
+    "Descricao_original": "KIT LAMPADAS H1 OSRAM",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193NB2202HB",
+    "Descricao_original": "KIT LAMPADAS H4",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193NL2HB",
+    "Descricao_original": "KIT LAMPADAS H4",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210NB2202HB",
+    "Descricao_original": "KIT LAMPADAS H7",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "O64210CBN2HB",
+    "Descricao_original": "KIT LAMPADAS H7 OSRAM",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "O64210NBS2HB",
+    "Descricao_original": "KIT LAMPADAS H7 OSRAM",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "O64210NL2HB",
+    "Descricao_original": "KIT LAMPADAS H7 OSRAM",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OTSK6ESN",
+    "Descricao_original": "KIT PNEU + COMPRESSOR",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150DWESY2HB",
+    "Descricao_original": "LAMP-12-55 H1 P14,5S-LED",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64211CBN2HB",
+    "Descricao_original": "LAMP-12-55 H11 PGJ19-2 BLISTER",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9006CBN2HB",
+    "Descricao_original": "LAMP-12-55 HB4 P22d BLISTER",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210NL2HB",
+    "Descricao_original": "LAMP-12-55W H7 BLISTER",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150CBN2HB",
+    "Descricao_original": "LAMP-12V - 55W P14,5s BLISTER",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2825DRP02B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64151DWESY2HB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64176DWESY2HB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193CBN2HB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193DWESY2HB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193DWXTR",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193NB220",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193NB220HB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210DWESY",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210DWESY2HB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210DWXTR",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210NB220",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "642121BL",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66140XNN",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "75052BL",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2351MFX6",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2352MFX6",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2452MFX6",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2473MFX6",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2504",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2721",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2721MF",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2721MF8",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2721MFX",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2722",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2722MF",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2723",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2741",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2741MF",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2741MF8",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2820",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2821",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2825",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2825HCBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2825ULT",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2827NA",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2841",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2845",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2850CW02B",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2886X",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "3156",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "3157",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "3796",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "3797",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "3850CW02B",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "3860",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "3886X",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "3893",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "3930",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "5007",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "5007ULT",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "5008",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "5008ULT",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "5009",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "5626",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "5627",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "5627TSP",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "5637",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "62200SBP",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "62201SBP",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "62204SBP",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "62261SBP",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6411",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64111",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64113",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64115",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6413",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64132",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64132CB",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64132ULT",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64136",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64137ULT",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64138",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150CBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150CBN",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150D",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150NBU",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150NL",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150SUP",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150SV2",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150SVS",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150ULT",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64151",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64151CB",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64151CBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64151NBR",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64151NBU",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64151NL",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64152",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64152SB",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64153",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64153SB",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64155",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64156",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64173",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64175",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64176",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64176CBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6418",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64183",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64185",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6418ULT",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193ALS",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193CBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193CBN",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193CLC",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193D",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193NBL",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193NBU",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193NL",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193SV2",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193ULT",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64194",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64194SB",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64196",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64198",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64198SB",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64199",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64199SB",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64203",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210CBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210CBN",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210CLC",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210D",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210NBL",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210NBS",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210NBU",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210NL",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210SV2",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210ULT",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64211",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64211CBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64211CBN",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64211CBNHCB",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64211NBU",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64211NL",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64211SV2",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64211ULT",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64212",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6421201B",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64213",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64215",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64219CBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64219L+",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6423",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6424",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64241",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64242",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64243",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6428",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6429",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6430",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6438",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64427S",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6453",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6461",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6486X",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66140",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66140CBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66140CBN",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66140CLC",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66140ULT",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66140XNB",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66150",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66150CBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66240",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66240CBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66240CLC",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66240ULT",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66250",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66250CBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66340",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66340CBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66340CLC",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66340ULT",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66340XNL",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66350",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66440",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66440CBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66440CLC",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66440ULT",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66440XNB",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66450",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66540",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66548",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "69005SBP",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "69006SBP",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7225",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7351",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7504",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7505",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7506",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7506ULT",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7507",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7507DC02B",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7507LDA",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7507LDA02B",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7507ULT",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7510",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7510TSP",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7511",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7515",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7528",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7528ULT",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7537",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7951",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "880",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "880CBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "881",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "881CBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9005",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9005CB",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9005CBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9005XS",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9006",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9006CB",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9006CBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9006CBIHCB",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9006XS",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9007",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9008",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9011",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9012",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9012CBI",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9145",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "921",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "921NA",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "94193HD",
+    "Descricao_original": "LÂMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2341",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "272102B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "272202B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2722MFX",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2741MFX",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "282102B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "282502B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2825HCBN",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2825HCBN02B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2825ULT02B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2827DC02B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2827NA02B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2840",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "284102B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "284502B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2845TSP",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "3757AK",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "389302B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "393002B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "3930TSP",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "500702B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "5007ULT02B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "500802B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "5008ULT02B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "5009NA",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "5201",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "5202",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "562702B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "563702B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "5637TSP",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "62150CBBHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "62193CBBHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "62210CBBHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "62211CBBHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "641102B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6411102B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64132ULT02B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6415001B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150CBN01B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150CBNHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150NBS",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150NBS01B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150NBSHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150NL01B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150NLHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150ULT01B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150ULTHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6415101B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64151NLHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6415501B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64155TSP",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64155TSPHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6415601B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64156TSP",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64176CBN",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64176CBNHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64177",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "641802B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64180L",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64181L",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6418301B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6418501",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6418ULT02B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6419301B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193CBN01B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193CBNHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193NB200",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193NBS",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193NBS01B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193NBSHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193NL01B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193NLHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193ULT01B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193ULTHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6419601B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64196TSP",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64196TSPHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6421",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6421001B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210CBN01B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210CBNHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210NB200",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210NBS01B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210NBSHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210NL01B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210NLHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210ULT01B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210ULTHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6421101B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64211NBS",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64211NBSHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64211NL01B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64211NLHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64211ULT01B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64211ULTHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64212CBNHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64212NL",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64212NLHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6421501B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64215TSP",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64215TSPHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64216TSP",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64216TSPHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "642302B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64326",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64327",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6432701B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "643802B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "661401SCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66140CBBHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66140CBNHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66140ULTHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66140XNL",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66140XNLHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "662401SCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66240CBBHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66240CBNHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66240ULTHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66240XNL",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66240XNLHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6624CBN",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66250CBN",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "663401SCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66340CBBHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66340CBN",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66340CBNHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66340XNLHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "664401SCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66440CBBHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66440CBN",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66440CBNHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66440ULTHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66440XNL",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66440XNLHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66548CBN",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6851",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "722502B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "750502B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "750602B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7506ULT02B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "750702B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7507ULT02B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "751102B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7511TSP",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "751502B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "752802B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7528ULT02B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7529",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "753702B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7537TSP",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "828",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "900501B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9005CBNHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9005NL",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9005NLHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "900601B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9006CBNHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9006NL",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9006NLHCB",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "901201B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9012CBN",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "92102B",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "94196",
+    "Descricao_original": "LAMPADA",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2431MFX6",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2722MF8",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "2827",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150CB",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150NBP",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64150NBR",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64151NBP",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193CB",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193NBP",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64193SVS",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64204SB",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210CB",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210NBP",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64210SVS",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64211D",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "64211NBP",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6475",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "6498CW01B",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66142",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66144",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66240XNB",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66340XNB",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "7327",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9145RD",
+    "Descricao_original": "LAMPADA AUTO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "66154",
+    "Descricao_original": "LAMPADA D1R D1RV 35W",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "9003L",
+    "Descricao_original": "LAMPADA HB2 12V 60W",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL203",
+    "Descricao_original": "LANTERNA LED",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL424",
+    "Descricao_original": "LEDINSPECT DUAL CHARGE PAD",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL423",
+    "Descricao_original": "LEDINSPECT SINGLE CHARGE PAD",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL426",
+    "Descricao_original": "LEDINSPECT TASK 180 ESSENTIAL",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL421",
+    "Descricao_original": "LEDINSPECT WIRE-FREE PRO 600",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL422",
+    "Descricao_original": "LEDINSPECT WIRE-FREE SLIM 600",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDINT106",
+    "Descricao_original": "LUZ INTERIOR HABITACULO PORTATIL",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDSL105",
+    "Descricao_original": "LUZ LED AVISO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDSL102",
+    "Descricao_original": "LUZES LED AVISO",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL104",
+    "Descricao_original": "LUZES LED DE INSPECAO LEDINSPECT",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL401",
+    "Descricao_original": "LUZES LED DE INSPECAO LEDINSPECT",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL402",
+    "Descricao_original": "LUZES LED DE INSPECAO LEDINSPECT",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL403",
+    "Descricao_original": "LUZES LED DE INSPECAO LEDINSPECT",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL404",
+    "Descricao_original": "LUZES LED DE INSPECAO LEDINSPECT",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL405",
+    "Descricao_original": "LUZES LED DE INSPECAO LEDINSPECT",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL406",
+    "Descricao_original": "LUZES LED DE INSPECAO LEDINSPECT",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL407",
+    "Descricao_original": "LUZES LED DE INSPECAO LEDINSPECT",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL408",
+    "Descricao_original": "LUZES LED DE INSPECAO LEDINSPECT",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL409",
+    "Descricao_original": "LUZES LED DE INSPECAO LEDINSPECT",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL410",
+    "Descricao_original": "LUZES LED DE INSPECAO LEDINSPECT",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL411",
+    "Descricao_original": "LUZES LED DE INSPECAO LEDINSPECT",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL412",
+    "Descricao_original": "LUZES LED DE INSPECAO LEDINSPECT",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL413",
+    "Descricao_original": "LUZES LED DE INSPECAO LEDINSPECT",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL414",
+    "Descricao_original": "LUZES LED DE INSPECAO LEDINSPECT",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "LEDIL415",
+    "Descricao_original": "LUZES LED DE INSPECAO LEDINSPECT",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "510737",
+    "Descricao_original": "PACOTE LAMPADAS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "510738",
+    "Descricao_original": "PACOTE LAMPADAS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OTS4502ESN",
+    "Descricao_original": "SELANTE KIT EMERGENCIA OSRAM",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OTSB450",
+    "Descricao_original": "SELANTE PNEUS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OTSK4",
+    "Descricao_original": "SELANTE PNEUS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  },
+  {
+    "Referencia": "OTIR4000",
+    "Descricao_original": "TYREINFLATE 4000COMPRES.S/FIOS",
+    "Marca": "OSRAM",
+    "Familia": "67",
+    "Descricao_pesquisada": "",
+    "Estado_pesquisa": "Por pesquisar",
+    "Fonte_oficial": ""
+  }
+]
